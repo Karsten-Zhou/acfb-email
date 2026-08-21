@@ -306,9 +306,8 @@ export class ImapClient {
     cc: { name: string | null; address: string | null }[];
     messageId: string | null;
   } | null {
-    const envMatch = /ENVELOPE\((.*)\)\s*$/.exec(body);
-    if (!envMatch) return null;
-    const envBody = envMatch[1];
+    const envBody = extractBalanced(body, "ENVELOPE(");
+    if (envBody === null) return null;
     const parts = splitTopLevel(envBody);
     // env: (date subject from sender reply-to to cc bcc in-reply-to message-id)
     if (parts.length < 10) return null;
@@ -433,6 +432,31 @@ export function splitTopLevel(s: string): string[] {
   }
   if (cur.length) out.push(cur);
   return out;
+}
+
+/**
+ * Given `text` containing `prefix` (e.g. "ENVELOPE("), return the substring
+ * inside the matching balanced parentheses, or null if not found/mismatched.
+ * Respects quoted strings (spaces and parens inside quotes are not structural).
+ */
+export function extractBalanced(text: string, prefix: string): string | null {
+  const start = text.indexOf(prefix);
+  if (start < 0) return null;
+  let depth = 0;
+  let inQuote = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' && text[i - 1] !== "\\") inQuote = !inQuote;
+    if (inQuote) continue;
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) {
+        return text.slice(start + prefix.length, i);
+      }
+    }
+  }
+  return null;
 }
 
 export function unquote(s: string): string | null {

@@ -1,7 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { splitTopLevel, unquote, decodeMimeWord, parseAddressList } from "./client";
+import { splitTopLevel, unquote, decodeMimeWord, parseAddressList, extractBalanced } from "./client";
 
 describe("IMAP ENVELOPE parsing helpers", () => {
+  it("extracts balanced ENVELOPE content from the middle of a line", () => {
+    // ENVELOPE is not at end-of-line: more fields follow before the final ).
+    const line =
+      '1 FETCH (UID 7 FLAGS (\\Seen) RFC822.SIZE 1234 INTERNALDATE "21-Feb-2026 09:30:00 +0000" ENVELOPE("Sat, 21 Feb 2026 09:30:00 +0000" "Hello" (("Alice" NIL "alice" "example.com")) NIL NIL (("Bob" NIL "bob" "other.org")) NIL NIL NIL "msg@id") BODY[HEADER.FIELDS (DATE)] "x")';
+    const env = extractBalanced(line, "ENVELOPE(");
+    expect(env).not.toBeNull();
+    const parts = splitTopLevel(env as string);
+    expect(parts).toHaveLength(10);
+    expect(unquote(parts[1])).toBe("Hello");
+    const from = parseAddressList(parts[2]);
+    expect(from[0]?.address).toBe("alice@example.com");
+  });
+
   it("splits top-level parenthesized tokens", () => {
     const s = '"date" "subject" NIL ("From Name" NIL "from" "example.com") NIL NIL NIL NIL NIL "msg@id"';
     const parts = splitTopLevel(s);

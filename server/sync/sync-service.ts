@@ -8,6 +8,7 @@
 import { randomUUID } from "crypto";
 import { buildProvider } from "../email/providers";
 import { roleFromImapName, roleSortOrder } from "../email/providers/role-map";
+import { decodeModifiedUtf7 } from "../email/imap/modified-utf7";
 import type { ProviderMessage } from "../email/providers/types";
 import type { Env } from "../env";
 
@@ -47,7 +48,7 @@ export async function syncAccount(
   await setAccountState(env, accountId, "running", null);
 
   const timeBudgetMs = parseInt(env.SYNC_TIMEOUT_MS ?? "", 10) || 45_000;
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error("sync_timeout")), timeBudgetMs);
   });
@@ -74,7 +75,7 @@ export async function syncAccount(
     })();
 
     const result = await Promise.race([work, timeout]);
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
 
     // Update account sync timestamp.
     const now = new Date().toISOString();
@@ -91,7 +92,7 @@ export async function syncAccount(
 
     return result;
   } catch (err) {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
     const message = err instanceof Error && err.message === "sync_timeout"
       ? "Synchronization timed out. The mail server may be slow or unreachable."
       : classifyError(err);
@@ -254,13 +255,16 @@ async function upsertMailbox(
   if (existing) return existing;
 
   const id = randomUUID();
-  const role = roleFromImapName(path, []);
+  // Decode IMAP modified-UTF-7 folder names (non-ASCII) for display; the raw
+  // provider_path is kept for IMAP commands.
+  const displayName = decodeModifiedUtf7(path);
+  const role = roleFromImapName(displayName, []);
   const sortOrder = roleSortOrder(role);
   await env.DB.prepare(
     `INSERT INTO mailboxes (id, account_id, name, role, provider_path, sort_order)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(id, accountId, path, role, path, sortOrder)
+    .bind(id, accountId, displayName, role, path, sortOrder)
     .run();
   return { id };
 }
