@@ -11,4 +11,5 @@ export interface Env {
   APP_URL: string;
   SESSION_DAYS: string;
   SYNC_FETCH_LIMIT: string;
+  SYNC_TIMEOUT_MS: string;
 }

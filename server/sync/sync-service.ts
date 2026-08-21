@@ -32,6 +32,10 @@ interface CredRow {
 
 /**
  * Synchronize one account's mailboxes. Returns a summary that can be surfaced.
+ *
+ * Guarantees: the account's `state` column always leaves "running" — either to
+ * "healthy" or to "unavailable" — even if a provider socket hangs, by racing
+ * the sync against a hard time budget.
  */
 export async function syncAccount(
   env: Env,
@@ -42,23 +46,35 @@ export async function syncAccount(
 
   await setAccountState(env, accountId, "running", null);
 
+  const timeBudgetMs = parseInt(env.SYNC_TIMEOUT_MS ?? "", 10) || 45_000;
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("sync_timeout")), timeBudgetMs);
+  });
+
   try {
-    const credential = await getCredential(env, accountId);
-    const provider = await buildProvider(
-      account,
-      credential ? { credential: credential.credential } : null,
-      env,
-    );
+    const work = (async () => {
+      const credential = await getCredential(env, accountId);
+      const provider = await buildProvider(
+        account,
+        credential ? { credential: credential.credential } : null,
+        env,
+      );
 
-    const mailboxes = await provider.listMailboxes();
-    let mailboxesSynced = 0;
-    let messagesSeen = 0;
+      const mailboxes = await provider.listMailboxes();
+      let mailboxesSynced = 0;
+      let messagesSeen = 0;
 
-    for (const mb of mailboxes) {
-      const result = await syncOneMailbox(env, provider, account, mb.name);
-      mailboxesSynced += result.synced ? 1 : 0;
-      messagesSeen += result.seen;
-    }
+      for (const mb of mailboxes) {
+        const result = await syncOneMailbox(env, provider, account, mb.name);
+        mailboxesSynced += result.synced ? 1 : 0;
+        messagesSeen += result.seen;
+      }
+      return { mailboxesSynced, messagesSeen };
+    })();
+
+    const result = await Promise.race([work, timeout]);
+    clearTimeout(timer);
 
     // Update account sync timestamp.
     const now = new Date().toISOString();
@@ -73,9 +89,12 @@ export async function syncAccount(
       .bind(accountId)
       .run();
 
-    return { mailboxesSynced, messagesSeen };
+    return result;
   } catch (err) {
-    const message = classifyError(err);
+    clearTimeout(timer);
+    const message = err instanceof Error && err.message === "sync_timeout"
+      ? "Synchronization timed out. The mail server may be slow or unreachable."
+      : classifyError(err);
     await setAccountState(env, accountId, "unavailable", message);
     await env.DB.prepare(
       `UPDATE sync_state SET state = 'error', last_error = ?, error_count = error_count + 1 WHERE account_id = ?`,

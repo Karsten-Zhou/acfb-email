@@ -21,6 +21,11 @@ export default defineConfig({
       "@shared": fileURLToPath(new URL("./shared", import.meta.url)),
     },
   },
+  server: {
+    // The @vitejs/plugin-vue HMR integration with the Cloudflare plugin can
+    // trigger a false-positive dev overlay on file edits; disable the overlay.
+    hmr: { overlay: false },
+  },
   test: {
     // Vitest config for the workers pool is defined in vitest.config.ts
   },

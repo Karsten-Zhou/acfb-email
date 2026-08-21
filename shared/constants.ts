@@ -9,6 +9,7 @@ export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
 export const ACCOUNT_STATES = [
   "healthy",
+  "running", // transient: a sync is in progress
   "unavailable",
   "auth_required",
   "invalid_config",

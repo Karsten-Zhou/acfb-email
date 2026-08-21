@@ -21,6 +21,7 @@
   "vars": {
     "APP_URL": "http://localhost:5173",
     "SESSION_DAYS": "7",
-    "SYNC_FETCH_LIMIT": "100"
+    "SYNC_FETCH_LIMIT": "100",
+    "SYNC_TIMEOUT_MS": "45000"
   }
 }
