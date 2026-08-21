@@ -142,12 +142,16 @@ function formatDate(iso: string): string {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
+
+// About
+const appVersion = __APP_VERSION__;
+const appBuildTime = __APP_BUILD_TIME__;
 </script>
 
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
-      <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'mailbox' })" :title="t('settings')">
+      <Button variant="ghost" size="icon" class="h-8 w-8" :title="t('settings')" @click="router.push({ name: 'mailbox' })">
         <ChevronLeft class="h-4 w-4" />
       </Button>
       <h1 class="text-sm font-semibold">{{ t('settings') }}</h1>
@@ -325,24 +329,24 @@ function formatDate(iso: string): string {
                 <button
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
                   :class="themeValue === 'light' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
-                  @click="themeValue = 'light'"
                   :title="t('themeLight')"
+                  @click="themeValue = 'light'"
                 >
                   <Sun class="h-3.5 w-3.5" /> {{ t('themeLight') }}
                 </button>
                 <button
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
                   :class="themeValue === 'dark' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
-                  @click="themeValue = 'dark'"
                   :title="t('themeDark')"
+                  @click="themeValue = 'dark'"
                 >
                   <Moon class="h-3.5 w-3.5" /> {{ t('themeDark') }}
                 </button>
                 <button
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
                   :class="themeValue === 'auto' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
-                  @click="themeValue = 'auto'"
                   :title="t('themeAuto')"
+                  @click="themeValue = 'auto'"
                 >
                   <Monitor class="h-3.5 w-3.5" /> {{ t('themeAuto') }}
                 </button>
@@ -358,8 +362,8 @@ function formatDate(iso: string): string {
           </h2>
           <dl class="space-y-1.5 text-sm">
             <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('appName') }}</dt><dd class="font-medium">Cloudflare Email Client</dd></div>
-            <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('version') }}</dt><dd class="font-medium">{{ meta?.version || '0.1.0' }}</dd></div>
-            <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('buildTime') }}</dt><dd class="font-medium">{{ meta?.buildTime ? new Date(meta.buildTime).toLocaleString() : '—' }}</dd></div>
+            <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('version') }}</dt><dd class="font-medium">{{ appVersion }}</dd></div>
+            <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('buildTime') }}</dt><dd class="font-medium">{{ new Date(appBuildTime).toLocaleString() }}</dd></div>
           </dl>
           <a
             v-if="meta?.repo"
