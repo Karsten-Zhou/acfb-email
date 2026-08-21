@@ -5,7 +5,10 @@ import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import { openMessage, updateFlags, deleteMessages } from "../stores/mail";
 import { t } from "../lib/i18n";
-import { Star, Trash2, Reply, ChevronLeft, Paperclip, MailOpen } from "lucide-vue-next";
+import UiButton from "../components/UiButton.vue";
+import UiToolTip from "../components/UiToolTip.vue";
+import UiDialog from "../components/UiDialog.vue";
+import { Star, Trash2, Reply, ChevronLeft, Paperclip, MailOpen, Loader2 } from "lucide-vue-next";
 import type { MessageDetail } from "@shared/types";
 
 const route = useRoute();
@@ -71,38 +74,33 @@ function formatDate(iso: string): string {
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="flex items-center gap-1 border-b border-border bg-card px-2 py-2">
-      <button class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" :aria-label="t('content')" @click="router.back()">
-        <ChevronLeft class="h-5 w-5" />
-      </button>
+      <UiToolTip :label="t('back')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
+          <ChevronLeft class="h-5 w-5" />
+        </UiButton>
+      </UiToolTip>
       <div class="flex-1" />
-      <button class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" :aria-label="t('reply')" @click="reply">
-        <Reply class="h-5 w-5" />
-      </button>
-      <button class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" :aria-label="t('star')" @click="toggleStar">
-        <Star class="h-5 w-5" :class="msg?.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
-      </button>
-      <button class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" :aria-label="t('markRead')" @click="toggleRead">
-        <MailOpen class="h-5 w-5" />
-      </button>
-      <button class="rounded-md p-2 text-muted-foreground hover:bg-destructive hover:text-white" :aria-label="t('delete')" @click="askDelete">
-        <Trash2 class="h-5 w-5" />
-      </button>
+      <UiToolTip :label="t('reply')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="reply">
+          <Reply class="h-5 w-5" />
+        </UiButton>
+      </UiToolTip>
+      <UiToolTip :label="t('star')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="toggleStar">
+          <Star class="h-5 w-5" :class="msg?.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
+        </UiButton>
+      </UiToolTip>
+      <UiToolTip :label="msg?.isRead ? t('markUnread') : t('markRead')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="toggleRead">
+          <MailOpen class="h-5 w-5" />
+        </UiButton>
+      </UiToolTip>
+      <UiToolTip :label="t('delete')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white" @click="askDelete">
+          <Trash2 class="h-5 w-5" />
+        </UiButton>
+      </UiToolTip>
     </header>
-
-    <!-- delete confirm -->
-    <div v-if="confirmDelete" class="border-b border-border bg-card px-4 py-3">
-      <p class="text-sm">{{ t('confirmDeleteMessages') }}</p>
-      <div class="mt-2 flex gap-2">
-        <button
-          class="inline-flex h-8 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground disabled:opacity-50"
-          :disabled="deleting"
-          @click="remove"
-        >
-          {{ deleting ? '…' : t('ok') }}
-        </button>
-        <button class="rounded-md px-3 py-1 text-xs text-muted-foreground hover:bg-accent" @click="confirmDelete = false">{{ t('cancelAction') }}</button>
-      </div>
-    </div>
 
     <main class="flex-1 overflow-y-auto p-4">
       <div v-if="loading" class="py-10 text-center text-sm text-muted-foreground">{{ t('content') }}…</div>
@@ -121,7 +119,7 @@ function formatDate(iso: string): string {
         </div>
 
         <div v-if="msg.to.length" class="mt-2 text-xs text-muted-foreground">
-          To: <span v-for="(t, i) in msg.to" :key="i">{{ t.name || t.address }}<span v-if="i < msg.to.length - 1">, </span></span>
+          To: <span v-for="(recip, i) in msg.to" :key="i">{{ recip.name || recip.address }}<span v-if="i < msg.to.length - 1">, </span></span>
         </div>
 
         <div v-if="msg.attachments?.length" class="mt-3 flex flex-wrap gap-2">
@@ -134,5 +132,21 @@ function formatDate(iso: string): string {
         <div class="email-body mt-5 text-[15px]" v-html="sanitizeHtml(msg.html || msg.text || '')" /><!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
       </template>
     </main>
+
+    <!-- Modal delete confirmation -->
+    <UiDialog
+      :open="confirmDelete"
+      :title="t('confirmDeleteMessages')"
+      :busy="deleting"
+      @close="confirmDelete = false"
+    >
+      <p class="text-sm text-muted-foreground">{{ t('confirmDeleteMessages') }}</p>
+      <template #footer>
+        <UiButton variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{ t('cancelAction') }}</UiButton>
+        <UiButton variant="destructive" size="sm" :disabled="deleting" @click="remove">
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t('ok') }}
+        </UiButton>
+      </template>
+    </UiDialog>
   </div>
 </template>

@@ -137,7 +137,4 @@ export interface HealthPayload {
     outlookOauth: boolean;
     githubOauth: boolean;
   };
-  version: string;
-  buildTime: string;
-  repo: string;
 }

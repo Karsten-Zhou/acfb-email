@@ -58,37 +58,76 @@ interface Response {
 /**
  * A low-level reader that handles CRLF lines AND {n} literals, so that
  * FETCH BODY[...] responses with literal payloads can be captured.
+ *
+ * IMPORTANT: all counting happens on RAW BYTES. Literal sizes (`{n}`) are
+ * byte counts, but `TextDecoder`→string length is UTF-16 code units, so a
+ * multi-byte (UTF-8/GBK…) literal would desync the reader and hang on the
+ * tagged completion line. We therefore keep a byte buffer and only decode
+ * line data back to text.
  */
-class WireReader {
-  private buffer = "";
+export class WireReader {
+  /** Pending raw bytes not yet consumed by a line or literal. */
+  private bytes = new Uint8Array(0);
+  /** Bytes still owed by an announced but not-yet-read literal. */
   private need = 0;
   private literalBytes: Uint8Array[] = [];
 
   constructor(private reader: ReadableStreamDefaultReader<Uint8Array>) {}
 
-  /** Read one logical line, absorbing embedded literals into `literals`. */
+  /** Append raw socket bytes to the internal buffer. */
+  private async fill(): Promise<boolean> {
+    const { value, done } = await this.reader.read();
+    if (done) return false;
+    if (value && value.byteLength > 0) {
+      const next = new Uint8Array(this.bytes.byteLength + value.byteLength);
+      next.set(this.bytes, 0);
+      next.set(value, this.bytes.byteLength);
+      this.bytes = next;
+    }
+    return true;
+  }
+
+  /** Find CRLF in the raw buffer; -1 if not present yet. */
+  private findCrlf(from = 0): number {
+    for (let i = from; i + 1 < this.bytes.length; i++) {
+      if (this.bytes[i] === 13 && this.bytes[i + 1] === 10) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Read one logical line, absorbing embedded literals into `literals`.
+   * Lines are returned as decoded ASCII/UTF-8 text; literals stay raw bytes.
+   */
   async readLine(): Promise<string | null> {
     while (true) {
       if (this.need > 0) {
-        // A literal was announced; consume its bytes before continuing the line.
-        while (this.buffer.length < this.need) {
-          const { value, done } = await this.reader.read();
-          if (done) break;
-          this.buffer += new TextDecoder().decode(value);
+        // Consume exactly `need` bytes (may span multiple socket chunks).
+        while (this.bytes.byteLength < this.need && (await this.fill())) {
+          /* loop */
         }
-        const take = Math.min(this.need, this.buffer.length);
-        const chunk = this.buffer.slice(0, take);
-        this.buffer = this.buffer.slice(take);
+        const take = Math.min(this.need, this.bytes.byteLength);
+        const literal = new Uint8Array(take);
+        literal.set(this.bytes.subarray(0, take));
+        this.bytes = this.bytes.subarray(take);
         this.need -= take;
-        this.literalBytes.push(new TextEncoder().encode(chunk));
-        if (this.need > 0) continue;
+        this.literalBytes.push(literal);
+        if (this.need > 0) return null; // stream ended mid-literal (rare)
         continue;
       }
 
-      const idx = this.buffer.indexOf("\r\n");
+      // Look for a complete line in the raw buffer.
+      let idx = this.findCrlf();
+      // If no CRLF yet but we have data that could be the tail (e.g. a
+      // literal-less line ending without newline), wait for more data.
+      while (idx < 0) {
+        if (!(await this.fill())) break;
+        idx = this.findCrlf();
+      }
       if (idx >= 0) {
-        const line = this.buffer.slice(0, idx);
-        this.buffer = this.buffer.slice(idx + 2);
+        const raw = this.bytes.subarray(0, idx);
+        const line = new TextDecoder().decode(raw);
+        this.bytes = this.bytes.subarray(idx + 2);
         // If this line announces a literal, remember it.
         const lit = /\{(\d+)\}$/.exec(line);
         if (lit) {
@@ -96,15 +135,11 @@ class WireReader {
         }
         return line;
       }
-
-      const { value, done } = await this.reader.read();
-      if (done) {
-        if (this.buffer.length === 0) return null;
-        const line = this.buffer;
-        this.buffer = "";
-        return line;
-      }
-      this.buffer += new TextDecoder().decode(value);
+      // No CRLF and source ended.
+      if (this.bytes.byteLength === 0) return null;
+      const tail = new TextDecoder().decode(this.bytes);
+      this.bytes = new Uint8Array(0);
+      return tail.length > 0 ? tail : null;
     }
   }
 

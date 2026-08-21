@@ -8,7 +8,6 @@
   "compilerOptions": {
     // Alias resolution for the editor's inferred "solution" project so
     // routes/imports resolve even if the referenced projects aren't loaded.
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@shared/*": ["./shared/*"],

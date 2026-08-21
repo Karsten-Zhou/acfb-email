@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { splitTopLevel, unquote, decodeMimeWord, parseAddressList, extractBalanced, parseHeaderText, parseAddressListBySemicolon } from "./client";
+import {
+  splitTopLevel,
+  unquote,
+  decodeMimeWord,
+  parseAddressList,
+  extractBalanced,
+  parseHeaderText,
+  parseAddressListBySemicolon,
+  WireReader,
+} from "./client";
 
 describe("IMAP raw-header parsing", () => {
   it("parses standard headers incl. folded continuation", () => {
@@ -75,5 +84,68 @@ describe("IMAP ENVELOPE parsing helpers", () => {
   it("decodes base64 display names with non-ascii", () => {
     const name = decodeMimeWord("=?utf-8?B?44Ko44Od44K544Kr44O844OJ?=");
     expect(name).toBe("エポスカード");
+  });
+});
+
+/** Build a ReadableStream that enqueues raw byte chunks from an IMAP exchange. */
+function streamFromChunks(chunks: (string | Uint8Array)[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const c of chunks) {
+        controller.enqueue(typeof c === "string" ? enc.encode(c) : c);
+      }
+      controller.close();
+    },
+  });
+}
+
+describe("WireReader (byte-accurate literal parsing)", () => {
+  it("returns lines and literals in order for an ASCII literal", async () => {
+    const body = new TextEncoder().encode("Subject: Hello\r\n\r\nBody");
+    const reader = new WireReader(
+      streamFromChunks([
+        `* 1 FETCH (UID 42 BODY[] {${body.byteLength}}\r\n`,
+        body,
+        ")\r\nA1 OK FETCH completed\r\n",
+      ]).getReader(),
+    );
+    const lines: string[] = [];
+    let line: string | null;
+    while ((line = await reader.readLine()) !== null) lines.push(line);
+    const lits = reader.takeLiterals();
+    expect(lines).toEqual(["* 1 FETCH (UID 42 BODY[] {22}", ")", "A1 OK FETCH completed"]);
+    expect(lits.reduce((a, b) => a + b.byteLength, 0)).toBe(22);
+    expect(new TextDecoder().decode(lits[0])).toBe("Subject: Hello\r\n\r\nBody");
+  });
+
+  it("handles a multi-byte (UTF-8) literal split across chunk boundaries", async () => {
+    const body = new TextEncoder().encode("连接到 Microsoft 帐户的新应用 你好 world 中文内容");
+    // Split mid multi-byte sequence to simulate real socket chunking.
+    const a = body.slice(0, 17);
+    const b = body.slice(17, 40);
+    const c = body.slice(40);
+    const reader = new WireReader(
+      streamFromChunks([
+        `* 5365 FETCH (UID 5365 BODY[] {${body.byteLength}}\r\n`,
+        a,
+        b,
+        c,
+        ")\r\nA1 OK FETCH completed\r\n",
+      ]).getReader(),
+    );
+    const lines: string[] = [];
+    let line: string | null;
+    while ((line = await reader.readLine()) !== null) lines.push(line);
+    const lits = reader.takeLiterals();
+    expect(lines[lines.length - 1]).toBe("A1 OK FETCH completed");
+    const gotLen = lits.reduce((x, y) => x + y.byteLength, 0);
+    expect(gotLen).toBe(body.byteLength);
+    expect(new TextDecoder().decode(lits[0])).toBe("连接到 Microsoft 帐户的新应用 你好 world 中文内容");
+  });
+
+  it("returns null when the stream ends without data", async () => {
+    const reader = new WireReader(streamFromChunks([]).getReader());
+    expect(await reader.readLine()).toBeNull();
   });
 });

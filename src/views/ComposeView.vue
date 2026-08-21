@@ -5,7 +5,8 @@ import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
-import Button from "../components/ui/button/AppButton.vue";
+import Button from "../components/UiButton.vue";
+import AppTooltip from "../components/UiToolTip.vue";
 import { ChevronLeft, Send, Trash2, FilePlus2, Loader2 } from "lucide-vue-next";
 
 const route = useRoute();
@@ -113,22 +114,30 @@ function discard() {
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
-      <Button variant="ghost" size="icon" class="h-8 w-8" :title="t('back')" @click="router.back()">
-        <ChevronLeft class="h-4 w-4" />
-      </Button>
+      <AppTooltip :label="t('back')">
+        <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
+          <ChevronLeft class="h-4 w-4" />
+        </Button>
+      </AppTooltip>
       <h1 class="text-sm font-semibold">{{ t('newMessage') }}</h1>
       <div class="flex-1" />
-      <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
-        <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
-        <FilePlus2 v-else class="h-4 w-4" /> {{ t('saveDraft') }}
-      </Button>
-      <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
-        <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
-        <Send v-else class="h-4 w-4" /> {{ sending ? t('sending') : t('send') }}
-      </Button>
-      <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white" :title="t('discard')" @click="discard">
-        <Trash2 class="h-4 w-4" />
-      </Button>
+      <AppTooltip :label="t('saveDraft')">
+        <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
+          <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
+          <FilePlus2 v-else class="h-4 w-4" /> {{ t('saveDraft') }}
+        </Button>
+      </AppTooltip>
+      <AppTooltip :label="sending ? t('sending') : t('send')">
+        <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
+          <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
+          <Send v-else class="h-4 w-4" /> {{ sending ? t('sending') : t('send') }}
+        </Button>
+      </AppTooltip>
+      <AppTooltip :label="t('discard')">
+        <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white" @click="discard">
+          <Trash2 class="h-4 w-4" />
+        </Button>
+      </AppTooltip>
     </header>
 
     <div class="flex-1 overflow-y-auto p-4">

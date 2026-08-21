@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// AppTooltip — lightweight hover/focus popover (no native `title` attribute).
-// Uses only CSS + role=tooltip semantics.
+// UiToolTip — lightweight hover/focus popover (no native `title` attribute).
+// Uses only CSS + role=tooltip semantics. The reka-ui Tooltip export is
+// missing in this reka version, so this custom one is used project-wide.
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { cn } from "@/lib/cn";
+import { cn } from "../lib/cn";
 
 const props = withDefaults(
   defineProps<{
@@ -10,7 +11,7 @@ const props = withDefaults(
     side?: "top" | "right" | "bottom" | "left";
     class?: string;
   }>(),
-  { side: "top" },
+  { side: "top", class: undefined },
 );
 
 const open = ref(false);

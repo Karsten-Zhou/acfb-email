@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { type HTMLAttributes, computed } from "vue";
-import { cn } from "@/lib/cn";
+// UiInput — flat input component (v-model:modelValue).
+// Referenced from the RSS reader's UiInput.vue.
+import { computed, type HTMLAttributes } from "vue";
+import { cn } from "../lib/cn";
 
 const props = withDefaults(
   defineProps<{
     type?: "text" | "password" | "email" | "number" | "search" | "url" | "tel" | "date";
+    modelValue?: string | number;
+    placeholder?: string;
     class?: HTMLAttributes["class"];
-    modelValue?: string;
   }>(),
-  { type: "text" },
+  { type: "text", modelValue: "", placeholder: undefined, class: undefined },
 );
 
-const emit = defineEmits<{ "update:modelValue": [string] }>();
+const emit = defineEmits<{ "update:modelValue": [value: string | number] }>();
 
 function onInput(e: Event) {
   emit("update:modelValue", (e.target as HTMLInputElement).value);
@@ -26,5 +29,5 @@ const inputClass = computed(() =>
 </script>
 
 <template>
-  <input :type="type" :value="modelValue" :class="inputClass" :data-slot="'input'" @input="onInput" />
+  <input :type="type" :value="modelValue" :placeholder="placeholder" :class="inputClass" :data-slot="'input'" @input="onInput" />
 </template>
