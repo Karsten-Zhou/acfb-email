@@ -1,0 +1,64 @@
+// Build an RFC5322 MIME message for sending, using mimetext.
+import { createMimeMessage } from "mimetext";
+
+export interface ComposeInput {
+  from: { name: string | null; address: string };
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  inReplyTo?: string | null;
+  references?: string[];
+  attachments?: { filename: string; contentType: string; base64: string }[];
+}
+
+export function buildRawMessage(input: ComposeInput): Uint8Array {
+  const msg = createMimeMessage();
+  msg.setSender({ name: input.from.name ?? undefined, addr: input.from.address });
+  for (const t of input.to) msg.setTo(t);
+  for (const t of input.cc ?? []) msg.setCc(t);
+  for (const t of input.bcc ?? []) msg.setBcc(t);
+  msg.setSubject(input.subject);
+
+  if (input.inReplyTo) {
+    // mimetext expects a bare Message-ID (no angle brackets).
+    const bare = input.inReplyTo.replace(/^<|>$/g, "");
+    msg.setHeader("In-Reply-To", `<${bare}>`);
+  }
+  if (input.references && input.references.length > 0) {
+    const refs = input.references
+      .map((r) => r.replace(/^<|>$/g, ""))
+      .map((r) => `<${r}>`)
+      .join(" ");
+    msg.setHeader("References", refs);
+  }
+
+  const hasHtml = !!input.html;
+  const hasText = !!input.text;
+  const useMultipart = hasHtml && hasText;
+
+  if (useMultipart) {
+    msg.addMessage({ contentType: "text/plain", data: input.text as string });
+    msg.addMessage({ contentType: "text/html", data: input.html as string });
+  } else if (hasHtml) {
+    msg.addMessage({ contentType: "text/html", data: input.html as string });
+  } else if (hasText) {
+    msg.addMessage({ contentType: "text/plain", data: input.text as string });
+  } else {
+    msg.addMessage({ contentType: "text/plain", data: "" });
+  }
+
+  for (const a of input.attachments ?? []) {
+    msg.addAttachment({
+      filename: a.filename,
+      contentType: a.contentType,
+      data: a.base64,
+      encoding: "base64",
+    });
+  }
+
+  const raw = msg.asRaw();
+  return new TextEncoder().encode(raw);
+}

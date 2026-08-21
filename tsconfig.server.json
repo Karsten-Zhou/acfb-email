@@ -1,0 +1,19 @@
+// Worker (backend) project: runs in the Cloudflare Workers runtime.
+{
+  "extends": "@vue/tsconfig/tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@server/*": ["./server/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "types": ["@cloudflare/workers-types", "@types/bun"],
+    "lib": ["ES2022", "DOM", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022"
+  },
+  "include": ["server/**/*.ts", "shared/**/*.ts", "worker-configuration.d.ts"]
+}
