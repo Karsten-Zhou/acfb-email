@@ -29,11 +29,6 @@ export default tseslint.config(
       "vue/max-attributes-per-line": "off",
       "vue/singleline-html-element-content-newline": "off",
       "vue/html-self-closing": "off",
-      // shadcn-vue components are intentionally single-word (Button, Input…)
-      "vue/multi-word-component-names": [
-        "error",
-        { ignores: ["Button", "Input", "Badge", "Card", "Dialog", "Tooltip"] },
-      ],
     },
   }
 );

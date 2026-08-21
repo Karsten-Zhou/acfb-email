@@ -9,7 +9,7 @@ import DOMPurify from "dompurify";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, mailState } from "../stores/mail";
 import { api } from "../lib/api";
-import Button from "../components/ui/button/Button.vue";
+import Button from "../components/ui/button/AppButton.vue";
 import {
   Inbox,
   Send,

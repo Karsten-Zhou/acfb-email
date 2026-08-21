@@ -5,7 +5,7 @@ import { useRouter } from "vue-router";
 import { accountsState, loadAccounts, removeAccount, syncAccount } from "../stores/accounts";
 import { logout } from "../stores/auth";
 import { api } from "../lib/api";
-import Button from "../components/ui/button/Button.vue";
+import Button from "../components/ui/button/AppButton.vue";
 import { ChevronLeft, Plus, RefreshCw, Trash2, Loader2, CheckCircle2, XCircle } from "lucide-vue-next";
 
 const router = useRouter();

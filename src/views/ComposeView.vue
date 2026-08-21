@@ -4,7 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { api } from "../lib/api";
-import Button from "../components/ui/button/Button.vue";
+import Button from "../components/ui/button/AppButton.vue";
 import { ChevronLeft, Send, Trash2, FilePlus2 } from "lucide-vue-next";
 
 const route = useRoute();
