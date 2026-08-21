@@ -11,7 +11,6 @@ export default defineConfig({
       return {
         wrangler: {
           configPath: "./wrangler.jsonc",
-          environment: "production",
         },
         miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
