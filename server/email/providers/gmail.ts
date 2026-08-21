@@ -51,8 +51,8 @@ export class GmailProvider implements IEmailProvider {
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
-    const { status, json } = await providerGet(`${API}/labels`, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to list Gmail labels");
+    const { status, json, errorText } = await providerGet(`${API}/labels`, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to list Gmail labels (${errorText ?? status})`);
     const labels = ((json as { labels?: { id: string; name: string }[] }).labels ?? []);
     return labels.map((l) => ({ name: l.name, delimiter: "/", flags: [] }));
   }
@@ -69,8 +69,8 @@ export class GmailProvider implements IEmailProvider {
       // derived from sinceUid is impossible, so use maxResults paging + newest.
       void options.sinceUid;
     }
-    const { status, json } = await providerGet(`${API}/messages?${qs}`, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to list Gmail messages");
+    const { status, json, errorText } = await providerGet(`${API}/messages?${qs}`, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to list Gmail messages (${errorText ?? status})`);
     const list = ((json as { messages?: { id: string; threadId: string }[] }).messages ?? []);
 
     const out: ProviderMessage[] = [];
@@ -106,8 +106,8 @@ export class GmailProvider implements IEmailProvider {
   }
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
-    const { status, json } = await providerGet(`${API}/messages/${encodeURIComponent(providerId)}?format=full`, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to fetch Gmail message");
+    const { status, json, errorText } = await providerGet(`${API}/messages/${encodeURIComponent(providerId)}?format=full`, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to fetch Gmail message (${errorText ?? status})`);
     const d = json as GmailMessage;
     const html = extractBody(d.payload, "text/html");
     const text = extractBody(d.payload, "text/plain");

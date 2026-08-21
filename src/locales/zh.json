@@ -56,7 +56,7 @@
   "themeDark": "深色",
   "themeAuto": "自动",
   "language": "语言",
-  "languageAuto": "自动",
+  "languageAuto": "自动（{0}）",
   "about": "关于",
   "version": "版本",
   "buildTime": "构建时间",

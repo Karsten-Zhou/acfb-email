@@ -55,8 +55,8 @@ export class MicrosoftProvider implements IEmailProvider {
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
-    const { status, json } = await providerGet(`${GRAPH}/me/mailFolders?$select=id,displayName,parentFolderId`, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to list Outlook folders");
+    const { status, json, errorText } = await providerGet(`${GRAPH}/me/mailFolders?$select=id,displayName,parentFolderId`, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to list Outlook folders (${errorText ?? status})`);
     const folders = ((json as { value?: { id: string; displayName: string }[] }).value ?? []);
     // Include standard well-known folders plus favorites; use displayName as path.
     return folders.map((f) => ({ name: f.displayName, delimiter: "/", flags: [] }));
@@ -108,8 +108,8 @@ export class MicrosoftProvider implements IEmailProvider {
       const sinceDate = new Date(Math.max(options.sinceUid, 0)).toISOString();
       url += `&$filter=sentDateTime gt ${sinceDate}`;
     }
-    const { status, json } = await providerGet(url, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to list Outlook messages");
+    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
     const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
     const out: ProviderMessage[] = msgs.map((m) => ({
       providerId: m.id,
@@ -130,8 +130,8 @@ export class MicrosoftProvider implements IEmailProvider {
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
     const url = `${GRAPH}/me/messages/${encodeURIComponent(providerId)}?$select=id,body`;
-    const { status, json } = await providerGet(url, this.token.access_token);
-    if (status !== 200) throw new Error("Failed to fetch Outlook message");
+    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to fetch Outlook message (${errorText ?? status})`);
     const m = json as GraphMessage;
     const bodyHtml = m.body?.contentType === "html" ? m.body.content ?? null : null;
     const bodyText = m.body?.contentType === "text" ? m.body.content ?? null : null;

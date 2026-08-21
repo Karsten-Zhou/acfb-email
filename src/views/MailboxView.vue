@@ -37,6 +37,8 @@ const route = useRoute();
 const router = useRouter();
 const activeMailboxId = ref<string | null>("unified");
 const syncing = ref(false);
+/** Last sync failure shown in the list-pane banner (null = none). */
+const syncError = ref<string | null>(null);
 const reading = ref(false); // mobile: whether the compact reader is open
 const onlyUnread = ref(false);
 const loadingOlder = ref(false);
@@ -93,8 +95,11 @@ async function loadInto() {
 
 async function syncNow() {
   syncing.value = true;
+  syncError.value = null;
   try {
-    await Promise.all(accountsState.accounts.map((a) => api.syncAccount(a.id).catch(() => ({ ok: false }))));
+    const results = await Promise.all(accountsState.accounts.map((a) => api.syncAccount(a.id).catch(() => ({ ok: false as const, message: undefined }))));
+    const failed = results.find((r) => !r.ok);
+    if (failed && failed.message) syncError.value = failed.message;
     await refresh();
   } finally {
     syncing.value = false;
@@ -103,8 +108,10 @@ async function syncNow() {
 
 async function syncAccountNow(id: string) {
   syncingAccountId.value = id;
+  syncError.value = null;
   try {
-    await api.syncAccount(id);
+    const res = await api.syncAccount(id);
+    if (!res.ok && res.message) syncError.value = res.message;
     await refresh();
   } finally {
     syncingAccountId.value = null;
@@ -344,6 +351,14 @@ watch(activeMailboxId, () => loadInto());
         </div>
       </header>
 
+      <div
+        v-if="syncError"
+        class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive"
+      >
+        <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
+        <span class="min-w-0 flex-1 truncate">{{ syncError }}</span>
+        <button class="shrink-0 rounded px-1 text-destructive/80 hover:bg-destructive/15" @click="syncError = null">✕</button>
+      </div>
       <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
       </div>

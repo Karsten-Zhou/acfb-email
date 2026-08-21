@@ -3,32 +3,51 @@ import type { OAuthToken } from "../../oauth/client";
 
 export type { OAuthToken };
 
-/** Authenticated GET. */
+/** Authenticated GET (includes a human-readable error text when non-2xx). */
 export async function providerGet(
   url: string,
   accessToken: string,
-): Promise<{ status: number; json: unknown }> {
+): Promise<{ status: number; json: unknown; errorText?: string }> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
   });
   const json = await res.json().catch(() => null);
-  return { status: res.status, json };
+  let errorText: string | undefined;
+  if (!res.ok) {
+    const detail =
+      (json && typeof json === "object" && "error" in json && (json as { error?: { message?: string } }).error?.message) ||
+      (json && typeof json === "object" && "errorDescription" in json && (json as { errorDescription?: string }).errorDescription) ||
+      "";
+    errorText = `${res.status}${detail ? ` — ${detail}` : ""}`;
+  }
+  return { status: res.status, json, errorText };
 }
 
-/** Authenticated POST (JSON body). */
+/** Authenticated POST (JSON body; includes error detail when non-2xx). */
 export async function providerJson(
   url: string,
   accessToken: string,
   body: unknown,
   method: "POST" | "PATCH" | "DELETE" = "POST",
-): Promise<{ status: number; json: unknown }> {
+): Promise<{ status: number; json: unknown; errorText?: string }> {
   const res = await fetch(url, {
     method,
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => null);
-  return { status: res.status, json };
+  let errorText: string | undefined;
+  if (!res.ok) {
+    const errObj = json && typeof json === "object" ? (json as Record<string, unknown>) : null;
+    const detail =
+      (errObj && typeof errObj.error === "object" && errObj.error !== null
+        ? (errObj.error as { message?: string }).message
+        : undefined) ||
+      (errObj && typeof errObj.errorDescription === "string" ? errObj.errorDescription : undefined) ||
+      "";
+    errorText = `${res.status}${detail ? ` — ${detail}` : ""}`;
+  }
+  return { status: res.status, json, errorText };
 }
 
 /** Authenticated PATCH (JSON body). */

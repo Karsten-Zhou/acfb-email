@@ -56,7 +56,7 @@
   "themeDark": "Dark",
   "themeAuto": "Auto",
   "language": "Language",
-  "languageAuto": "Auto",
+  "languageAuto": "Auto ({0})",
   "about": "About",
   "version": "Version",
   "buildTime": "Build time",

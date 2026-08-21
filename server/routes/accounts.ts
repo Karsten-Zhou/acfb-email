@@ -236,8 +236,19 @@ accountRoutes.post("/:id/sync", async (c) => {
     const result = await syncAccount(c.env, id);
     return c.json({ ok: true, ...result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Sync failed";
-    return c.json({ ok: false, message }, 502);
+    // syncAccount() persists a detailed, classified message to the account's
+    // state_message before rethrowing the raw error — surface that (fall back
+    // to the raw message). Return 200 so the client can read the raw
+    // { ok:false, message } detail (a non-2xx would make the generic client
+    // throw and lose the message).
+    const row = await c.env.DB.prepare(
+      `SELECT state_message FROM accounts WHERE id = ?`,
+    )
+      .bind(id)
+      .first<{ state_message: string | null }>();
+    const message =
+      row?.state_message ?? (err instanceof Error ? err.message : "Sync failed");
+    return c.json({ ok: false, message }, 200);
   }
 });
 

@@ -351,6 +351,9 @@ function classifyError(err: unknown): string {
   if (/timeout|timed out|ETIMEDOUT|socket|connection|ECONN/i.test(m)) {
     return "Could not reach the mail server. It may be temporarily unavailable.";
   }
-  // Generic but safe
+  // Provider/REST errors already carry a usable detail (status + API message),
+  // e.g. "Failed to list Outlook messages (403 — …access token expired…)".
+  if (m.includes(" — ") || /\(\d{3}\)/.test(m)) return m;
+  // Generic but safe fallback for opaque/unknown failures.
   return "Synchronization failed. Check the server settings.";
 }

@@ -44,6 +44,8 @@ const testResult = ref<{ ok: boolean; message: string } | null>(null);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
 const syncingId = ref<string | null>(null);
+/** Last sync failure message per account id (shown under the row). */
+const syncErrorMap = ref<Record<string, string>>({});
 const confirmDeleteId = ref<string | null>(null);
 /** Whether the confirm dialog is open (so the row can be deleted via modal). */
 const deleteDialogOpen = ref(false);
@@ -122,19 +124,16 @@ const themeValue = computed({
   set: (v: ThemeSetting) => setTheme(v),
 });
 
-/** Native-language labels for the language dropdown (Intl, no hardcoded list). */
-function languageLabel(locale: LocaleSetting): string {
-  if (locale === "auto") {
-    const current = detectActiveLocale();
-    const name = new Intl.DisplayNames([current], { type: "language" }).of(current) ?? current;
-    return `${t("languageAuto")} · ${name}`;
-  }
-  const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
-  // Capitalize display name for a nicer UI (e.g. "Deutsch", "中文", "English").
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-function detectActiveLocale(): string {
-  return localeState.value.locale;
+function languageLabel(lang: LocaleSetting): string {
+	if (lang !== "auto") {
+		return new Intl.DisplayNames([lang], { type: "language" }).of(lang) ?? lang;
+	}
+
+	return t("languageAuto", {
+		0:
+			new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language) ??
+				navigator.language,
+	});
 }
 const languageMenuOpen = ref(false);
 const languageMenuRef = ref<HTMLElement | null>(null);
@@ -207,7 +206,12 @@ async function confirmRemove() {
 async function syncOne(id: string) {
   syncingId.value = id;
   try {
-    await syncAccount(id);
+    const res = await syncAccount(id);
+    if (!res.ok && res.message) {
+      syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
+    } else {
+      syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
+    }
     await loadAccounts();
   } finally {
     syncingId.value = null;
@@ -452,6 +456,10 @@ const appBuildTime = __APP_BUILD_TIME__;
                 <span v-else-if="a.state === 'auth_required'" class="text-destructive">{{ t('authRequired') }}</span>
                 <span v-else>{{ a.state }}</span>
                 <span v-if="a.lastSyncedAt" class="ml-2">{{ t('syncedOn') }} {{ formatDate(a.lastSyncedAt) }}</span>
+              </div>
+              <div v-if="syncErrorMap[a.id]" class="mt-0.5 flex items-center gap-1.5 text-xs text-destructive">
+                <XCircle class="h-3.5 w-3.5 shrink-0" />
+                <span class="min-w-0 truncate">{{ syncErrorMap[a.id] }}</span>
               </div>
             </div>
             <UiToolTip :label="t('syncNow')">
