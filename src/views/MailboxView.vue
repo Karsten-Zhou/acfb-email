@@ -11,6 +11,7 @@ import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, ma
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import Button from "../components/ui/button/AppButton.vue";
+import AppTooltip from "../components/ui/tooltip/AppTooltip.vue";
 import {
   Inbox,
   Send,
@@ -43,6 +44,9 @@ const hasOlder = ref(true);
 const confirmDelete = ref(false);
 const deleting = ref(false);
 const syncingAccountId = ref<string | null>(null);
+const loadingMessage = ref(false);
+/** If set, the confirm dialog targets a single message (from the reading pane). */
+const pendingDeleteId = ref<string | null>(null);
 
 const roleLabel: Record<string, string> = {
   inbox: "Inbox",
@@ -137,15 +141,28 @@ async function markSelectedRead() {
 }
 
 async function confirmDeleteSelected() {
+  pendingDeleteId.value = null;
+  confirmDelete.value = true;
+}
+
+/** Confirm dialog for a single message (from the reading pane). */
+function confirmDeleteOne(id: string) {
+  pendingDeleteId.value = id;
   confirmDelete.value = true;
 }
 
 async function doDeleteSelected() {
   deleting.value = true;
-  const ids = [...mailState.selectedIds];
+  const ids = pendingDeleteId.value ? [pendingDeleteId.value] : [...mailState.selectedIds];
   try {
     await deleteMessages(ids);
-    mailState.selectedIds = new Set();
+    if (pendingDeleteId.value) {
+      mailState.selected = null;
+      pendingDeleteId.value = null;
+      if (route.params.id) await router.replace("/mail");
+    } else {
+      mailState.selectedIds = new Set();
+    }
     confirmDelete.value = false;
   } finally {
     deleting.value = false;
@@ -209,14 +226,18 @@ watch(
   async (id) => {
     if (typeof id === "string" && id) {
       reading.value = true;
+      loadingMessage.value = true;
       try {
         await openMessage(id);
       } catch {
         mailState.selected = null;
+      } finally {
+        loadingMessage.value = false;
       }
     } else {
       mailState.selected = null;
       reading.value = false;
+      loadingMessage.value = false;
     }
   },
   { immediate: true },
@@ -373,13 +394,18 @@ watch(activeMailboxId, () => loadInto());
       :class="reading ? 'flex md:flex' : 'hidden md:flex'"
     >
       <div v-if="!mailState.selected" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        Select a message to read it
+        {{ t('selectToRead') }}
+      </div>
+      <div v-else-if="loadingMessage" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+        <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
       </div>
       <template v-else>
         <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-          <Button variant="ghost" size="icon" class="md:hidden" @click="router.replace('/mail')" title="Back to list">
-            <ChevronLeft class="h-4 w-4" />
-          </Button>
+          <AppTooltip :label="t('content')" side="bottom">
+            <Button variant="ghost" size="icon" class="h-8 w-8 md:hidden" @click="router.replace('/mail')">
+              <ChevronLeft class="h-4 w-4" />
+            </Button>
+          </AppTooltip>
           <div class="min-w-0 flex-1">
             <h1 class="truncate text-base font-semibold leading-tight">{{ mailState.selected.subject || '(no subject)' }}</h1>
             <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
@@ -389,36 +415,41 @@ watch(activeMailboxId, () => loadInto());
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="replyTo" title="Reply">
-              <Reply class="h-4 w-4" />
-            </Button>
+            <AppTooltip :label="t('reply')">
+              <Button variant="ghost" size="icon" class="h-8 w-8" @click="replyTo">
+                <Reply class="h-4 w-4" />
+              </Button>
+            </AppTooltip>
+            <AppTooltip :label="t('star')">
             <Button
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              :title="mailState.selected.isStarred ? 'Unstar' : 'Star'"
               @click="updateFlags([mailState.selected.id], { starred: !mailState.selected.isStarred })"
             >
               <Star class="h-4 w-4" :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
             </Button>
+            </AppTooltip>
+            <AppTooltip :label="mailState.selected.isRead ? t('markUnread') : t('markRead')">
             <Button
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              :title="mailState.selected.isRead ? 'Mark unread' : 'Mark read'"
               @click="updateFlags([mailState.selected.id], { read: !mailState.selected.isRead })"
             >
               <MailIcon class="h-4 w-4" />
             </Button>
+            </AppTooltip>
+            <AppTooltip :label="t('delete')">
             <Button
               variant="ghost"
               size="icon"
-              class="h-8 w-8 text-destructive"
-              title="Delete"
-              @click="deleteMessages([mailState.selected.id]); router.replace('/mail')"
+              class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
+              @click="confirmDeleteOne(mailState.selected.id)"
             >
               <Trash2 class="h-4 w-4" />
             </Button>
+            </AppTooltip>
           </div>
         </header>
 
