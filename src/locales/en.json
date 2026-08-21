@@ -78,9 +78,6 @@
   "secure": "TLS/SSL",
   "imapGroup": "IMAP",
   "smtpGroup": "SMTP",
-  "hostName": "Host",
   "showPassword": "Show password",
-  "hidePassword": "Hide password",
-  "copy": "Copy",
-  "copied": "Copied"
+  "hidePassword": "Hide password"
 }

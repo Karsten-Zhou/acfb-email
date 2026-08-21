@@ -78,9 +78,6 @@
   "secure": "TLS/SSL",
   "imapGroup": "IMAP",
   "smtpGroup": "SMTP",
-  "hostName": "主机",
   "showPassword": "显示密码",
-  "hidePassword": "隐藏密码",
-  "copy": "复制",
-  "copied": "已复制"
+  "hidePassword": "隐藏密码"
 }
