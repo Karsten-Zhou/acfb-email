@@ -67,7 +67,7 @@ messageRoutes.get("/:id", async (c) => {
     if (!account) throw new HttpError(404, "Account not found");
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const providerId = row.remote_message_id ?? String(row.remote_uid ?? "");
+    const providerId = providerIdFor(account.provider, row);
     const body = await provider.fetchBody(row.provider_path, providerId);
     html = body.html;
     text = body.text;
@@ -99,7 +99,7 @@ messageRoutes.patch("/flags", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
     const flags: { read?: boolean; starred?: boolean } = {};
     if (input.read !== undefined) flags.read = input.read;
     if (input.starred !== undefined) flags.starred = input.starred;
@@ -131,7 +131,7 @@ messageRoutes.post("/move", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
     await provider.move(source.provider_path, pids, target.provider_path);
     for (const m of msgs) await repo.moveMessage(c.env, m.id, target.id);
   }
@@ -158,7 +158,7 @@ messageRoutes.post("/delete", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
     await provider.delete(box.provider_path, pids);
     for (const m of msgs) await repo.deleteMessage(c.env, m.id);
   }
@@ -231,4 +231,19 @@ async function rowToDetail(env: Env, row: MessageRow, html: string | null, text:
     remoteUid: row.remote_uid,
     remoteMessageId: row.remote_message_id,
   });
+}
+
+/**
+ * The provider-side id of a message. IMAP identifies messages by a numeric UID
+ * (stored in remote_uid); REST providers (Gmail/Graph) use their string id in
+ * remote_message_id.
+ */
+function providerIdFor(
+  provider: string,
+  row: { remote_message_id: string | null; remote_uid: number | null },
+): string {
+  if (provider === "imap") {
+    return String(row.remote_uid ?? "");
+  }
+  return row.remote_message_id ?? "";
 }
