@@ -630,24 +630,11 @@ export function parseAddressListBySemicolon(s: string | null | undefined): {
     const trimmed = raw.trim();
     if (!trimmed) continue;
     const angleM = /<([^>]+)>/.exec(trimmed);
-    let address: string | null = null;
-    let name: string | null = null;
-    if (angleM) {
-      address = angleM[1].trim();
-      const namePart = trimmed.slice(0, angleM.index).trim().replace(/^"|"$/g, "");
-      name = decodeWords1(namePart) || null;
-    } else {
-      // Bare address (possibly quoted display name then address, or plain).
-      const atM = trimmed.match(/^[^@\s"']+@[^@\s"']+$/);
-      if (atM) {
-        address = trimmed;
-        name = null;
-      } else {
-        // e.g. "Name <...>" without angle already handled; fall back to raw
-        address = trimmed;
-        name = null;
-      }
-    }
+    const hasAngle = angleM !== null;
+    const address = hasAngle ? angleM![1].trim() : trimmed;
+    const name = hasAngle
+      ? decodeWords1(trimmed.slice(0, angleM!.index).trim().replace(/^"|"$/g, "")) || null
+      : null;
     if (address) out.push({ name, address });
   }
   return out;
