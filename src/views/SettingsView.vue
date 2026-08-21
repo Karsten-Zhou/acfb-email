@@ -328,6 +328,14 @@ const appBuildTime = __APP_BUILD_TIME__;
               <div class="flex gap-1.5">
                 <button
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
+                  :class="themeValue === 'auto' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
+                  :title="t('themeAuto')"
+                  @click="themeValue = 'auto'"
+                >
+                  <Monitor class="h-3.5 w-3.5" /> {{ t('themeAuto') }}
+                </button>
+                <button
+                  class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
                   :class="themeValue === 'light' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
                   :title="t('themeLight')"
                   @click="themeValue = 'light'"
@@ -341,14 +349,6 @@ const appBuildTime = __APP_BUILD_TIME__;
                   @click="themeValue = 'dark'"
                 >
                   <Moon class="h-3.5 w-3.5" /> {{ t('themeDark') }}
-                </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-                  :class="themeValue === 'auto' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
-                  :title="t('themeAuto')"
-                  @click="themeValue = 'auto'"
-                >
-                  <Monitor class="h-3.5 w-3.5" /> {{ t('themeAuto') }}
                 </button>
               </div>
             </div>

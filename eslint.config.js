@@ -17,7 +17,13 @@ export default tseslint.config(
   },
   {
     files: ["src/**/*.ts", "src/**/*.vue"],
-    languageOptions: { globals: globals.browser },
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        __APP_VERSION__: "readonly",
+        __APP_BUILD_TIME__: "readonly",
+      },
+    },
   },
   {
     rules: {

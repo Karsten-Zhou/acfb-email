@@ -92,6 +92,7 @@ const dict = {
     ok: "Delete",
     cancelAction: "Cancel",
     oauthNotConfigured: "Not configured — add {name} OAuth credentials to run this.",
+    back: "Back",
   },
   de: {
     appName: "Mail",
@@ -168,6 +169,7 @@ const dict = {
     ok: "Löschen",
     cancelAction: "Abbrechen",
     oauthNotConfigured: "Nicht konfiguriert — füge {name} OAuth-Zugangsdaten hinzu, um dies zu verwenden.",
+    back: "Zurück",
   },
   zh: {
     appName: "Mail",
@@ -244,6 +246,7 @@ const dict = {
     ok: "删除",
     cancelAction: "取消",
     oauthNotConfigured: "未配置——添加 {name} OAuth 凭据以启用此功能。",
+    back: "返回",
   },
 } as const;
 
