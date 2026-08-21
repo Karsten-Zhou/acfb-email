@@ -87,7 +87,7 @@ export class ImapProvider implements IEmailProvider {
         uids = all.slice(-limit); // newest `limit`
       }
 
-      const envelopes = await imap.fetchEnvelopes(uids);
+      const envelopes = await imap.fetchHeadersByUid(uids);
       const messages: ProviderMessage[] = envelopes.map((e) => ({
         remoteUid: e.uid,
         messageId: e.messageId,

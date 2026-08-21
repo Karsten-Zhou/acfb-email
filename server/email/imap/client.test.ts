@@ -1,5 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { splitTopLevel, unquote, decodeMimeWord, parseAddressList, extractBalanced } from "./client";
+import { splitTopLevel, unquote, decodeMimeWord, parseAddressList, extractBalanced, parseHeaderText, parseAddressListBySemicolon } from "./client";
+
+describe("IMAP raw-header parsing", () => {
+  it("parses standard headers incl. folded continuation", () => {
+    const raw = "From: Alice <alice@example.com>\r\nTo: Bob <bob@example.com>, c@example.com\r\nSubject: Hello\r\nDate: 2026-01-01\r\nMessage-ID: <x@y>\r\n";
+    const h = parseHeaderText(raw);
+    expect(h["from"]).toContain("alice@example.com");
+    expect(h["subject"]).toBe("Hello");
+    expect(h["date"]).toBe("2026-01-01");
+    expect(h["message-id"]).toBe("<x@y>");
+  });
+
+  it("decodes encoded-word in subject", () => {
+    const raw = "Subject: =?utf-8?B?SGVsbG8gV29ybGQ=?=\r\n";
+    const h = parseHeaderText(raw);
+    expect(h["subject"]).toBe("Hello World");
+  });
+
+  it("parses address header with names and bare addresses", () => {
+    const addrs = parseAddressListBySemicolon('"Alice Example" <alice@example.com>, Bob <bob@other.org>, c@example.com');
+    expect(addrs).toHaveLength(3);
+    expect(addrs[0]).toEqual({ name: "Alice Example", address: "alice@example.com" });
+    expect(addrs[1]).toEqual({ name: "Bob", address: "bob@other.org" });
+    expect(addrs[2]).toEqual({ name: null, address: "c@example.com" });
+  });
+});
 
 describe("IMAP ENVELOPE parsing helpers", () => {
   it("extracts balanced ENVELOPE content from the middle of a line", () => {

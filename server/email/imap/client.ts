@@ -271,6 +271,60 @@ export class ImapClient {
     return out;
   }
 
+  /**
+   * Fetch only the raw header block (as a literal) for a set of UIDs, and
+   * parse FROM/SUBJECT/DATE/MESSAGE-ID from it. This is more robust than the
+   * ENVELOPE parser for providers that return non-standard ENVELOPE data.
+   */
+  async fetchHeadersByUid(uids: number[]): Promise<Envelope[]> {
+    const out: Envelope[] = [];
+    for (let i = 0; i < uids.length; i += 100) {
+      const chunk = uids.slice(i, i + 100);
+      const res = await this.command(
+        "UID FETCH",
+        `${chunk.join(",")} (UID FLAGS INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID)])`,
+      );
+      // res.literals holds the header bodies in order; associate with UIDs by
+      // matching the preceding FETCH line.
+      let litIdx = 0;
+      for (let li = 0; li < res.lines.length; li++) {
+        const line = res.lines[li];
+        if (!line.startsWith("* ")) continue;
+        const m = /^\* \d+ FETCH \(([^)]*UID[^)]*)\)/.exec(line);
+        if (!m) continue;
+        const uidM = /\bUID (\d+)/.exec(line);
+        if (!uidM) continue;
+        const uid = parseInt(uidM[1], 10);
+        const body = res.literals[litIdx++] ?? new Uint8Array();
+        out.push(this.parseHeaderLiteral(uid, line, body));
+      }
+    }
+    return out;
+  }
+
+  private parseHeaderLiteral(uid: number, line: string, body: Uint8Array): Envelope {
+    const flagsM = /FLAGS \(([^)]*)\)/.exec(line);
+    const flags = flagsM ? flagsM[1].split(" ").filter(Boolean) : [];
+    const sizeM = /RFC822\.SIZE (\d+)/.exec(line);
+    const size = sizeM ? parseInt(sizeM[1], 10) : null;
+    const internalM = /INTERNALDATE "([^"]*)"/.exec(line);
+    const internalDate = internalM ? internalM[1] : null;
+    const headerText = new TextDecoder().decode(body);
+    const headers = parseHeaderText(headerText);
+    return {
+      uid,
+      messageId: headers["message-id"] ?? null,
+      subject: headers["subject"] ?? null,
+      from: parseAddressListBySemicolon(headers["from"])[0] ?? null,
+      to: parseAddressListBySemicolon(headers["to"]),
+      cc: parseAddressListBySemicolon(headers["cc"]),
+      date: headers["date"] ?? null,
+      flags,
+      size,
+      internalDate,
+    };
+  }
+
   private parseEnvelopeLine(body: string): Envelope | null {
     const uidM = /\bUID (\d+)/.exec(body);
     if (!uidM) return null;
@@ -506,6 +560,95 @@ export function parseAddressList(s: string | null): { name: string | null; addre
     if (mailbox && host) address = `${mailbox}@${host}`;
     else if (mailbox) address = mailbox;
     out.push({ name, address });
+  }
+  return out;
+}
+
+/**
+ * Parse a raw RFC5322 header block (already unfolded/decoded where possible)
+ * into a map of lowercased header name -> value (first occurrence wins).
+ */
+export function parseHeaderText(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  // Handle CRLF or LF line endings; a header may span folded continuation lines.
+  const lines = raw.split(/\r?\n/);
+  let currentKey: string | null = null;
+  for (const line of lines) {
+    if (/^[\t ]/.test(line) && currentKey) {
+      // Folded continuation
+      out[currentKey] += " " + line.trim();
+      continue;
+    }
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim().toLowerCase();
+    const val = line.slice(idx + 1).trim();
+    currentKey = key;
+    if (out[key] === undefined) out[key] = decodeWords1(val);
+  }
+  return out;
+}
+
+/** Decode MIME encoded-words + strip surrounding whitespace. */
+function decodeWords1(val: string): string {
+  const decoded = decodeMimeWord(val) ?? "";
+  return decoded.trim();
+}
+
+/**
+ * Parse a raw address header (From/To/Cc) into structured addresses.
+ * Handles comma-separated "Name <addr>" / bare addresses / encoded names.
+ */
+export function parseAddressListBySemicolon(s: string | null | undefined): {
+  name: string | null;
+  address: string | null;
+}[] {
+  if (!s) return [];
+  const out: { name: string | null; address: string | null }[] = [];
+  // Split on commas at top level (not inside quotes or <>).
+  const parts: string[] = [];
+  let cur = "";
+  let inQuote = false;
+  let angle = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"' && s[i - 1] !== "\\") inQuote = !inQuote;
+    if (!inQuote) {
+      if (ch === "<") angle++;
+      else if (ch === ">") angle--;
+      if (ch === "," && angle === 0) {
+        parts.push(cur);
+        cur = "";
+        continue;
+      }
+    }
+    cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+
+  for (const raw of parts) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const angleM = /<([^>]+)>/.exec(trimmed);
+    let address: string | null = null;
+    let name: string | null = null;
+    if (angleM) {
+      address = angleM[1].trim();
+      const namePart = trimmed.slice(0, angleM.index).trim().replace(/^"|"$/g, "");
+      name = decodeWords1(namePart) || null;
+    } else {
+      // Bare address (possibly quoted display name then address, or plain).
+      const atM = trimmed.match(/^[^@\s"']+@[^@\s"']+$/);
+      if (atM) {
+        address = trimmed;
+        name = null;
+      } else {
+        // e.g. "Name <...>" without angle already handled; fall back to raw
+        address = trimmed;
+        name = null;
+      }
+    }
+    if (address) out.push({ name, address });
   }
   return out;
 }
