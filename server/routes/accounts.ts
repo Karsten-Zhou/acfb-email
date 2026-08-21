@@ -185,7 +185,9 @@ accountRoutes.post("/test", async (c) => {
     return c.json({ ok: true, message: "Connection successful" });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Connection failed";
-    return c.json({ ok: false, message }, 400);
+    // Return 200 so the client can read {ok:false, message}; a non-2xx makes
+    // the generic client throw and lose the message.
+    return c.json({ ok: false, message }, 200);
   }
 });
 

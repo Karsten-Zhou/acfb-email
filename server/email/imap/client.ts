@@ -175,7 +175,10 @@ export class ImapClient {
       const code = m ? m[1] : null;
       const literals = this.wire.takeLiterals();
       if (status !== "ok") {
-        const reason = lines[lines.length - 1] ?? "";
+        const untagged = lines[lines.length - 1] ?? "";
+        // The tagged response (rest) holds the human-readable reason, e.g.
+        // "NO [AUTHENTICATIONFAILED] Invalid credentials." — use it.
+        const reason = (untagged + " " + rest).trim();
         throw new ImapError(`IMAP ${cmd} refused: ${reason}`, status);
       }
       return { ok: true, lines, literals, code };

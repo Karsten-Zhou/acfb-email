@@ -332,8 +332,11 @@ function simpleHash(s: string): string {
 
 function classifyError(err: unknown): string {
   const m = err instanceof Error ? err.message : String(err);
+  if (/basic authentication is disabled/i.test(m)) {
+    return "The mail server requires OAuth (Basic auth is disabled). Reconnect using the provider's OAuth button (Gmail/Outlook).";
+  }
   if (/login|authentication|AUTHENTICATE|LOGIN/i.test(m)) {
-    return "Authentication failed. Check the account password or reauthorize.";
+    return "Authentication failed. This account may need an app password or OAuth login.";
   }
   if (/timeout|timed out|ETIMEDOUT|socket|connection|ECONN/i.test(m)) {
     return "Could not reach the mail server. It may be temporarily unavailable.";
