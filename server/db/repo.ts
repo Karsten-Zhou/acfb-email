@@ -166,16 +166,16 @@ export const repo = {
     env: Env,
     userId: string,
     ids: string[],
-  ): Promise<{ id: string; mailbox_id: string; remote_uid: number | null }[]> {
+  ): Promise<{ id: string; mailbox_id: string; remote_message_id: string | null }[]> {
     if (ids.length === 0) return [];
     const ph = ids.map(() => "?").join(",");
     const rows = await env.DB.prepare(
-      `SELECT m.id, m.mailbox_id, m.remote_uid
+      `SELECT m.id, m.mailbox_id, m.remote_message_id
        FROM messages m JOIN accounts a ON a.id = m.account_id
        WHERE m.id IN (${ph}) AND a.user_id = ?`,
     )
       .bind(...ids, userId)
-      .all<{ id: string; mailbox_id: string; remote_uid: number | null }>();
+      .all<{ id: string; mailbox_id: string; remote_message_id: string | null }>();
     return rows.results;
   },
 

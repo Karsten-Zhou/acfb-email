@@ -9,6 +9,7 @@ import { HttpError } from "./http-error";
 import { csrfGuard } from "./auth";
 import { authRoutes } from "./routes/auth";
 import { accountRoutes } from "./routes/accounts";
+import { oauthRoutes } from "./routes/oauth";
 import { mailboxRoutes } from "./routes/mailboxes";
 import { messageRoutes } from "./routes/messages";
 import { sendRoutes } from "./routes/send";
@@ -26,6 +27,7 @@ app.use("/api/*", csrfGuard);
 // ----- api routes -----
 const api = new Hono<AppEnv>();
 api.route("/auth", authRoutes);
+api.route("/oauth", oauthRoutes);
 api.route("/accounts", accountRoutes);
 api.route("/mailboxes", mailboxRoutes);
 api.route("/messages", messageRoutes);

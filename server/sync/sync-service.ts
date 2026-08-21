@@ -178,10 +178,15 @@ async function upsertMessage(
     [uidValidity, msg.remoteUid, isRead, isStarred, subject, date].join("|"),
   );
 
+  // remote_message_id holds the provider's id for this message in this mailbox
+  // (IMAP UID, Gmail message id, Outlook message id). We use it as the stable
+  // unique key because remote ids are per-mailbox.
+  const providerKey = msg.providerId ?? String(msg.remoteUid);
+
   const existing = await env.DB.prepare(
-    `SELECT id FROM messages WHERE mailbox_id = ? AND remote_uid = ?`,
+    `SELECT id FROM messages WHERE mailbox_id = ? AND remote_message_id = ?`,
   )
-    .bind(mailbox.id, msg.remoteUid)
+    .bind(mailbox.id, providerKey)
     .first<{ id: string }>();
 
   if (existing) {
@@ -207,7 +212,7 @@ async function upsertMessage(
       account.id,
       mailbox.id,
       msg.remoteUid,
-      msg.messageId,
+      providerKey,
       subject,
       fromName,
       fromAddress,

@@ -67,7 +67,8 @@ messageRoutes.get("/:id", async (c) => {
     if (!account) throw new HttpError(404, "Account not found");
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const body = await provider.fetchBody(row.provider_path, row.remote_uid!);
+    const providerId = row.remote_message_id ?? String(row.remote_uid ?? "");
+    const body = await provider.fetchBody(row.provider_path, providerId);
     html = body.html;
     text = body.text;
     await repo.markBodyFetched(c.env, row.id, html, text);
@@ -98,11 +99,11 @@ messageRoutes.patch("/flags", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const uids = msgs.map((m) => m.remote_uid).filter((n): n is number => n != null);
+    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
     const flags: { read?: boolean; starred?: boolean } = {};
     if (input.read !== undefined) flags.read = input.read;
     if (input.starred !== undefined) flags.starred = input.starred;
-    await provider.setFlags(box.provider_path, uids, flags);
+    await provider.setFlags(box.provider_path, pids, flags);
     for (const m of msgs) await repo.updateFlags(c.env, m.id, flags);
   }
   return c.json({ ok: true });
@@ -130,8 +131,8 @@ messageRoutes.post("/move", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const uids = msgs.map((m) => m.remote_uid).filter((n): n is number => n != null);
-    await provider.move(source.provider_path, uids, target.provider_path);
+    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
+    await provider.move(source.provider_path, pids, target.provider_path);
     for (const m of msgs) await repo.moveMessage(c.env, m.id, target.id);
   }
   return c.json({ ok: true });
@@ -157,8 +158,8 @@ messageRoutes.post("/delete", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const uids = msgs.map((m) => m.remote_uid).filter((n): n is number => n != null);
-    await provider.delete(box.provider_path, uids);
+    const pids = msgs.map((m) => m.remote_message_id ?? "").filter(Boolean);
+    await provider.delete(box.provider_path, pids);
     for (const m of msgs) await repo.deleteMessage(c.env, m.id);
   }
   return c.json({ ok: true });

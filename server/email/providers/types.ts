@@ -16,6 +16,9 @@ export interface ProviderAddress {
 }
 
 export interface ProviderMessage {
+  /** Stable provider-side id: IMAP UID (numeric as string), Gmail message id,
+   *  Outlook message id. Used to perform operations on the message. */
+  providerId: string;
   remoteUid: number;
   messageId: string | null;
   subject: string | null;
@@ -63,8 +66,9 @@ export interface SendOptions {
   cc?: string[];
   bcc?: string[];
   subject: string;
-  rawMessage: Uint8Array; // pre-built MIME (escaped) — provider adapters may
-  // instead build their own; the IMAP/SMTP adapter just relays this.
+  rawMessage: Uint8Array; // pre-built MIME — IMAP/SMTP adapter relays this
+  html?: string; // for REST providers (Gmail/Graph) that build their own body
+  text?: string;
   inReplyTo?: string | null;
   references?: string[];
 }
@@ -76,7 +80,7 @@ export interface IEmailProvider {
   testConnection(): Promise<{ ok: true }>;
 
   /**
-   * List mailboxes. Returns provider mailboxes and their role mapping hint.
+   * List mailboxes. Returns provider mailboxes (paths).
    */
   listMailboxes(): Promise<ProviderMailbox[]>;
 
@@ -88,17 +92,25 @@ export interface IEmailProvider {
     options: ProviderSyncOptions,
   ): Promise<ProviderFetchResult>;
 
-  /** Fetch the full body & attachments of a message by UID. */
-  fetchBody(mailboxPath: string, uid: number): Promise<ProviderBody>;
+  /** Fetch the full body & attachments of a message. */
+  fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;
 
-  /** Set flags (read/starred) for a set of UIDs in a mailbox. */
-  setFlags(mailboxPath: string, uids: number[], flags: { read?: boolean; starred?: boolean }): Promise<void>;
+  /** Set flags (read/starred) for a set of provider message ids. */
+  setFlags(
+    mailboxPath: string,
+    providerMessageIds: string[],
+    flags: { read?: boolean; starred?: boolean },
+  ): Promise<void>;
 
-  /** Move UIDs to another mailbox. */
-  move(mailboxPath: string, uids: number[], targetMailboxPath: string): Promise<void>;
+  /** Move provider message ids to another mailbox. */
+  move(
+    mailboxPath: string,
+    providerMessageIds: string[],
+    targetMailboxPath: string,
+  ): Promise<void>;
 
-  /** Delete UIDs from a mailbox. */
-  delete(mailboxPath: string, uids: number[]): Promise<void>;
+  /** Delete provider message ids from a mailbox. */
+  delete(mailboxPath: string, providerMessageIds: string[]): Promise<void>;
 
   /** Send a message. */
   send(opts: SendOptions): Promise<void>;

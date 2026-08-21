@@ -1,9 +1,9 @@
 // Constructs a concrete provider adapter from persisted account data.
-// For OAuth providers (gmail/microsoft) this would load stored tokens;
-// the IMAP adapter uses decrypted credentials.
-
 import { decryptCredential } from "../../security/crypto";
 import { ImapProvider } from "./imap";
+import { GmailProvider } from "./gmail";
+import { MicrosoftProvider } from "./microsoft";
+import type { OAuthToken } from "../../oauth/client";
 import type { IEmailProvider } from "./types";
 import type { Env } from "../../env";
 
@@ -30,15 +30,8 @@ export async function buildProvider(
 ): Promise<IEmailProvider> {
   switch (account.provider) {
     case "imap": {
-      if (!credential) {
-        throw new Error("Missing credentials for IMAP account");
-      }
-      if (
-        !account.imap_host ||
-        !account.smtp_host ||
-        !account.imap_port ||
-        !account.smtp_port
-      ) {
+      if (!credential) throw new Error("Missing credentials for IMAP account");
+      if (!account.imap_host || !account.smtp_host || !account.imap_port || !account.smtp_port) {
         throw new Error("Incomplete IMAP/SMTP configuration");
       }
       const { username, password } = await decryptedImap(credential.credential, env);
@@ -55,6 +48,16 @@ export async function buildProvider(
         account.email,
       );
     }
+    case "gmail": {
+      if (!credential) throw new Error("Missing OAuth token for Gmail");
+      const token = await decryptedOAuthToken(credential.credential, env);
+      return new GmailProvider(token, account.email);
+    }
+    case "microsoft": {
+      if (!credential) throw new Error("Missing OAuth token for Outlook");
+      const token = await decryptedOAuthToken(credential.credential, env);
+      return new MicrosoftProvider(token, account.email);
+    }
     default:
       throw new Error(`Provider "${account.provider}" is not implemented yet`);
   }
@@ -67,7 +70,6 @@ interface ImapPlainCreds {
 
 async function decryptedImap(blob: string, env: Env): Promise<ImapPlainCreds> {
   const plain = await decryptCredential(blob, env.CREDENTIAL_ENCRYPTION_KEY);
-  // Our stored IMAP credential is JSON {username, password}
   try {
     const parsed = JSON.parse(plain);
     if (typeof parsed.username === "string" && typeof parsed.password === "string") {
@@ -77,4 +79,17 @@ async function decryptedImap(blob: string, env: Env): Promise<ImapPlainCreds> {
     /* invalid */
   }
   throw new Error("Invalid stored credential format");
+}
+
+async function decryptedOAuthToken(blob: string, env: Env): Promise<OAuthToken> {
+  const plain = await decryptCredential(blob, env.CREDENTIAL_ENCRYPTION_KEY);
+  try {
+    const parsed = JSON.parse(plain) as { type?: string; token?: OAuthToken };
+    if (parsed.type === "oauth" && parsed.token && parsed.token.access_token) {
+      return parsed.token;
+    }
+  } catch {
+    /* invalid */
+  }
+  throw new Error("Invalid stored OAuth token");
 }

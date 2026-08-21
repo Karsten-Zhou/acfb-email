@@ -89,6 +89,7 @@ export class ImapProvider implements IEmailProvider {
 
       const envelopes = await imap.fetchHeadersByUid(uids);
       const messages: ProviderMessage[] = envelopes.map((e) => ({
+        providerId: String(e.uid),
         remoteUid: e.uid,
         messageId: e.messageId,
         subject: e.subject,
@@ -113,7 +114,9 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async fetchBody(mailboxPath: string, uid: number): Promise<ProviderBody> {
+  async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
+    const uid = parseInt(providerId, 10);
+    if (Number.isNaN(uid)) throw new Error("Invalid IMAP message id");
     const imap = this.connectImap();
     try {
       await imap.connect();
@@ -147,9 +150,11 @@ export class ImapProvider implements IEmailProvider {
 
   async setFlags(
     mailboxPath: string,
-    uids: number[],
+    providerIds: string[],
     flags: { read?: boolean; starred?: boolean },
   ): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
     const imap = this.connectImap();
     try {
       await imap.connect();
@@ -162,9 +167,11 @@ export class ImapProvider implements IEmailProvider {
 
   async move(
     mailboxPath: string,
-    uids: number[],
+    providerIds: string[],
     targetMailboxPath: string,
   ): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
     const imap = this.connectImap();
     try {
       await imap.connect();
@@ -185,7 +192,9 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async delete(mailboxPath: string, uids: number[]): Promise<void> {
+  async delete(mailboxPath: string, providerIds: string[]): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
     const imap = this.connectImap();
     try {
       await imap.connect();

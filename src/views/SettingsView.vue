@@ -15,6 +15,7 @@ const adding = ref(false);
 const testing = ref(false);
 const testResult = ref<{ ok: boolean; message: string } | null>(null);
 const error = ref<string | null>(null);
+const notice = ref<string | null>(null);
 
 const form = ref({
   name: "",
@@ -32,7 +33,17 @@ const form = ref({
 
 onMounted(async () => {
   await loadAccounts();
+  // If we just returned from an OAuth provider callback, show a toast-ish note.
+  const connected = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("connected");
+  if (connected === "google" || connected === "microsoft") {
+    notice.value = connected === "google" ? "Gmail connected" : "Outlook connected";
+    window.setTimeout(() => (notice.value = null), 4000);
+  }
 });
+
+async function connectOAuth(provider: "google" | "microsoft") {
+  window.location.href = `/api/oauth/${provider}/start`;
+}
 
 async function testConnection() {
   testing.value = true;
@@ -106,6 +117,31 @@ function formatDate(iso: string): string {
             <Plus class="h-4 w-4" /> Add account
           </Button>
         </div>
+
+        <div v-if="notice" class="card-surface mb-3 border-emerald-500/40 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400">
+          {{ notice }}
+        </div>
+
+        <!-- OAuth providers -->
+        <div class="card-surface mb-4 grid gap-2 p-4 sm:grid-cols-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-medium">Gmail</div>
+              <div class="text-xs text-muted-foreground">Connect via Google OAuth</div>
+            </div>
+            <Button variant="outline" size="sm" @click="connectOAuth('google')">Connect</Button>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-medium">Outlook / Microsoft</div>
+              <div class="text-xs text-muted-foreground">Connect via Microsoft Graph</div>
+            </div>
+            <Button variant="outline" size="sm" @click="connectOAuth('microsoft')">Connect</Button>
+          </div>
+        </div>
+
+        <div v-if="showAdd" class="text-sm text-muted-foreground">…or an IMAP / SMTP account:</div>
+        <div v-else class="mb-2 text-sm text-muted-foreground">IMAP / SMTP account:</div>
 
         <!-- Add form -->
         <div v-if="showAdd" class="card-surface mb-4 space-y-3 p-4">
