@@ -1,11 +1,15 @@
 <script setup lang="ts">
-// Mailbox view: 3-pane layout (desktop) / stacked nav (mobile).
+// Mailbox view — 3-pane desktop layout / stacked mobile.
+// Wide screens: sidebar | list | reading pane (message content changes in the
+// rightmost column, never a separate page).
+// The route /mail/message/:id maps here; on desktop the right pane reads it.
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import { accountsState, loadAccounts } from "../stores/accounts";
-import { loadUnified, loadMessages, deleteMessages, updateFlags, mailState } from "../stores/mail";
+import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, mailState } from "../stores/mail";
 import { api } from "../lib/api";
+import Button from "../components/ui/button/Button.vue";
 import {
   Inbox,
   Send,
@@ -19,12 +23,16 @@ import {
   Mail as MailIcon,
   Settings,
   Reply,
+  ChevronLeft,
+  Paperclip,
 } from "lucide-vue-next";
-import type { Mailbox } from "@shared/types";
+import type { Mailbox, Message } from "@shared/types";
 
+const route = useRoute();
 const router = useRouter();
 const activeMailboxId = ref<string | null>("unified");
 const syncing = ref(false);
+const reading = ref(false); // mobile: whether the compact reader is open
 
 const roleLabel: Record<string, string> = {
   inbox: "Inbox",
@@ -46,7 +54,6 @@ const roleIcon: Record<string, typeof Inbox> = {
   trash: Trash2,
 };
 
-// mailboxTree: per-account mailboxes, loaded from server
 const mailboxTree = ref<{ accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[]>([]);
 
 async function refresh() {
@@ -82,11 +89,15 @@ async function syncNow() {
 function selectMailbox(id: string) {
   activeMailboxId.value = id;
   mailState.selectedIds = new Set();
+  // Clear any open message when switching folders.
+  if (route.params.id) router.replace("/mail");
   void loadInto();
 }
 
-function openMessageById(m: { id: string }) {
+/** Open a message: desktop reads it in the rightmost pane via the route. */
+function openMessageRow(m: Message) {
   router.push({ name: "message", params: { id: m.id } });
+  reading.value = true; // mobile: show the compact reader
 }
 
 function toggleSelect(id: string) {
@@ -122,177 +133,243 @@ function formatDate(iso: string): string {
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   if (sameDay) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  const year = d.getFullYear() === today.getFullYear();
+  return d.toLocaleDateString([], { month: "short", day: "numeric", ...(year ? {} : { year: "numeric" }) });
 }
 
 function sanitizeHtml(s: string): string {
   return DOMPurify.sanitize(s);
 }
 
+// ---- route-driven reading pane ----
+watch(
+  () => route.params.id,
+  async (id) => {
+    if (typeof id === "string" && id) {
+      reading.value = true;
+      try {
+        await openMessage(id);
+      } catch {
+        mailState.selected = null;
+      }
+    } else {
+      mailState.selected = null;
+      reading.value = false;
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(refresh);
 watch(activeMailboxId, () => loadInto());
 </script>
 
 <template>
-  <div class="flex h-full">
+  <div class="flex h-full bg-background text-foreground">
     <!-- Sidebar -->
-    <aside class="hidden w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 md:flex">
-      <div class="p-4">
-        <button
-          class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
-          @click="router.push({ name: 'compose' })"
-        >
-          <Plus class="h-4 w-4" /> Compose
-        </button>
-        <button
-          class="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          @click="syncNow"
-          :disabled="syncing"
-        >
-          <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" /> {{ syncing ? "Syncing…" : "Sync now" }}
-        </button>
+    <aside class="hidden w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex">
+      <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
+        <span class="text-sm font-semibold tracking-tight">Mail</span>
+        <div class="flex items-center gap-1">
+          <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow" title="Sync now">
+            <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" />
+          </Button>
+          <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'settings' })" title="Settings">
+            <Settings class="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-2 pb-4">
+      <div class="px-3 py-2">
+        <Button class="w-full" variant="default" size="sm" @click="router.push({ name: 'compose' })">
+          <Plus class="h-4 w-4" /> Compose
+        </Button>
+      </div>
+
+      <nav class="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
         <button
-          class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800"
-          :class="activeMailboxId === 'unified' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ''"
+          class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
+          :class="activeMailboxId === 'unified' ? 'bg-accent text-accent-foreground' : ''"
           @click="selectMailbox('unified')"
         >
-          <MailIcon class="h-4 w-4" />
+          <MailIcon class="h-4 w-4 shrink-0" />
           <span class="flex-grow text-left">Unified Inbox</span>
         </button>
 
         <template v-for="acct in accountsState.accounts" :key="acct.id">
-          <div class="mb-1 mt-4 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {{ acct.name }} <span class="ml-1 font-normal normal-case">{{ acct.email }}</span>
+          <div class="mt-4 mb-0.5 px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ acct.name }}
           </div>
           <button
             v-for="item in mailboxTree.filter((t) => t.accountId === acct.id)"
             :key="item.mailbox.id"
-            class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
-            :class="activeMailboxId === item.mailbox.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ''"
+            class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
+            :class="activeMailboxId === item.mailbox.id ? 'bg-accent text-accent-foreground' : ''"
             @click="selectMailbox(item.mailbox.id)"
           >
-            <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4" />
+            <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4 shrink-0" />
             <span class="flex-grow truncate text-left">{{ item.mailbox.name }}</span>
-            <span v-if="item.mailbox.unseenMessages" class="rounded-full bg-blue-600 px-1.5 py-0.5 text-xs text-white">
+            <span v-if="item.mailbox.unseenMessages" class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
               {{ item.mailbox.unseenMessages }}
             </span>
           </button>
         </template>
       </nav>
-
-      <div class="border-t border-slate-200 p-3 dark:border-slate-800">
-        <button
-          class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
-          @click="router.push({ name: 'settings' })"
-        >
-          <Settings class="h-4 w-4" /> Settings
-        </button>
-      </div>
     </aside>
 
     <!-- Message list -->
-    <section class="flex min-w-0 flex-1 flex-col border-r border-slate-200 dark:border-slate-800">
-      <header class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <h2 class="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+    <section
+      class="flex min-w-0 flex-1 flex-col border-r border-border bg-background"
+      :class="reading ? 'hidden md:flex' : 'flex'"
+    >
+      <header class="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <h2 class="truncate text-sm font-semibold">
           {{ activeMailboxId === 'unified' ? 'Unified Inbox' : roleLabel[mailboxTree.find((t) => t.mailbox.id === activeMailboxId)?.mailbox.role ?? 'inbox'] ?? 'Mailbox' }}
         </h2>
-        <div class="flex gap-2">
-          <button
-            v-if="selectedCount > 0"
-            class="rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
-            @click="markSelectedRead"
-          >
-            Mark read
-          </button>
-          <button
-            v-if="selectedCount > 0"
-            class="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-            @click="deleteSelected"
-          >
+        <div class="flex items-center gap-1">
+          <Button v-if="selectedCount > 0" variant="ghost" size="sm" @click="markSelectedRead">Mark read</Button>
+          <Button v-if="selectedCount > 0" variant="ghost" size="sm" class="text-destructive" @click="deleteSelected">
             Delete ({{ selectedCount }})
-          </button>
+          </Button>
         </div>
       </header>
 
-      <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-slate-400">
+      <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> Loading…
       </div>
-      <div v-else-if="mailState.messages.length === 0" class="flex flex-1 items-center justify-center p-8 text-center text-sm text-slate-400">
+      <div v-else-if="mailState.messages.length === 0" class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
         <div>
-          <MailIcon class="mx-auto mb-2 h-8 w-8" />
+          <MailIcon class="mx-auto mb-2 h-8 w-8 opacity-40" />
           No messages here yet.
         </div>
       </div>
-      <div v-else class="flex-1 overflow-y-auto">
+      <div v-else class="flex-1 divide-y divide-border overflow-y-auto">
         <button
           v-for="m in mailState.messages"
           :key="m.id"
-          class="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-          :class="{ 'bg-blue-50 dark:bg-blue-900/20': mailState.selected?.id === m.id }"
-          @click="openMessageById(m)"
+          class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
+          :class="[mailState.selected?.id === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"
+          @click="openMessageRow(m)"
         >
           <input
             type="checkbox"
-            class="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+            class="mt-1 h-4 w-4 shrink-0 accent-primary"
             :checked="mailState.selectedIds.has(m.id)"
             @click.stop
             @change="toggleSelect(m.id)"
           />
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="truncate text-sm" :class="m.isRead ? 'font-normal text-slate-600 dark:text-slate-300' : 'font-semibold text-slate-900 dark:text-white'">
-                {{ m.from?.name || m.from?.address || "(unknown)" }}
+              <span class="truncate text-sm" :class="m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'">
+                {{ m.from?.name || m.from?.address || '(unknown)' }}
               </span>
-              <span class="shrink-0 text-xs text-slate-400">{{ formatDate(m.receivedAt) }}</span>
+              <span class="shrink-0 text-xs text-muted-foreground">{{ formatDate(m.receivedAt) }}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="truncate text-sm" :class="m.isRead ? 'text-slate-500' : 'font-medium text-slate-700 dark:text-slate-200'">
-                {{ m.subject || "(no subject)" }}
+              <span class="truncate text-sm" :class="m.isRead ? 'text-muted-foreground' : 'font-medium'">
+                {{ m.subject || '(no subject)' }}
               </span>
-              <Star v-if="m.isStarred" class="h-3.5 w-3.5 shrink-0 text-yellow-400" />
+              <Star v-if="m.isStarred" class="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
             </div>
-            <div class="truncate text-xs text-slate-400">{{ m.snippet }}</div>
+            <div class="truncate text-xs text-muted-foreground">{{ m.snippet }}</div>
           </div>
         </button>
       </div>
     </section>
 
-    <!-- Detail pane (desktop) -->
-    <section class="hidden min-w-0 flex-1 lg:flex">
-      <div v-if="!mailState.selected" class="flex flex-1 items-center justify-center text-sm text-slate-400">
+    <!-- Reading pane (desktop rightmost column) / compact reader (mobile) -->
+    <section
+      class="min-w-0 flex-1 flex-col bg-background"
+      :class="reading ? 'flex md:flex' : 'hidden md:flex'"
+    >
+      <div v-if="!mailState.selected" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         Select a message to read it
       </div>
-      <div v-else class="flex flex-1 flex-col overflow-y-auto p-6">
-        <h1 class="text-lg font-semibold text-slate-900 dark:text-white">{{ mailState.selected.subject || "(no subject)" }}</h1>
-        <div class="mt-2 flex items-center gap-2 text-sm text-slate-500">
-          <span class="font-medium">{{ mailState.selected.from?.name || mailState.selected.from?.address }}</span>
-          <span class="text-slate-400">&lt;{{ mailState.selected.from?.address }}&gt;</span>
-          <span class="ml-auto text-xs">{{ formatDate(mailState.selected.receivedAt) }}</span>
+      <template v-else>
+        <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+          <Button variant="ghost" size="icon" class="md:hidden" @click="router.replace('/mail')" title="Back to list">
+            <ChevronLeft class="h-4 w-4" />
+          </Button>
+          <div class="min-w-0 flex-1">
+            <h1 class="truncate text-base font-semibold leading-tight">{{ mailState.selected.subject || '(no subject)' }}</h1>
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span class="font-medium text-foreground">{{ mailState.selected.from?.name || mailState.selected.from?.address }}</span>
+              <span v-if="mailState.selected.from?.address" class="text-xs">&lt;{{ mailState.selected.from.address }}&gt;</span>
+              <span class="text-xs">{{ formatDate(mailState.selected.receivedAt) }}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="replyTo" title="Reply">
+              <Reply class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :title="mailState.selected.isStarred ? 'Unstar' : 'Star'"
+              @click="updateFlags([mailState.selected.id], { starred: !mailState.selected.isStarred })"
+            >
+              <Star class="h-4 w-4" :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :title="mailState.selected.isRead ? 'Mark unread' : 'Mark read'"
+              @click="updateFlags([mailState.selected.id], { read: !mailState.selected.isRead })"
+            >
+              <MailIcon class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-destructive"
+              title="Delete"
+              @click="deleteMessages([mailState.selected.id]); router.replace('/mail')"
+            >
+              <Trash2 class="h-4 w-4" />
+            </Button>
+          </div>
+        </header>
+
+        <div v-if="mailState.selected.to.length" class="border-b border-border px-5 py-1.5 text-xs text-muted-foreground">
+          To: <span v-for="(t, i) in mailState.selected.to" :key="i">{{ t.name || t.address }}<span v-if="i < mailState.selected.to.length - 1">, </span></span>
         </div>
-        <div class="mt-4 flex gap-2">
-          <button
-            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500"
-            @click="replyTo"
+        <div v-if="mailState.selected.attachments?.length" class="flex flex-wrap gap-2 border-b border-border px-5 py-2">
+          <div
+            v-for="a in mailState.selected.attachments"
+            :key="a.id"
+            class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
           >
-            <Reply class="h-3.5 w-3.5" /> Reply
-          </button>
+            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
+            <span class="max-w-[200px] truncate">{{ a.filename || 'attachment' }}</span>
+          </div>
         </div>
-        <div class="email-body mt-6 flex-1" v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')" /><!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify above -->
-      </div>
+
+        <div class="flex-1 overflow-y-auto px-5 py-5">
+          <div class="email-body text-[15px]" v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')" />
+        </div>
+      </template>
     </section>
 
-    <!-- Mobile bottom navigation -->
-    <nav class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-slate-600 dark:text-slate-300" @click="router.push({ name: 'mailbox' })">
+    <!-- Mobile top bar (when no message open) -->
+    <div v-if="!reading" class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">
+      <span class="text-sm font-semibold">Mail</span>
+      <div class="flex items-center gap-1">
+        <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" /></Button>
+        <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'settings' })"><Settings class="h-4 w-4" /></Button>
+      </div>
+    </div>
+
+    <!-- Mobile bottom nav -->
+    <nav class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-card py-1.5 md:hidden">
+      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70" @click="router.push({ name: 'mailbox' })">
         <MailIcon class="h-5 w-5" /> Mail
       </button>
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-blue-600" @click="router.push({ name: 'compose' })">
+      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-primary" @click="router.push({ name: 'compose' })">
         <Plus class="h-5 w-5" /> Compose
       </button>
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-slate-600 dark:text-slate-300" @click="router.push({ name: 'settings' })">
+      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70" @click="router.push({ name: 'settings' })">
         <Settings class="h-5 w-5" /> Settings
       </button>
     </nav>

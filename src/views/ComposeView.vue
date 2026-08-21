@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { api } from "../lib/api";
+import Button from "../components/ui/button/Button.vue";
 import { ChevronLeft, Send, Trash2, FilePlus2 } from "lucide-vue-next";
 
 const route = useRoute();
@@ -105,64 +106,64 @@ function discard() {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
-    <header class="flex items-center gap-3 border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
-      <button class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" @click="router.back()" aria-label="Back">
-        <ChevronLeft class="h-5 w-5" />
-      </button>
-      <h1 class="text-sm font-semibold text-slate-800 dark:text-slate-100">New message</h1>
+  <div class="flex h-full flex-col bg-background">
+    <header class="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
+      <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()" title="Back">
+        <ChevronLeft class="h-4 w-4" />
+      </Button>
+      <h1 class="text-sm font-semibold">New message</h1>
       <div class="flex-1" />
-      <button class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" @click="saveDraft">
+      <Button variant="ghost" size="sm" @click="saveDraft">
         <FilePlus2 class="h-4 w-4" /> Save draft
-      </button>
-      <button class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50" :disabled="!canSend || sending" @click="send">
-        <Send class="h-3.5 w-3.5" /> {{ sending ? "Sending…" : "Send" }}
-      </button>
-      <button class="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30" @click="discard" aria-label="Discard">
+      </Button>
+      <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
+        <Send class="h-4 w-4" /> {{ sending ? "Sending…" : "Send" }}
+      </Button>
+      <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive" @click="discard" title="Discard">
         <Trash2 class="h-4 w-4" />
-      </button>
+      </Button>
     </header>
 
     <div class="flex-1 overflow-y-auto p-4">
-      <div v-if="error" class="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
+      <div v-if="error" class="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
         {{ error }}
       </div>
 
       <div class="space-y-3">
         <div class="flex items-center gap-2 text-sm">
-          <label class="w-14 shrink-0 text-slate-500">From</label>
-          <select v-model="accountId" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900">
+          <label class="w-14 shrink-0 text-muted-foreground">From</label>
+          <select v-model="accountId" class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm">
             <option v-for="a in accountsState.accounts" :key="a.id" :value="a.id">{{ a.name }} &lt;{{ a.email }}&gt;</option>
           </select>
         </div>
         <div class="flex items-center gap-2 text-sm">
-          <label class="w-14 shrink-0 text-slate-500">To</label>
-          <input v-model="to" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="recipient@example.com, another@example.com" />
+          <label class="w-14 shrink-0 text-muted-foreground">To</label>
+          <input v-model="to" class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground" placeholder="recipient@example.com, another@example.com" />
         </div>
         <div class="flex items-center gap-2 text-sm">
-          <label class="w-14 shrink-0 text-slate-500">CC</label>
-          <input v-model="cc" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="cc@example.com" />
+          <label class="w-14 shrink-0 text-muted-foreground">CC</label>
+          <input v-model="cc" class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground" placeholder="cc@example.com" />
         </div>
         <div class="flex items-center gap-2 text-sm">
-          <label class="w-14 shrink-0 text-slate-500">BCC</label>
-          <input v-model="bcc" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="bcc@example.com" />
+          <label class="w-14 shrink-0 text-muted-foreground">BCC</label>
+          <input v-model="bcc" class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground" placeholder="bcc@example.com" />
         </div>
         <div class="flex items-center gap-2 text-sm">
-          <label class="w-14 shrink-0 text-slate-500">Subject</label>
-          <input v-model="subject" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="Subject" />
+          <label class="w-14 shrink-0 text-muted-foreground">Subject</label>
+          <input v-model="subject" class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground" placeholder="Subject" />
         </div>
 
         <div class="flex items-center gap-1">
           <button
             class="rounded-md px-2.5 py-1 text-xs font-medium"
-            :class="mode === 'text' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            :class="mode === 'text' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'"
             @click="mode = 'text'"
           >
             Plain text
           </button>
           <button
             class="rounded-md px-2.5 py-1 text-xs font-medium"
-            :class="mode === 'html' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            :class="mode === 'html' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'"
             @click="mode = 'html'"
           >
             HTML
@@ -171,7 +172,7 @@ function discard() {
 
         <textarea
           v-model="body"
-          class="min-h-[280px] w-full rounded-md border border-slate-300 bg-white p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-900"
+          class="min-h-[280px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm placeholder:text-muted-foreground"
           :placeholder="mode === 'html' ? '<p>Write HTML here…</p>' : 'Write your message…'"
         />
       </div>

@@ -1,9 +1,11 @@
-import { createRouter, createWebHashHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 import { authState, bootstrap } from "../stores/auth";
 
 export const router = createRouter({
-  // Hash history so deep links work on the Workers SPA (no server rewrites).
-  history: createWebHashHistory(),
+  // HTML5 history: non-API routes are handled by the Workers SPA fallback
+  // (assets.not_found_handling = single_page_application), so deep links work
+  // without hash fragments.
+  history: createWebHistory(),
   routes: [
     { path: "/", redirect: "/mail" },
     {
@@ -17,9 +19,12 @@ export const router = createRouter({
       component: () => import("../views/MailboxView.vue"),
     },
     {
+      // On wide screens this renders inside MailboxView's reading pane
+      // (via a nested router-view); on narrow screens it's a standalone page.
       path: "/mail/message/:id",
       name: "message",
-      component: () => import("../views/MessageView.vue"),
+      component: () => import("../views/MailboxView.vue"),
+      props: true,
     },
     {
       path: "/compose",
