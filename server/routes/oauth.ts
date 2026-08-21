@@ -18,8 +18,8 @@ import { configFor } from "../oauth/config";
 const OAUTH_STATE_COOKIE = "ec_oauth_state";
 
 export const oauthRoutes = new Hono<{ Bindings: Env }>();
-oauthRoutes.use("/callback", requireAuth);
-oauthRoutes.use("/start", requireAuth);
+// Require auth for every /api/oauth/* route (start + callback).
+oauthRoutes.use("*", requireAuth);
 
 // GET /api/oauth/:provider/start?action=connect|reconnect
 oauthRoutes.get("/:provider/start", async (c) => {

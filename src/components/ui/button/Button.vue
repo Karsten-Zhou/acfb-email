@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { type HTMLAttributes, computed } from "vue";
-import { Primitive } from "reka-ui";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
@@ -36,21 +35,16 @@ const props = withDefaults(
   defineProps<{
     variant?: ButtonVariants["variant"];
     size?: ButtonVariants["size"];
-    asChild?: boolean;
     class?: HTMLAttributes["class"];
   }>(),
-  { variant: "default", size: "default", asChild: false },
+  { variant: "default", size: "default" },
 );
 
 const computedClass = computed(() => cn(buttonVariants({ variant: props.variant, size: props.size }), props.class));
 </script>
 
 <template>
-  <Primitive
-    :as="asChild ? 'template' : 'button'"
-    :class="computedClass"
-    :data-slot="asChild ? undefined : 'button'"
-  >
+  <button :class="computedClass" :data-slot="'button'">
     <slot />
-  </Primitive>
+  </button>
 </template>

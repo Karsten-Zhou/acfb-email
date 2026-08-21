@@ -20,8 +20,13 @@ export function googleConfig(env: Env): OAuthProviderConfig {
 
 export function microsoftConfig(env: Env): OAuthProviderConfig {
   return {
-    authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    // Personal (consumer) Microsoft accounts — matches an Entra app whose
+    // "Supported account types" is "Personal Microsoft accounts only".
+    // (Use "/common/" for an "All" audience app, "/organizations/" for
+    //  work/school only. The /common/ endpoint errors on Consumer-audience
+    //  apps with invalid_request.)
+    authorizeUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
     clientId: env.MICROSOFT_CLIENT_ID ?? "",
     clientSecret: env.MICROSOFT_CLIENT_SECRET ?? "",
     scopes: ["User.Read", "Mail.ReadWrite", "offline_access"],

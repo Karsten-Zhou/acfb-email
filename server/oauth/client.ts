@@ -65,7 +65,13 @@ export async function exchangeCode(
   });
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !data.access_token) {
-    throw new HttpError(502, "Provider token exchange failed");
+    const providerMsg =
+      typeof data.error_description === "string"
+        ? data.error_description
+        : typeof data.error === "string"
+          ? data.error
+          : `HTTP ${res.status}`;
+    throw new HttpError(502, `Provider token exchange failed: ${providerMsg}`);
   }
   return normalizeToken(data);
 }
@@ -89,7 +95,13 @@ export async function refreshToken(
   });
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !data.access_token) {
-    throw new HttpError(502, "Provider token refresh failed");
+    const providerMsg =
+      typeof data.error_description === "string"
+        ? data.error_description
+        : typeof data.error === "string"
+          ? data.error
+          : `HTTP ${res.status}`;
+    throw new HttpError(502, `Provider token refresh failed: ${providerMsg}`);
   }
   // Preserve the original refresh token if the provider didn't rotate it.
   return { ...normalizeToken(data), refresh_token: (data.refresh_token as string) ?? refreshTokenValue };
