@@ -195,6 +195,11 @@ and STARTTLS/implicit TLS. This is the one place we could not use a library.
 
 ---
 
+> **Status note (2026-08):** the IMAP/SMTP adapter is **tested live** (QQ Mail).
+> The Gmail (REST) and Microsoft Graph adapters are **implemented but not yet
+> live-verified** — they need Google Cloud / Entra app registrations with OAuth
+> consent. Until verified, treat them as untested experimental code paths.
+
 ## 7. Cloudflare resource usage
 
 | Resource | Used? | Why |
