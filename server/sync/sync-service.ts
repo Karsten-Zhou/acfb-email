@@ -167,7 +167,10 @@ async function upsertMessage(
   const fromAddress = msg.from?.address ?? null;
   const subject = msg.subject ?? null;
   const date = msg.date ?? null;
-  const receivedAt = msg.internalDate ?? new Date().toISOString();
+  // Normalize to an ISO-8601 string so cross-provider sorts are consistent
+  // (IMAP INTERNALDATE is "d-MMM-yyyy ..." which would sort lexically above
+  // ISO dates like "2026-…" — breaking unified-inbox ordering).
+  const receivedAt = isoDate(msg.internalDate) ?? isoDate(msg.date) ?? new Date().toISOString();
   const isRead = msg.flags.includes("\\Seen");
   const isStarred = msg.flags.includes("\\Flagged");
   const hasAttachments = false; // set when body fetched
@@ -192,9 +195,9 @@ async function upsertMessage(
   if (existing) {
     // Update flags/read state if changed.
     await env.DB.prepare(
-      `UPDATE messages SET is_read = ?, is_starred = ?, sync_hash = ?, date = COALESCE(?, date), subject = COALESCE(?, subject) WHERE id = ?`,
+      `UPDATE messages SET is_read = ?, is_starred = ?, sync_hash = ?, date = COALESCE(?, date), subject = COALESCE(?, subject), received_at = COALESCE(?, received_at) WHERE id = ?`,
     )
-      .bind(isRead ? 1 : 0, isStarred ? 1 : 0, hash, date, subject, existing.id)
+      .bind(isRead ? 1 : 0, isStarred ? 1 : 0, hash, date, subject, receivedAt, existing.id)
       .run();
     // recipients rarely change; skip for speed
     return;
@@ -328,6 +331,13 @@ function simpleHash(s: string): string {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
+}
+
+/** Parse a provider date string into ISO-8601 (UTC), or null. */
+function isoDate(raw: string | null): string | null {
+  if (!raw) return null;
+  const t = new Date(raw);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
 }
 
 function classifyError(err: unknown): string {
