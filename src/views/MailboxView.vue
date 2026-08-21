@@ -9,6 +9,7 @@ import DOMPurify from "dompurify";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, mailState } from "../stores/mail";
 import { api } from "../lib/api";
+import { t } from "../lib/i18n";
 import Button from "../components/ui/button/AppButton.vue";
 import {
   Inbox,
@@ -25,6 +26,8 @@ import {
   Reply,
   ChevronLeft,
   Paperclip,
+  MailOpen,
+  Loader2,
 } from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
@@ -33,6 +36,13 @@ const router = useRouter();
 const activeMailboxId = ref<string | null>("unified");
 const syncing = ref(false);
 const reading = ref(false); // mobile: whether the compact reader is open
+const onlyUnread = ref(false);
+const loadingOlder = ref(false);
+const pageSize = 50;
+const hasOlder = ref(true);
+const confirmDelete = ref(false);
+const deleting = ref(false);
+const syncingAccountId = ref<string | null>(null);
 
 const roleLabel: Record<string, string> = {
   inbox: "Inbox",
@@ -86,9 +96,20 @@ async function syncNow() {
   }
 }
 
+async function syncAccountNow(id: string) {
+  syncingAccountId.value = id;
+  try {
+    await api.syncAccount(id);
+    await refresh();
+  } finally {
+    syncingAccountId.value = null;
+  }
+}
+
 function selectMailbox(id: string) {
   activeMailboxId.value = id;
   mailState.selectedIds = new Set();
+  hasOlder.value = true;
   // Clear any open message when switching folders.
   if (route.params.id) router.replace("/mail");
   void loadInto();
@@ -115,10 +136,51 @@ async function markSelectedRead() {
   mailState.selectedIds = new Set();
 }
 
-async function deleteSelected() {
+async function confirmDeleteSelected() {
+  confirmDelete.value = true;
+}
+
+async function doDeleteSelected() {
+  deleting.value = true;
   const ids = [...mailState.selectedIds];
-  await deleteMessages(ids);
-  mailState.selectedIds = new Set();
+  try {
+    await deleteMessages(ids);
+    mailState.selectedIds = new Set();
+    confirmDelete.value = false;
+  } finally {
+    deleting.value = false;
+  }
+}
+
+/** Messages after applying the "only unread" filter. */
+const visibleMessages = computed(() => {
+  if (!onlyUnread.value) return mailState.messages;
+  return mailState.messages.filter((m) => !m.isRead);
+});
+
+/** Load an older page (offset paging) into the current list. */
+async function loadOlder() {
+  if (loadingOlder.value || !hasOlder.value) return;
+  loadingOlder.value = true;
+  try {
+    const offset = mailState.messages.length;
+    const incoming =
+      activeMailboxId.value === "unified"
+        ? await api.unified(pageSize, offset)
+        : await api.messages(activeMailboxId.value!, pageSize, offset);
+    const seen = new Set(mailState.messages.map((m) => m.id));
+    const fresh = incoming.messages.filter((m) => !seen.has(m.id));
+    hasOlder.value = incoming.messages.length === pageSize;
+    mailState.messages = [...mailState.messages, ...fresh];
+  } finally {
+    loadingOlder.value = false;
+  }
+}
+
+/** Infinite-scroll trigger: when scrolled near the bottom. */
+function onListScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) void loadOlder();
 }
 
 function replyTo() {
@@ -197,8 +259,17 @@ watch(activeMailboxId, () => loadInto());
         </button>
 
         <template v-for="acct in accountsState.accounts" :key="acct.id">
-          <div class="mt-4 mb-0.5 px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {{ acct.name }}
+            <button
+              class="rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              :title="t('syncNow')"
+              :disabled="syncingAccountId === acct.id"
+              @click.stop="syncAccountNow(acct.id)"
+            >
+              <RefreshCw v-if="syncingAccountId === acct.id" class="h-3 w-3 animate-spin" />
+              <RefreshCw v-else class="h-3 w-3" />
+            </button>
           </div>
           <button
             v-for="item in mailboxTree.filter((t) => t.accountId === acct.id)"
@@ -222,30 +293,49 @@ watch(activeMailboxId, () => loadInto());
       class="flex min-w-0 flex-1 flex-col border-r border-border bg-background"
       :class="reading ? 'hidden md:flex' : 'flex'"
     >
-      <header class="flex items-center justify-between border-b border-border px-4 py-2.5">
+      <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
         <h2 class="truncate text-sm font-semibold">
-          {{ activeMailboxId === 'unified' ? 'Unified Inbox' : roleLabel[mailboxTree.find((t) => t.mailbox.id === activeMailboxId)?.mailbox.role ?? 'inbox'] ?? 'Mailbox' }}
+          {{ activeMailboxId === 'unified' ? t('unifiedInbox') : roleLabel[mailboxTree.find((t) => t.mailbox.id === activeMailboxId)?.mailbox.role ?? 'inbox'] ?? 'Mailbox' }}
         </h2>
         <div class="flex items-center gap-1">
-          <Button v-if="selectedCount > 0" variant="ghost" size="sm" @click="markSelectedRead">Mark read</Button>
-          <Button v-if="selectedCount > 0" variant="ghost" size="sm" class="text-destructive" @click="deleteSelected">
-            Delete ({{ selectedCount }})
+          <button
+            class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
+            :class="onlyUnread ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'"
+            :title="t('showOnlyUnread')"
+            @click="onlyUnread = !onlyUnread"
+          >
+            <MailOpen class="h-3.5 w-3.5" /> {{ t('showOnlyUnread') }}
+          </button>
+          <Button v-if="selectedCount > 0" variant="ghost" size="sm" @click="markSelectedRead">{{ t('markRead') }}</Button>
+          <Button v-if="selectedCount > 0" variant="ghost" size="sm" class="text-destructive" @click="confirmDeleteSelected">
+            <Trash2 class="h-4 w-4" /> {{ t('delete') }} ({{ selectedCount }})
           </Button>
         </div>
       </header>
 
-      <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> Loading…
-      </div>
-      <div v-else-if="mailState.messages.length === 0" class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
-        <div>
-          <MailIcon class="mx-auto mb-2 h-8 w-8 opacity-40" />
-          No messages here yet.
+      <!-- delete confirm dialog -->
+      <div v-if="confirmDelete" class="border-b border-border bg-card px-4 py-3">
+        <p class="text-sm">{{ t('confirmDeleteMessages') }}</p>
+        <div class="mt-2 flex gap-2">
+          <Button variant="destructive" size="sm" :disabled="deleting" @click="doDeleteSelected">
+            <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t('ok') }}
+          </Button>
+          <Button variant="ghost" size="sm" @click="confirmDelete = false">{{ t('cancelAction') }}</Button>
         </div>
       </div>
-      <div v-else class="flex-1 divide-y divide-border overflow-y-auto">
+
+      <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+        <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
+      </div>
+      <div v-else-if="visibleMessages.length === 0" class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+        <div>
+          <MailIcon class="mx-auto mb-2 h-8 w-8 opacity-40" />
+          {{ t('noMessages') }}
+        </div>
+      </div>
+      <div v-else class="flex-1 divide-y divide-border overflow-y-auto" @scroll="onListScroll">
         <button
-          v-for="m in mailState.messages"
+          v-for="m in visibleMessages"
           :key="m.id"
           class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
           :class="[mailState.selected?.id === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"

@@ -57,6 +57,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  // meta
+  health: () => request<HealthPayload>("/health"),
+
   // auth
   me: () => request<{ user: User }>("/auth/me"),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
@@ -125,4 +128,16 @@ export interface DraftInput {
   subject?: string;
   html?: string;
   text?: string;
+}
+
+export interface HealthPayload {
+  ok: boolean;
+  config: {
+    gmailOauth: boolean;
+    outlookOauth: boolean;
+    githubOauth: boolean;
+  };
+  version: string;
+  buildTime: string;
+  repo: string;
 }

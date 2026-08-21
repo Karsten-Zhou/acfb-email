@@ -37,7 +37,23 @@ api.route("/settings", settingsRoutes);
 app.route("/api", api);
 
 // Health check (unauthenticated)
-app.get("/api/health", (c) => c.json({ ok: true }));
+// Health + app meta: oauth config status (for disabling Connect buttons) and
+// version/build info (for the About section).
+const BUILD_TIME = new Date().toISOString(); // replaced at deploy/build time
+app.get("/api/health", (c) => {
+  const env = c.env;
+  return c.json({
+    ok: true,
+    config: {
+      gmailOauth: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+      outlookOauth: Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET),
+      githubOauth: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
+    },
+    version: "0.1.0",
+    buildTime: BUILD_TIME,
+    repo: "https://github.com/XiaoSong-CPE/cloudflare-email-client",
+  });
+});
 
 // 404 for unknown /api paths
 app.notFound((c) => {
