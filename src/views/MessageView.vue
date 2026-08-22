@@ -4,7 +4,7 @@ import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import { openMessage, updateFlags, deleteMessages } from "../stores/mail";
-import { t } from "../lib/i18n";
+import { t, formatDateTime } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
 import UiDialog from "../components/UiDialog.vue";
@@ -64,11 +64,6 @@ function reply() {
 function sanitizeHtml(s: string): string {
   return DOMPurify.sanitize(s);
 }
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-}
 </script>
 
 <template>
@@ -115,7 +110,7 @@ function formatDate(iso: string): string {
             <div class="truncate font-medium">{{ msg.from?.name || msg.from?.address }}</div>
             <div class="truncate text-xs text-muted-foreground">{{ msg.from?.address }}</div>
           </div>
-          <div class="ml-auto shrink-0 text-xs text-muted-foreground">{{ formatDate(msg.receivedAt) }}</div>
+          <div class="ml-auto shrink-0 text-xs text-muted-foreground">{{ formatDateTime(msg.receivedAt) }}</div>
         </div>
 
         <div v-if="msg.to.length" class="mt-2 text-xs text-muted-foreground">

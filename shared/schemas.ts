@@ -42,6 +42,7 @@ export const MessageSchema = z.object({
   id: z.string(),
   accountId: z.string(),
   mailboxId: z.string(),
+  remoteUid: z.number().int().nullable(),
   subject: z.string().nullable(),
   snippet: z.string().nullable(),
   from: AddressSchema.nullable(),

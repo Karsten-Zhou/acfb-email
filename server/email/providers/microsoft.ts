@@ -7,6 +7,7 @@ import type {
   ProviderFetchResult,
   ProviderMailbox,
   ProviderMessage,
+  ProviderPageResult,
   ProviderSyncOptions,
   SendOptions,
 } from "./types";
@@ -111,21 +112,31 @@ export class MicrosoftProvider implements IEmailProvider {
     const { status, json, errorText } = await providerGet(url, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
     const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
-    const out: ProviderMessage[] = msgs.map((m) => ({
-      providerId: m.id,
-      remoteUid: oidToUid(m.id),
-      messageId: m.internetMessageId ?? null,
-      subject: m.subject ?? null,
-      from: m.from?.emailAddress ? { name: m.from.emailAddress.name ?? null, address: m.from.emailAddress.address ?? null } : null,
-      to: (m.toRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
-      cc: (m.ccRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
-      date: m.sentDateTime ?? null,
-      internalDate: m.receivedDateTime ?? null,
-      flags: m.isRead ? ["\\Seen"] : [],
-      size: null,
-    }));
+    const out: ProviderMessage[] = msgs.map(mapGraphMessage);
     const highestUid = out.length ? Math.max(...out.map((o) => o.remoteUid)) : 0;
     return { messages: out, highestUid, uidValidity: null, total: msgs.length };
+  }
+
+  async fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult> {
+    const folders = await this.listMailboxes();
+    const folder = folders.find((f) => f.name === mailboxPath);
+    const folderId = folder ? await this.folderIdByName(mailboxPath) : null;
+    if (!folderId) return { messages: [], hasMore: false };
+    const top = Math.min(options.fetchLimit ?? 50, 50);
+    let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
+    if (options.beforeDate) {
+      url += `&$filter=receivedDateTime lt ${new Date(options.beforeDate).toISOString()}`;
+    } else if (options.beforeUid) {
+      url += `&$filter=receivedDateTime lt ${new Date(options.beforeUid).toISOString()}`;
+    }
+    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
+    const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
+    const out: ProviderMessage[] = msgs.map(mapGraphMessage);
+    return { messages: out, hasMore: msgs.length === top };
   }
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
@@ -188,6 +199,22 @@ export class MicrosoftProvider implements IEmailProvider {
     void base64url;
     void b64urlToBytes;
   }
+}
+
+function mapGraphMessage(m: GraphMessage): ProviderMessage {
+  return {
+    providerId: m.id,
+    remoteUid: oidToUid(m.id),
+    messageId: m.internetMessageId ?? null,
+    subject: m.subject ?? null,
+    from: m.from?.emailAddress ? { name: m.from.emailAddress.name ?? null, address: m.from.emailAddress.address ?? null } : null,
+    to: (m.toRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
+    cc: (m.ccRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
+    date: m.sentDateTime ?? null,
+    internalDate: m.receivedDateTime ?? null,
+    flags: m.isRead ? ["\\Seen"] : [],
+    size: null,
+  };
 }
 
 function oidToUid(oid: string): number {

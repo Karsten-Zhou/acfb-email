@@ -318,6 +318,44 @@ async function setAccountState(
     .run();
 }
 
+/**
+ * Load an older page from the provider for a mailbox and import it into D1.
+ * Used by the load-older path in the messages route (when the local DB page
+ * is exhausted). Returns the messages imported.
+ */
+export async function importOlderPage(
+  env: Env,
+  account: { id: string; provider: string },
+  mailboxPath: string,
+  beforeUid: number,
+  limit: number,
+  beforeDate?: number,
+): Promise<void> {
+  const credential = await getCredential(env, account.id);
+  const fullAccount = await getAccount(env, account.id);
+  if (!fullAccount) return;
+  const provider = await buildProvider(
+    fullAccount,
+    credential ? { credential: credential.credential } : null,
+    env,
+  );
+  const result = await provider.fetchOlder(mailboxPath, { beforeUid, beforeDate, fetchLimit: limit });
+  const mailbox = await upsertMailbox(env, account.id, mailboxPath);
+  for (const msg of result.messages) {
+    await upsertMessage(env, fullAccount, mailbox, null, msg);
+  }
+  // Refresh the aggregate counts (unseen changed as older messages arrive).
+  await env.DB.prepare(
+    `UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`,
+  )
+    .bind(
+      (await env.DB.prepare(`SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ?`).bind(mailbox.id).first<{ n: number }>())?.n ?? 0,
+      await unseenForBox(env, mailbox.id),
+      mailbox.id,
+    )
+    .run();
+}
+
 async function unseenForBox(env: Env, mailboxId: string): Promise<number> {
   const r = await env.DB.prepare(
     `SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ? AND is_read = 0`,

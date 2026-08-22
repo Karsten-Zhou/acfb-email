@@ -1,36 +1,19 @@
 <script setup lang="ts">
-// Mailbox view — 3-pane desktop layout / stacked mobile.
-// Wide screens: sidebar | list | reading pane (message content changes in the
-// rightmost column, never a separate page).
-// The route /mail/message/:id maps here; on desktop the right pane reads it.
+// Mailbox view — composition root over three panes:
+//   MailboxSidebar (accounts + folder tree), MessageListPane (middle column),
+//   MessageReaderPane (rightmost reader). Mobile top/bottom bars live here.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import DOMPurify from "dompurify";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, mailState } from "../stores/mail";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import Button from "../components/UiButton.vue";
-import AppTooltip from "../components/UiToolTip.vue";
 import UiDialog from "../components/UiDialog.vue";
-import {
-  Inbox,
-  Send,
-  FileText,
-  Trash2,
-  Archive,
-  AlertTriangle,
-  Star,
-  RefreshCw,
-  Plus,
-  Mail as MailIcon,
-  Settings,
-  Reply,
-  ChevronLeft,
-  Paperclip,
-  MailOpen,
-  Loader2,
-} from "lucide-vue-next";
+import MailboxSidebar from "./parts/MailboxSidebar.vue";
+import MessageListPane from "./parts/MessageListPane.vue";
+import MessageReaderPane from "./parts/MessageReaderPane.vue";
+import { RefreshCw, Plus, Mail as MailIcon, Settings, Loader2 } from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
@@ -61,17 +44,20 @@ const roleLabel: Record<string, string> = {
   trash: "Trash",
 };
 
-const roleIcon: Record<string, typeof Inbox> = {
-  inbox: Inbox,
-  all: MailIcon,
-  sent: Send,
-  drafts: FileText,
-  archive: Archive,
-  spam: AlertTriangle,
-  trash: Trash2,
-};
-
 const mailboxTree = ref<{ accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[]>([]);
+
+/**
+ * Unread count per mailbox, derived from *loaded* messages so badges react
+ * instantly to read/unread/delete/move. For mailboxes whose messages aren't
+ * currently loaded we fall back to the server aggregate (`unseenMessages`).
+ */
+const unreadByMailbox = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const m of mailState.messages) {
+    if (!m.isRead) counts[m.mailboxId] = (counts[m.mailboxId] ?? 0) + 1;
+  }
+  return counts;
+});
 
 async function refresh() {
   await loadAccounts();
@@ -183,16 +169,30 @@ const visibleMessages = computed(() => {
   return mailState.messages.filter((m) => !m.isRead);
 });
 
+/** Sidebar badge: derived from loaded messages when available, else server aggregate. */
+function unreadBadge(item: { mailbox: Mailbox }): number {
+  const loaded = unreadByMailbox.value[item.mailbox.id];
+  if (loaded !== undefined) return loaded;
+  return item.mailbox.unseenMessages ?? 0;
+}
+
 /** Load an older page (offset paging) into the current list. */
 async function loadOlder() {
   if (loadingOlder.value || !hasOlder.value) return;
   loadingOlder.value = true;
   try {
     const offset = mailState.messages.length;
+    // Oldest remote UID + oldest receivedAt in the currently loaded set = the
+    // "before" cursors so the route can fetch even older messages from the
+    // provider when the local DB page is exhausted.
+    const remoteUids = mailState.messages.map((m) => m.remoteUid).filter((x): x is number => !!x);
+    const beforeUid = remoteUids.length ? Math.min(...remoteUids) : 0;
+    const dates = mailState.messages.map((m) => new Date(m.receivedAt).getTime()).filter((n) => !Number.isNaN(n));
+    const beforeDate = dates.length ? Math.min(...dates) : 0;
     const incoming =
       activeMailboxId.value === "unified"
         ? await api.unified(pageSize, offset)
-        : await api.messages(activeMailboxId.value!, pageSize, offset);
+        : await api.messages(activeMailboxId.value!, pageSize, offset, beforeUid, beforeDate);
     const seen = new Set(mailState.messages.map((m) => m.id));
     const fresh = incoming.messages.filter((m) => !seen.has(m.id));
     hasOlder.value = incoming.messages.length === pageSize;
@@ -212,20 +212,6 @@ function replyTo() {
   const m = mailState.selected;
   if (!m) return;
   router.push({ name: "compose", query: { to: m.from?.address ?? "", subject: m.subject ? `Re: ${m.subject}` : "" } });
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  if (sameDay) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const year = d.getFullYear() === today.getFullYear();
-  return d.toLocaleDateString([], { month: "short", day: "numeric", ...(year ? {} : { year: "numeric" }) });
-}
-
-function sanitizeHtml(s: string): string {
-  return DOMPurify.sanitize(s);
 }
 
 // ---- route-driven reading pane ----
@@ -253,239 +239,54 @@ watch(
 
 onMounted(refresh);
 watch(activeMailboxId, () => loadInto());
+
+const listTitle = computed(() => {
+  if (activeMailboxId.value === "unified") return t("unifiedInbox");
+  const item = mailboxTree.value.find((t) => t.mailbox.id === activeMailboxId.value);
+  return roleLabel[item?.mailbox.role ?? "inbox"] ?? item?.mailbox.name ?? "Mailbox";
+});
 </script>
 
 <template>
   <div class="flex h-full bg-background text-foreground">
-    <!-- Sidebar -->
-    <aside class="hidden w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex">
-      <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
-        <span class="text-sm font-semibold tracking-tight">Mail</span>
-        <div class="flex items-center gap-1">
-          <AppTooltip :label="t('syncNow')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow">
-              <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" />
-            </Button>
-          </AppTooltip>
-          <AppTooltip :label="t('settings')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'settings' })">
-              <Settings class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-        </div>
-      </div>
+    <MailboxSidebar
+      :mailboxes="mailboxTree"
+      :active-mailbox-id="activeMailboxId"
+      :syncing="syncing"
+      :syncing-account-id="syncingAccountId"
+      :unread="unreadBadge"
+      @select="selectMailbox"
+      @sync-all="syncNow"
+      @sync-account="syncAccountNow"
+    />
 
-      <div class="px-3 py-2">
-        <Button class="w-full" variant="default" size="sm" @click="router.push({ name: 'compose' })">
-          <Plus class="h-4 w-4" /> Compose
-        </Button>
-      </div>
+    <MessageListPane
+      :title="listTitle"
+      :reading="reading"
+      :only-unread="onlyUnread"
+      :sync-error="syncError"
+      :messages="visibleMessages"
+      :loading="mailState.loading"
+      :selected-id="mailState.selected?.id ?? null"
+      :selected-ids="mailState.selectedIds"
+      :selected-count="selectedCount"
+      @toggle-unread="onlyUnread = !onlyUnread"
+      @mark-read="markSelectedRead"
+      @confirm-delete="confirmDeleteSelected"
+      @open="openMessageRow"
+      @toggle-select="toggleSelect"
+      @scroll="onListScroll"
+      @dismiss-error="syncError = null"
+    />
 
-      <nav class="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
-        <button
-          class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
-          :class="activeMailboxId === 'unified' ? 'bg-accent text-accent-foreground' : ''"
-          @click="selectMailbox('unified')"
-        >
-          <MailIcon class="h-4 w-4 shrink-0" />
-          <span class="flex-grow text-left">Unified Inbox</span>
-        </button>
-
-        <template v-for="acct in accountsState.accounts" :key="acct.id">
-          <div class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {{ acct.name }}
-            <AppTooltip :label="t('syncNow')">
-              <button
-                class="rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                :disabled="syncingAccountId === acct.id"
-                @click.stop="syncAccountNow(acct.id)"
-              >
-                <RefreshCw v-if="syncingAccountId === acct.id" class="h-3 w-3 animate-spin" />
-                <RefreshCw v-else class="h-3 w-3" />
-              </button>
-            </AppTooltip>
-          </div>
-          <button
-            v-for="item in mailboxTree.filter((t) => t.accountId === acct.id)"
-            :key="item.mailbox.id"
-            class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
-            :class="activeMailboxId === item.mailbox.id ? 'bg-accent text-accent-foreground' : ''"
-            @click="selectMailbox(item.mailbox.id)"
-          >
-            <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4 shrink-0" />
-            <span class="flex-grow truncate text-left">{{ item.mailbox.name }}</span>
-            <span v-if="item.mailbox.unseenMessages" class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-              {{ item.mailbox.unseenMessages }}
-            </span>
-          </button>
-        </template>
-      </nav>
-    </aside>
-
-    <!-- Message list -->
-    <section
-      class="flex min-w-0 flex-1 flex-col border-r border-border bg-background"
-      :class="reading ? 'hidden md:flex' : 'flex'"
-    >
-      <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <h2 class="truncate text-sm font-semibold">
-          {{ activeMailboxId === 'unified' ? t('unifiedInbox') : roleLabel[mailboxTree.find((t) => t.mailbox.id === activeMailboxId)?.mailbox.role ?? 'inbox'] ?? 'Mailbox' }}
-        </h2>
-        <div class="flex items-center gap-1">
-          <button
-            class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
-            :class="onlyUnread ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'"
-            :title="t('showOnlyUnread')"
-            @click="onlyUnread = !onlyUnread"
-          >
-            <MailOpen class="h-3.5 w-3.5" /> {{ t('showOnlyUnread') }}
-          </button>
-          <AppTooltip v-if="selectedCount > 0" :label="t('markRead')">
-            <Button variant="ghost" size="sm" @click="markSelectedRead">{{ t('markRead') }}</Button>
-          </AppTooltip>
-          <AppTooltip v-if="selectedCount > 0" :label="t('delete')">
-            <Button variant="ghost" size="sm" class="text-destructive" @click="confirmDeleteSelected">
-              <Trash2 class="h-4 w-4" /> {{ t('delete') }} ({{ selectedCount }})
-            </Button>
-          </AppTooltip>
-        </div>
-      </header>
-
-      <div
-        v-if="syncError"
-        class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive"
-      >
-        <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
-        <span class="min-w-0 flex-1 truncate">{{ syncError }}</span>
-        <button class="shrink-0 rounded px-1 text-destructive/80 hover:bg-destructive/15" @click="syncError = null">✕</button>
-      </div>
-      <div v-if="mailState.loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
-      </div>
-      <div v-else-if="visibleMessages.length === 0" class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
-        <div>
-          <MailIcon class="mx-auto mb-2 h-8 w-8 opacity-40" />
-          {{ t('noMessages') }}
-        </div>
-      </div>
-      <div v-else class="flex-1 divide-y divide-border overflow-y-auto" @scroll="onListScroll">
-        <button
-          v-for="m in visibleMessages"
-          :key="m.id"
-          class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
-          :class="[mailState.selected?.id === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"
-          @click="openMessageRow(m)"
-        >
-          <input
-            type="checkbox"
-            class="mt-1 h-4 w-4 shrink-0 accent-primary"
-            :checked="mailState.selectedIds.has(m.id)"
-            @click.stop
-            @change="toggleSelect(m.id)"
-          />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-baseline justify-between gap-2">
-              <span class="truncate text-sm" :class="m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'">
-                {{ m.from?.name || m.from?.address || '(unknown)' }}
-              </span>
-              <span class="shrink-0 text-xs text-muted-foreground">{{ formatDate(m.receivedAt) }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="truncate text-sm" :class="m.isRead ? 'text-muted-foreground' : 'font-medium'">
-                {{ m.subject || '(no subject)' }}
-              </span>
-              <Star v-if="m.isStarred" class="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
-            </div>
-            <div class="truncate text-xs text-muted-foreground">{{ m.snippet }}</div>
-          </div>
-        </button>
-      </div>
-    </section>
-
-    <!-- Reading pane (desktop rightmost column) / compact reader (mobile) -->
-    <section
-      class="min-w-0 flex-1 flex-col bg-background"
-      :class="reading ? 'flex md:flex' : 'hidden md:flex'"
-    >
-      <div v-if="!mailState.selected" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {{ t('selectToRead') }}
-      </div>
-      <div v-else-if="loadingMessage" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
-      </div>
-      <template v-else>
-        <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-          <AppTooltip :label="t('content')" side="bottom">
-            <Button variant="ghost" size="icon" class="h-8 w-8 md:hidden" @click="router.replace('/mail')">
-              <ChevronLeft class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <div class="min-w-0 flex-1">
-            <h1 class="truncate text-base font-semibold leading-tight">{{ mailState.selected.subject || '(no subject)' }}</h1>
-            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-              <span class="font-medium text-foreground">{{ mailState.selected.from?.name || mailState.selected.from?.address }}</span>
-              <span v-if="mailState.selected.from?.address" class="text-xs">&lt;{{ mailState.selected.from.address }}&gt;</span>
-              <span class="text-xs">{{ formatDate(mailState.selected.receivedAt) }}</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1">
-            <AppTooltip :label="t('reply')">
-              <Button variant="ghost" size="icon" class="h-8 w-8" @click="replyTo">
-                <Reply class="h-4 w-4" />
-              </Button>
-            </AppTooltip>
-            <AppTooltip :label="t('star')">
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                @click="updateFlags([mailState.selected.id], { starred: !mailState.selected.isStarred })"
-              >
-                <Star class="h-4 w-4" :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
-              </Button>
-            </AppTooltip>
-            <AppTooltip :label="mailState.selected.isRead ? t('markUnread') : t('markRead')">
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                @click="updateFlags([mailState.selected.id], { read: !mailState.selected.isRead })"
-              >
-                <MailIcon class="h-4 w-4" />
-              </Button>
-            </AppTooltip>
-            <AppTooltip :label="t('delete')">
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
-                @click="confirmDeleteOne(mailState.selected.id)"
-              >
-                <Trash2 class="h-4 w-4" />
-              </Button>
-            </AppTooltip>
-          </div>
-        </header>
-
-        <div v-if="mailState.selected.to.length" class="border-b border-border px-5 py-1.5 text-xs text-muted-foreground">
-          To: <span v-for="(recip, i) in mailState.selected.to" :key="i">{{ recip.name || recip.address }}<span v-if="i < mailState.selected.to.length - 1">, </span></span>
-        </div>
-        <div v-if="mailState.selected.attachments?.length" class="flex flex-wrap gap-2 border-b border-border px-5 py-2">
-          <div
-            v-for="a in mailState.selected.attachments"
-            :key="a.id"
-            class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
-          >
-            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-            <span class="max-w-[200px] truncate">{{ a.filename || 'attachment' }}</span>
-          </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto px-5 py-5">
-          <div class="email-body text-[15px]" v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')" /><!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
-        </div>
-      </template>
-    </section>
+    <MessageReaderPane
+      :loading="loadingMessage"
+      @back="router.replace('/mail')"
+      @reply="replyTo"
+      @toggle-star="updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })"
+      @toggle-read="updateFlags([mailState.selected!.id], { read: !mailState.selected!.isRead })"
+      @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
+    />
 
     <!-- Mobile top bar (when no message open) -->
     <div v-if="!reading" class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">

@@ -82,8 +82,8 @@ export const api = {
   mailboxes: (accountId: string) => request<{ mailboxes: Mailbox[] }>(`/mailboxes?accountId=${encodeURIComponent(accountId)}`),
 
   // messages
-  messages: (mailboxId: string, limit = 50, offset = 0) =>
-    request<{ messages: Message[] }>(`/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}`),
+  messages: (mailboxId: string, limit = 50, offset = 0, beforeUid?: number, beforeDate?: number) =>
+    request<{ messages: Message[] }>(`/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`),
   unified: (limit = 50, offset = 0) =>
     request<{ messages: Message[] }>(`/messages/unified?limit=${limit}&offset=${offset}`),
   message: (id: string) => request<{ message: MessageDetail }>(`/messages/${encodeURIComponent(id)}`),

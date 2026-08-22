@@ -69,3 +69,48 @@ export function t(key: MessageKey, params?: Record<string, string>): string {
   }
   return s;
 }
+
+// ---------------------------------------------------------------
+// Locale-aware date/time formatting.
+// Uses the *selected* app locale (not the browser/os default) so dates
+// follow the language set in Settings. `localeState.value.locale` is
+// reactive, so views re-format automatically when the language changes.
+// ---------------------------------------------------------------
+
+/** The BCP-47 tag actually in effect for the current app locale. */
+export function currentLocaleTag(): string {
+  return localeState.value.locale;
+}
+
+function timeTag(): string {
+  const tag = currentLocaleTag();
+  if (tag === "zh") return "zh-CN";
+  if (tag === "de") return "de-DE";
+  return "en-US";
+}
+
+/** Date only, e.g. "Aug 22" / "22. Aug." / "8月22日" per selected language. */
+export function formatDate(iso: string | number | Date): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat(timeTag(), { month: "short", day: "numeric" }).format(d);
+}
+
+/** Relative short stamp: time-of-day for today, date otherwise. */
+export function formatRelativeDate(iso: string | number | Date): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return new Intl.DateTimeFormat(timeTag(), { hour: "2-digit", minute: "2-digit" }).format(d);
+  }
+  const sameYear = d.getFullYear() === today.getFullYear();
+  return new Intl.DateTimeFormat(timeTag(), { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) }).format(d);
+}
+
+/** Full date + time, e.g. for the reading pane / build time. */
+export function formatDateTime(iso: string | number | Date): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat(timeTag(), { dateStyle: "medium", timeStyle: "short" }).format(d);
+}

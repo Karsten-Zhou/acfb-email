@@ -6,6 +6,7 @@ import { requireAuth } from "../auth";
 import { currentUser } from "../auth/session";
 import { buildProvider } from "../email/providers";
 import { repo } from "../db/repo";
+import { importOlderPage } from "../sync/sync-service";
 import { readJson } from "../utils/http";
 import {
   UpdateFlagsInputSchema,
@@ -20,18 +21,36 @@ import type { MessageRow } from "../db/repo";
 export const messageRoutes = new Hono<{ Bindings: Env }>();
 messageRoutes.use("*", requireAuth);
 
-// GET /api/messages?mailboxId=...&limit=...&offset=...
+// GET /api/messages?mailboxId=...&limit=...&offset=...&beforeUid=...
 messageRoutes.get("/", async (c) => {
   const user = currentUser(c);
   const mailboxId = c.req.query("mailboxId") ?? "";
   const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
   const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
+  const beforeUid = c.req.query("beforeUid")
+    ? Math.max(parseInt(c.req.query("beforeUid")!, 10) || 0, 0)
+    : 0;
+  const beforeDate = c.req.query("beforeDate")
+    ? Math.max(parseInt(c.req.query("beforeDate")!, 10) || 0, 0)
+    : 0;
 
   if (!mailboxId) throw new HttpError(400, "mailboxId is required");
   const box = await repo.mailboxForUser(c.env, user.id, mailboxId);
   if (!box) throw new HttpError(404, "Mailbox not found");
 
-  const rows = await repo.listMessages(c.env, mailboxId, limit, offset);
+  let rows = await repo.listMessages(c.env, mailboxId, limit, offset);
+
+  // If this is a load-older request and we ran out of local rows, ask the
+  // provider for older messages and import them (so scrolling keeps working
+  // beyond what was synced).
+  if (offset > 0 && rows.length < limit && (beforeUid > 0 || beforeDate > 0)) {
+    const account = await repo.accountById(c.env, box.account_id);
+    if (account) {
+      await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, beforeUid, limit, beforeDate || undefined).catch(() => {});
+      rows = await repo.listMessages(c.env, mailboxId, limit, offset);
+    }
+  }
+
   const messages = await rowsToMessages(c.env, rows);
   return c.json({ messages });
 });
@@ -105,6 +124,7 @@ messageRoutes.patch("/flags", async (c) => {
     if (input.starred !== undefined) flags.starred = input.starred;
     await provider.setFlags(box.provider_path, pids, flags);
     for (const m of msgs) await repo.updateFlags(c.env, m.id, flags);
+    await repo.refreshUnseen(c.env, mailboxId);
   }
   return c.json({ ok: true });
 });
@@ -134,6 +154,8 @@ messageRoutes.post("/move", async (c) => {
     const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
     await provider.move(source.provider_path, pids, target.provider_path);
     for (const m of msgs) await repo.moveMessage(c.env, m.id, target.id);
+    await repo.refreshUnseen(c.env, mailboxId);
+    await repo.refreshUnseen(c.env, target.id);
   }
   return c.json({ ok: true });
 });
@@ -161,6 +183,7 @@ messageRoutes.post("/delete", async (c) => {
     const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
     await provider.delete(box.provider_path, pids);
     for (const m of msgs) await repo.deleteMessage(c.env, m.id);
+    await repo.refreshUnseen(c.env, mailboxId);
   }
   return c.json({ ok: true });
 });
@@ -181,6 +204,7 @@ async function rowsToMessages(env: Env, rows: MessageRow[]): Promise<Message[]> 
         id: r.id,
         accountId: r.account_id,
         mailboxId: r.mailbox_id,
+        remoteUid: r.remote_uid,
         subject: r.subject,
         snippet: r.snippet,
         from: r.from_address ? { name: r.from_name, address: r.from_address } : null,

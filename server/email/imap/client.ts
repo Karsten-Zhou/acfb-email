@@ -439,6 +439,19 @@ export class ImapClient {
       .filter((n) => n > lastUid);
   }
 
+  /** Search UIDs older than a given UID (page before `beforeUid`). */
+  async searchUidsBefore(beforeUid: number): Promise<number[]> {
+    const res = await this.command("UID SEARCH", `UID 1:${Math.max(beforeUid - 1, 1)}`);
+    const line = res.lines.find((l) => l.startsWith("* SEARCH"));
+    if (!line) return [];
+    return line
+      .slice("* SEARCH ".length)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(Number);
+  }
+
   /** Fetch the full raw message bytes for a UID (literal). */
   async fetchRawByUid(uid: number): Promise<Uint8Array> {
     const res = await this.command("UID FETCH", `${uid} (BODY.PEEK[])`);

@@ -8,6 +8,7 @@ import type {
   ProviderFetchResult,
   ProviderMailbox,
   ProviderMessage,
+  ProviderPageResult,
   ProviderSyncOptions,
   SendOptions,
 } from "./types";
@@ -80,6 +81,38 @@ export class GmailProvider implements IEmailProvider {
     }
     const highestUid = out.length ? Math.max(...out.map((o) => o.remoteUid)) : 0;
     return { messages: out, highestUid, uidValidity: null, total: list.length };
+  }
+
+  async fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult> {
+    // Gmail's list API is newest-first by default; we can't page *down* by
+    // uid directly, so fetch a bigger list and filter below the cursor.
+    const label = mailboxPath.toUpperCase() === "INBOX" ? "INBOX" : mailboxPath;
+    const max = Math.min(Math.max(options.fetchLimit ?? 50, 50), 100);
+    let pageToken: string | undefined;
+    const collected: ProviderMessage[] = [];
+    let guard = 0;
+    while (guard++ < 5) {
+      const qs = new URLSearchParams({ labelIds: label, maxResults: String(max) });
+      if (pageToken) qs.set("pageToken", pageToken);
+      const { status, json, errorText } = await providerGet(`${API}/messages?${qs}`, this.token.access_token);
+      if (status !== 200) throw new Error(`Failed to list Gmail messages (${errorText ?? status})`);
+      const list = ((json as { messages?: { id: string; threadId: string }[] }).messages ?? []);
+      const metas = await Promise.all(list.map((m) => this.fetchMessageMeta(m.id)));
+      const withUid = metas.filter((x): x is ProviderMessage => !!x && !!x.remoteUid);
+      // Stop once we've crossed below the cursor.
+      const below = withUid.filter((x) => !options.beforeUid || x.remoteUid < options.beforeUid);
+      collected.push(...below);
+      const next = (json as { nextPageToken?: string }).nextPageToken;
+      if (!next || below.length >= max) break;
+      pageToken = next;
+    }
+    // Sort newest-first and take the requested page.
+    collected.sort((a, b) => b.remoteUid - a.remoteUid);
+    const page = collected.slice(0, options.fetchLimit ?? 50);
+    return { messages: page, hasMore: collected.length > page.length };
   }
 
   private async fetchMessageMeta(gmailId: string): Promise<ProviderMessage | null> {

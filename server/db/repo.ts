@@ -228,6 +228,18 @@ export const repo = {
     await env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
   },
 
+  /** Recompute a mailbox's unseen count from its current messages. */
+  async refreshUnseen(env: Env, mailboxId: string): Promise<void> {
+    const r = await env.DB.prepare(
+      `SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ? AND is_read = 0`,
+    )
+      .bind(mailboxId)
+      .first<{ n: number }>();
+    await env.DB.prepare(`UPDATE mailboxes SET unseen_messages = ? WHERE id = ?`)
+      .bind(r?.n ?? 0, mailboxId)
+      .run();
+  },
+
   async moveMessage(env: Env, messageId: string, mailboxId: string): Promise<void> {
     await env.DB.prepare(`UPDATE messages SET mailbox_id = ? WHERE id = ?`).bind(mailboxId, messageId).run();
   },

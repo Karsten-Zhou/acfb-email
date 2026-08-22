@@ -10,6 +10,7 @@ import type {
   ProviderFetchResult,
   ProviderMailbox,
   ProviderMessage,
+  ProviderPageResult,
   ProviderSyncOptions,
   SendOptions,
 } from "./types";
@@ -109,6 +110,47 @@ export class ImapProvider implements IEmailProvider {
         total: sel.total,
       };
       return result;
+    } finally {
+      await imap.close().catch(() => {});
+    }
+  }
+
+  async fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult> {
+    const imap = this.connectImap();
+    try {
+      await imap.connect();
+      await imap.select(mailboxPath);
+
+      if (!options.beforeUid || options.beforeUid <= 1) {
+        return { messages: [], hasMore: false };
+      }
+      const all = await imap.searchUidsBefore(options.beforeUid);
+      const limit = options.fetchLimit ?? 50;
+      const uids = all.slice(-limit); // the `limit` most recent of those older than the cursor
+      if (uids.length === 0) return { messages: [], hasMore: false };
+
+      const envelopes = await imap.fetchHeadersByUid(uids);
+      const messages: ProviderMessage[] = envelopes.map((e) => ({
+        providerId: String(e.uid),
+        remoteUid: e.uid,
+        messageId: e.messageId,
+        subject: e.subject,
+        from: e.from,
+        to: e.to,
+        cc: e.cc,
+        date: e.date,
+        internalDate: e.internalDate,
+        flags: e.flags,
+        size: e.size,
+      }));
+      return {
+        messages,
+        // If we got a full page, there are (likely) more even older messages.
+        hasMore: uids.length === limit && all.length > limit,
+      };
     } finally {
       await imap.close().catch(() => {});
     }

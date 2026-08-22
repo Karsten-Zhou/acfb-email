@@ -57,7 +57,19 @@ export interface ProviderBody {
 export interface ProviderSyncOptions {
   // If set, only fetch messages with UID > this.
   sinceUid?: number;
+  // If set, only fetch messages with UID < this (older page).
+  beforeUid?: number;
+  // If set, only fetch messages received before this epoch-ms (older page,
+  // for date-based REST providers like Graph).
+  beforeDate?: number;
   fetchLimit?: number;
+}
+
+/** Result of fetching an older page (used by load-older). */
+export interface ProviderPageResult {
+  messages: ProviderMessage[];
+  // Whether more older messages exist upstream.
+  hasMore: boolean;
 }
 
 export interface SendOptions {
@@ -91,6 +103,12 @@ export interface IEmailProvider {
     mailboxPath: string,
     options: ProviderSyncOptions,
   ): Promise<ProviderFetchResult>;
+
+  /** Fetch an older page of messages (below `beforeUid`). */
+  fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult>;
 
   /** Fetch the full body & attachments of a message. */
   fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;
