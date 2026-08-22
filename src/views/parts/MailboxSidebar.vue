@@ -1,5 +1,7 @@
 <script setup lang="ts">
 // MailboxSidebar — account list + mailbox tree + per-account sync buttons.
+// Desktop: a static column in the 3-pane layout (md+).
+// Mobile: rendered as a slide-in drawer toggled by `open` (with a backdrop).
 import { useRouter } from "vue-router";
 import { accountsState } from "../../stores/accounts";
 import { t } from "../../lib/i18n";
@@ -16,6 +18,7 @@ import {
   Plus,
   Mail as MailIcon,
   Settings,
+  X,
 } from "lucide-vue-next";
 import type { Mailbox } from "@shared/types";
 
@@ -25,11 +28,14 @@ defineProps<{
   syncing: boolean;
   syncingAccountId: string | null;
   unread: (item: { mailbox: Mailbox }) => number;
+  /** Mobile drawer open state (ignored on md+). */
+  open: boolean;
 }>();
 const emit = defineEmits<{
   select: [id: string];
   "sync-all": [];
   "sync-account": [id: string];
+  close: [];
 }>();
 
 const router = useRouter();
@@ -46,10 +52,31 @@ const roleIcon: Record<string, typeof Inbox> = {
 </script>
 
 <template>
-  <aside class="hidden w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex">
+  <!-- Mobile backdrop (below md) -->
+  <div
+    v-if="open"
+    class="fixed inset-0 z-30 bg-black/50 md:hidden"
+    @click="emit('close')"
+  />
+  <!-- Mobile drawer: fixed overlay when open; desktop: static column. -->
+  <aside
+    class="w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex"
+    :class="
+      (open ? 'fixed inset-y-0 left-0 z-40 flex shadow-2xl md:static md:flex' : 'hidden md:flex')
+    "
+  >
     <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
       <span class="text-sm font-semibold tracking-tight">Mail</span>
       <div class="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 md:hidden"
+          :aria-label="t('back')"
+          @click="emit('close')"
+        >
+          <X class="h-4 w-4" />
+        </Button>
         <AppTooltip :label="t('syncNow')">
           <Button
             variant="ghost"

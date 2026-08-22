@@ -16,6 +16,10 @@ const buttonVariants = cva(
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        // Ghost button that stays destructive on hover (used for sign-out,
+        // delete-account etc. — the base `text-destructive` would otherwise be
+        // overridden by ghost's hover:text-accent-foreground).
+        "ghost-destructive": "text-destructive hover:bg-destructive hover:text-white",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

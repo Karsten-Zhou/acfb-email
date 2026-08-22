@@ -58,7 +58,7 @@ async function doLogout() {
       <h1 class="text-sm font-semibold">{{ t("settings") }}</h1>
       <div class="flex-1" />
       <UiToolTip :label="t('signOut')">
-        <UiButton variant="ghost" size="sm" class="text-destructive" @click="doLogout">{{
+        <UiButton variant="ghost-destructive" size="sm" @click="doLogout">{{
           t("signOut")
         }}</UiButton>
       </UiToolTip>

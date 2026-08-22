@@ -20,12 +20,14 @@ import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
 import MessageListPane from "./parts/MessageListPane.vue";
 import MessageReaderPane from "./parts/MessageReaderPane.vue";
-import { RefreshCw, Plus, Mail as MailIcon, Settings, Loader2 } from "lucide-vue-next";
+import { RefreshCw, Plus, Mail as MailIcon, Settings, Loader2, Menu } from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
 const router = useRouter();
 const activeMailboxId = ref<string | null>("unified");
+/** Mobile drawer: whether the folder sidebar is open (only below md). */
+const sidebarOpen = ref(false);
 const syncing = ref(false);
 /** Last sync failure shown in the list-pane banner (null = none). */
 const syncError = ref<string | null>(null);
@@ -138,6 +140,7 @@ function selectMailbox(id: string) {
   activeMailboxId.value = id;
   mailState.selectedIds = new Set();
   hasOlder.value = true;
+  sidebarOpen.value = false; // close the mobile drawer after picking a folder
   // Clear any open message when switching folders.
   if (route.params.id) router.replace("/mail");
   void loadInto();
@@ -293,9 +296,11 @@ const listTitle = computed(() => {
       :syncing="syncing"
       :syncing-account-id="syncingAccountId"
       :unread="unreadBadge"
+      :open="sidebarOpen"
       @select="selectMailbox"
       @sync-all="syncNow"
       @sync-account="syncAccountNow"
+      @close="sidebarOpen = false"
     />
 
     <MessageListPane
@@ -335,7 +340,17 @@ const listTitle = computed(() => {
       v-if="!reading"
       class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden"
     >
-      <span class="text-sm font-semibold">Mail</span>
+      <div class="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8"
+          :aria-label="t('emailAccounts')"
+          @click="sidebarOpen = true"
+          ><Menu class="h-4 w-4"
+        /></Button>
+        <span class="text-sm font-semibold">Mail</span>
+      </div>
       <div class="flex items-center gap-1">
         <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"
           ><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }"
