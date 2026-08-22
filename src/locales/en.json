@@ -62,6 +62,7 @@
   "buildTime": "Build time",
   "viewSource": "View source on GitHub",
   "showOnlyUnread": "Only unread",
+  "refreshPull": "Pull to refresh",
   "loadOlder": "Load older",
   "loadingOlder": "Loading older messages...",
   "noMoreMessages": "No more messages",

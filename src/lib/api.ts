@@ -1,4 +1,5 @@
 // Thin typed API client for the backend.
+import { toastError } from "../stores/toast";
 import type {
   AccountDetail,
   AccountSummary,
@@ -38,7 +39,11 @@ function csrfToken(): string {
   return m ? decodeURIComponent(m[1]) : "";
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  opts: { noToast?: boolean } = {},
+): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   const method = (init.method ?? "GET").toUpperCase();
@@ -63,6 +68,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // Session gone (GitHub credential missing/revoked/expired): let the app
     // reset auth state and route to the login page.
     if (res.status === 401) unauthorizedHandler?.();
+    // Surface failures to the user unless the caller renders its own inline
+    // error (e.g. the IMAP test-connection form).
+    if (res.status !== 401 && !opts.noToast) {
+      toastError(message);
+    }
     throw new ApiError(message, res.status, code);
   }
   if (res.status === 204) return undefined as T;
@@ -86,10 +96,15 @@ export const api = {
       body: JSON.stringify(input),
     }),
   testAccount: (input: AddAccountInput) =>
-    request<{ ok: boolean; message?: string }>("/accounts/test", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
+    request<{ ok: boolean; message?: string }>(
+      "/accounts/test",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      // The form renders the ok/message inline under the fields; no toast.
+      { noToast: true },
+    ),
   deleteAccount: (id: string) => request<{ ok: boolean }>(`/accounts/${id}`, { method: "DELETE" }),
   syncAccount: (id: string) =>
     request<{ ok: boolean; mailboxesSynced?: number; messagesSeen?: number; message?: string }>(

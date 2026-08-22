@@ -15,12 +15,13 @@ import {
 } from "../stores/mail";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
+import { toastError } from "../stores/toast";
 import Button from "../components/UiButton.vue";
 import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
 import MessageListPane from "./parts/MessageListPane.vue";
 import MessageReaderPane from "./parts/MessageReaderPane.vue";
-import { RefreshCw, Plus, Mail as MailIcon, Settings, Loader2, Menu } from "lucide-vue-next";
+import { RefreshCw, Plus, Settings, Loader2, Menu } from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
@@ -42,6 +43,8 @@ const syncingAccountId = ref<string | null>(null);
 const loadingMessage = ref(false);
 /** Read-toggle in flight: spinner shows on the reader's mark-read button. */
 const togglingRead = ref(false);
+/** Pull-to-refresh in flight (mobile touch drag). */
+const refreshing = ref(false);
 /** If set, the confirm dialog targets a single message (from the reading pane). */
 const pendingDeleteId = ref<string | null>(null);
 
@@ -119,10 +122,23 @@ async function syncNow() {
       ),
     );
     const failed = results.find((r) => !r.ok);
-    if (failed && failed.message) syncError.value = failed.message;
+    if (failed && failed.message) {
+      syncError.value = failed.message;
+      toastError(failed.message);
+    }
     await refresh();
   } finally {
     syncing.value = false;
+  }
+}
+
+/** Pull-to-refresh: same sync as the toolbar button, with the list spinner. */
+async function pullRefresh() {
+  refreshing.value = true;
+  try {
+    await syncNow();
+  } finally {
+    refreshing.value = false;
   }
 }
 
@@ -131,7 +147,10 @@ async function syncAccountNow(id: string) {
   syncError.value = null;
   try {
     const res = await api.syncAccount(id);
-    if (!res.ok && res.message) syncError.value = res.message;
+    if (!res.ok && res.message) {
+      syncError.value = res.message;
+      toastError(res.message);
+    }
     await refresh();
   } finally {
     syncingAccountId.value = null;
@@ -344,6 +363,7 @@ const listTitle = computed(() => {
       :loading="mailState.loading"
       :loading-older="loadingOlder"
       :has-older="hasOlder"
+      :refreshing="refreshing"
       :selected-id="mailState.selected?.id ?? null"
       :selected-ids="mailState.selectedIds"
       :selected-count="selectedCount"
@@ -354,6 +374,7 @@ const listTitle = computed(() => {
       @toggle-select="toggleSelect"
       @scroll="onListScroll"
       @dismiss-error="syncError = null"
+      @pull-refresh="pullRefresh"
     />
 
     <MessageReaderPane
@@ -398,29 +419,17 @@ const listTitle = computed(() => {
       </div>
     </div>
 
-    <!-- Mobile bottom nav -->
-    <nav
-      class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-card py-1.5 md:hidden"
+    <!-- Mobile compose FAB (replaces the redundant bottom nav — Mail/Settings
+         are reachable via the top bar + hamburger, Compose is the one action
+         that deserves a dedicated thumb-reachable button). -->
+    <button
+      v-if="!reading"
+      class="fixed bottom-4 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 md:hidden"
+      :aria-label="t('compose')"
+      @click="router.push({ name: 'compose' })"
     >
-      <button
-        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70"
-        @click="router.push({ name: 'mailbox' })"
-      >
-        <MailIcon class="h-5 w-5" /> Mail
-      </button>
-      <button
-        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-primary"
-        @click="router.push({ name: 'compose' })"
-      >
-        <Plus class="h-5 w-5" /> Compose
-      </button>
-      <button
-        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70"
-        @click="router.push({ name: 'settings' })"
-      >
-        <Settings class="h-5 w-5" /> Settings
-      </button>
-    </nav>
+      <Plus class="h-6 w-6" />
+    </button>
 
     <!-- Modal delete confirmation -->
     <UiDialog

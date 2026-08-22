@@ -62,6 +62,7 @@
   "buildTime": "Build-Zeit",
   "viewSource": "Quellcode auf GitHub ansehen",
   "showOnlyUnread": "Nur ungelesen",
+  "refreshPull": "Zum Aktualisieren ziehen",
   "loadOlder": "Ältere laden",
   "loadingOlder": "Ältere Nachrichten werden geladen...",
   "noMoreMessages": "Keine weiteren Nachrichten",

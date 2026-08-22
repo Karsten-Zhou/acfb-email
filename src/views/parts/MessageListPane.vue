@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // MessageListPane — the middle column: header (folder + unread filter + bulk
-// actions), sync-error banner, message rows, infinite scroll, and an
-// end-of-list footer (loading spinner / "no more messages" line).
-import { computed } from "vue";
+// actions), sync-error banner, message rows, infinite scroll, pull-to-refresh,
+// and an end-of-list footer (loading spinner / "no more messages" line).
+import { computed, ref } from "vue";
 import { t, formatRelativeDate } from "../../lib/i18n";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   MailOpen,
   RefreshCw,
+  ArrowDownToLine,
   Trash2,
   Mail as MailIcon,
   Star,
@@ -26,6 +27,7 @@ const props = defineProps<{
   loading: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
+  refreshing: boolean;
   selectedId: string | null;
   selectedIds: Set<string>;
   selectedCount: number;
@@ -39,10 +41,50 @@ const emit = defineEmits<{
   toggleSelect: [id: string];
   scroll: [e: Event];
   dismissError: [];
+  "pull-refresh": [];
 }>();
 
 // Action buttons only make sense when there are selected messages.
 const actionsVisible = computed(() => props.selectedCount > 0);
+
+// ---- pull-to-refresh (touch) ----
+// Drag-down while at the top reveals a pull indicator; releasing past the
+// threshold fires `pull-refresh` (the parent runs a sync).
+const pullDistance = ref(0);
+const PULL_THRESHOLD = 70; // px
+const PULL_MAX = 110; // px clamp
+
+let touchStartY = 0;
+let touchActive = false;
+
+function onTouchStart(e: TouchEvent) {
+  const el = e.currentTarget as HTMLElement;
+  if (el.scrollTop <= 0) {
+    touchStartY = e.touches[0].clientY;
+    touchActive = true;
+  }
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!touchActive) return;
+  const dy = e.touches[0].clientY - touchStartY;
+  const el = e.currentTarget as HTMLElement;
+  if (el.scrollTop > 0 || dy <= 0) {
+    pullDistance.value = 0;
+    touchActive = false;
+    return;
+  }
+  pullDistance.value = Math.min(dy, PULL_MAX);
+}
+
+function onTouchEnd() {
+  if (!touchActive) return;
+  touchActive = false;
+  if (pullDistance.value >= PULL_THRESHOLD && !props.refreshing) {
+    emit("pull-refresh");
+  }
+  pullDistance.value = 0;
+}
 </script>
 
 <template>
@@ -112,7 +154,25 @@ const actionsVisible = computed(() => props.selectedCount > 0);
       </div>
     </div>
     <div v-else class="flex min-h-0 flex-1 flex-col">
-      <div class="flex-1 divide-y divide-border overflow-y-auto" @scroll="emit('scroll', $event)">
+      <div
+        class="flex-1 divide-y divide-border overflow-y-auto touch-pan-y"
+        @scroll="emit('scroll', $event)"
+        @touchstart.passive="onTouchStart"
+        @touchmove.passive="onTouchMove"
+        @touchend="onTouchEnd"
+        @touchcancel="onTouchEnd"
+      >
+        <!-- Pull-to-refresh indicator (visible while dragging down at the top
+             or while the parent sync is running). -->
+        <div
+          v-if="pullDistance > 0 || refreshing"
+          class="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+          :style="refreshing ? undefined : { transform: `translateY(${pullDistance * 0.6}px)`, opacity: Math.min(pullDistance / PULL_THRESHOLD, 1) }"
+        >
+          <Loader2 v-if="refreshing" class="h-4 w-4 animate-spin" />
+          <ArrowDownToLine v-else class="h-4 w-4" :class="pullDistance >= PULL_THRESHOLD ? 'rotate-180' : ''" />
+          <span>{{ refreshing ? t("syncing") : t("refreshPull") }}</span>
+        </div>
         <button
           v-for="m in messages"
           :key="m.id"
