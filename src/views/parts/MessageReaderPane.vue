@@ -14,10 +14,14 @@ import {
   Mail as MailIcon,
   RefreshCw,
   Trash2,
+  Loader2,
 } from "lucide-vue-next";
 
 defineProps<{
   loading: boolean;
+  /** True while the mark-read/mark-unread toggle request is in flight — shows
+   *  a spinner inside the toggle button instead of blanking the whole pane. */
+  togglingRead: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -89,8 +93,15 @@ const emit = defineEmits<{
             </Button>
           </AppTooltip>
           <AppTooltip :label="mailState.selected.isRead ? t('markUnread') : t('markRead')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggle-read')">
-              <MailIcon class="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :disabled="togglingRead"
+              @click="emit('toggle-read')"
+            >
+              <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
+              <MailIcon v-else class="h-4 w-4" />
             </Button>
           </AppTooltip>
           <AppTooltip :label="t('delete')">

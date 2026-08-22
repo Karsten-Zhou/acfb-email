@@ -40,6 +40,8 @@ const confirmDelete = ref(false);
 const deleting = ref(false);
 const syncingAccountId = ref<string | null>(null);
 const loadingMessage = ref(false);
+/** Read-toggle in flight: spinner shows on the reader's mark-read button. */
+const togglingRead = ref(false);
 /** If set, the confirm dialog targets a single message (from the reading pane). */
 const pendingDeleteId = ref<string | null>(null);
 
@@ -264,7 +266,7 @@ function replyTo() {
 async function toggleReadFromReader() {
   const m = mailState.selected;
   if (!m) return;
-  loadingMessage.value = true;
+  togglingRead.value = true;
   try {
     // Toggle: the new desired read flag.
     const newRead = !m.isRead;
@@ -281,7 +283,7 @@ async function toggleReadFromReader() {
       reading.value = false;
     }
   } finally {
-    loadingMessage.value = false;
+    togglingRead.value = false;
   }
 }
 
@@ -356,6 +358,7 @@ const listTitle = computed(() => {
 
     <MessageReaderPane
       :loading="loadingMessage"
+      :toggling-read="togglingRead"
       @back="router.replace('/mail')"
       @reply="replyTo"
       @toggle-star="
