@@ -267,6 +267,8 @@ const listTitle = computed(() => {
       :sync-error="syncError"
       :messages="visibleMessages"
       :loading="mailState.loading"
+      :loading-older="loadingOlder"
+      :has-older="hasOlder"
       :selected-id="mailState.selected?.id ?? null"
       :selected-ids="mailState.selectedIds"
       :selected-count="selectedCount"

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // MessageListPane — the middle column: header (folder + unread filter + bulk
-// actions), sync-error banner, message rows, and infinite scroll.
+// actions), sync-error banner, message rows, infinite scroll, and an
+// end-of-list footer (loading spinner / "no more messages" line).
 import { computed } from "vue";
 import { t, formatRelativeDate } from "../../lib/i18n";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
-import { AlertTriangle, MailOpen, RefreshCw, Trash2, Mail as MailIcon, Star } from "lucide-vue-next";
+import { AlertTriangle, MailOpen, RefreshCw, Trash2, Mail as MailIcon, Star, Loader2 } from "lucide-vue-next";
 import type { Message } from "@shared/types";
 
 const props = defineProps<{
@@ -15,6 +16,8 @@ const props = defineProps<{
   syncError: string | null;
   messages: Message[];
   loading: boolean;
+  loadingOlder: boolean;
+  hasOlder: boolean;
   selectedId: string | null;
   selectedIds: Set<string>;
   selectedCount: number;
@@ -78,37 +81,52 @@ const actionsVisible = computed(() => props.selectedCount > 0);
         {{ t('noMessages') }}
       </div>
     </div>
-    <div v-else class="flex-1 divide-y divide-border overflow-y-auto" @scroll="emit('scroll', $event)">
-      <button
-        v-for="m in messages"
-        :key="m.id"
-        class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
-        :class="[selectedId === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"
-        @click="emit('open', m)"
-      >
-        <input
-          type="checkbox"
-          class="mt-1 h-4 w-4 shrink-0 accent-primary"
-          :checked="selectedIds.has(m.id)"
-          @click.stop
-          @change="emit('toggleSelect', m.id)"
-        />
-        <div class="min-w-0 flex-1">
-          <div class="flex items-baseline justify-between gap-2">
-            <span class="truncate text-sm" :class="m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'">
-              {{ m.from?.name || m.from?.address || '(unknown)' }}
-            </span>
-            <span class="shrink-0 text-xs text-muted-foreground">{{ formatRelativeDate(m.receivedAt) }}</span>
+    <div v-else class="flex min-h-0 flex-1 flex-col">
+      <div class="flex-1 divide-y divide-border overflow-y-auto" @scroll="emit('scroll', $event)">
+        <button
+          v-for="m in messages"
+          :key="m.id"
+          class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
+          :class="[selectedId === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"
+          @click="emit('open', m)"
+        >
+          <input
+            type="checkbox"
+            class="mt-1 h-4 w-4 shrink-0 accent-primary"
+            :checked="selectedIds.has(m.id)"
+            @click.stop
+            @change="emit('toggleSelect', m.id)"
+          />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="truncate text-sm" :class="m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'">
+                {{ m.from?.name || m.from?.address || '(unknown)' }}
+              </span>
+              <span class="shrink-0 text-xs text-muted-foreground">{{ formatRelativeDate(m.receivedAt) }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="truncate text-sm" :class="m.isRead ? 'text-muted-foreground' : 'font-medium'">
+                {{ m.subject || '(no subject)' }}
+              </span>
+              <Star v-if="m.isStarred" class="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
+            </div>
+            <div class="truncate text-xs text-muted-foreground">{{ m.snippet }}</div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="truncate text-sm" :class="m.isRead ? 'text-muted-foreground' : 'font-medium'">
-              {{ m.subject || '(no subject)' }}
-            </span>
-            <Star v-if="m.isStarred" class="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
-          </div>
-          <div class="truncate text-xs text-muted-foreground">{{ m.snippet }}</div>
+        </button>
+      </div>
+
+      <!-- End-of-list footer: loading indicator while fetching older, then an
+           explicit "no more messages" line when the list is exhausted. -->
+      <div class="flex items-center justify-center border-t border-border bg-background/80 px-4 py-2">
+        <div v-if="loadingOlder" class="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 class="h-3.5 w-3.5 animate-spin" />
+          {{ t('loadingOlder') }}…
         </div>
-      </button>
+        <span v-else-if="!hasOlder" class="text-xs text-muted-foreground/70">
+          {{ t('noMoreMessages') }}
+        </span>
+        <span v-else class="text-xs text-muted-foreground/40">{{ t('endOfList') }}</span>
+      </div>
     </div>
   </section>
 </template>

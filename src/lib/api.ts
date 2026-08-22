@@ -50,10 +50,39 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       /* non-json */
     }
+    // Session gone (GitHub credential missing/revoked/expired): return the
+    // user to the login page instead of leaving a broken authed view up.
+    if (res.status === 401) await handleUnauthorized();
     throw new ApiError(message, res.status, code);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/**
+ * Session is no longer valid — reset auth state and navigate to /login.
+ * Uses dynamic imports to avoid a circular dependency (auth store / router
+ * both import from this module's `api`).
+ *
+ * The navigation is deferred to the next microtask so it never re-enters a
+ * vue-router navigation that's currently in flight (e.g. the initial guard
+ * running `bootstrap()` after a reload).
+ */
+async function handleUnauthorized(): Promise<void> {
+  const { authState } = await import("../stores/auth");
+  if (authState.user !== null || authState.ready) {
+    authState.user = null;
+    authState.ready = true;
+  }
+  const { router } = await import("../router");
+  const current = router.currentRoute.value?.name;
+  if (current && current !== "login") {
+    // Defer so we don't navigate mid-guard.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (router.currentRoute.value.name !== "login" && !authState.user) {
+      await router.replace({ name: "login" });
+    }
+  }
 }
 
 export const api = {
