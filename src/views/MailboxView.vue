@@ -266,12 +266,18 @@ async function toggleReadFromReader() {
   if (!m) return;
   loadingMessage.value = true;
   try {
-    const unread = !m.isRead;
-    await updateFlags([m.id], { read: unread });
-    if (unread) {
-      // Deselect: back to the "select a message" state.
-      mailState.selected = null;
+    // Toggle: the new desired read flag.
+    const newRead = !m.isRead;
+    await updateFlags([m.id], { read: newRead });
+    // If the message *became unread*, close the reader so the changed entry
+    // is only visible in the list (bolded, unread count bumped). If it became
+    // read, keep it open as usual.
+    if (!newRead) {
+      // Navigate FIRST so the route watch clears the selection cleanly and
+      // never re-opens the (now unread) message with a stale id — that would
+      // re-run openMessage which auto-marks it read again.
       if (route.params.id) await router.replace("/mail");
+      mailState.selected = null;
       reading.value = false;
     }
   } finally {
