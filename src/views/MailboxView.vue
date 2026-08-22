@@ -272,7 +272,6 @@ const listTitle = computed(() => {
       :loading="mailState.loading"
       :loading-older="loadingOlder"
       :has-older="hasOlder"
-      :unified="activeMailboxId === 'unified'"
       :selected-id="mailState.selected?.id ?? null"
       :selected-ids="mailState.selectedIds"
       :selected-count="selectedCount"

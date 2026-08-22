@@ -26,9 +26,6 @@ const props = defineProps<{
   loading: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
-  /** True when this is the unified inbox (may have more mail on the providers
-   *  than what's synced locally, so the end-of-list hint differs). */
-  unified?: boolean;
   selectedId: string | null;
   selectedIds: Set<string>;
   selectedCount: number;
@@ -171,9 +168,9 @@ const actionsVisible = computed(() => props.selectedCount > 0);
         </button>
 
         <!-- End-of-list footer: only present when there's something to say —
-           a spinner while fetching older, an explicit "no more messages"
-           line once everything is exhausted, or a hint that older mail
-           is available via a sync (unified inbox pulls from providers). -->
+           a spinner while fetching older, or an explicit "no more messages"
+           line once everything is exhausted. Nothing is shown while more
+           pages exist but none are being loaded (e.g. at the top of the list). -->
         <div
           class="flex items-center justify-center border-border bg-background/80 px-4 py-2"
         >
@@ -185,7 +182,7 @@ const actionsVisible = computed(() => props.selectedCount > 0);
             {{ t("loadingOlder") }}
           </div>
           <span v-else-if="!hasOlder" class="text-xs text-muted-foreground/70">
-            {{ unified ? t("syncForOlder") : t("noMoreMessages") }}
+            {{ t("noMoreMessages") }}
           </span>
           <!-- a placeholder to avoid UI flash -->
           <span v-else class="text-xs text-muted-foreground/70 invisible">

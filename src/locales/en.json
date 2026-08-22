@@ -65,7 +65,6 @@
   "loadOlder": "Load older",
   "loadingOlder": "Loading older messages...",
   "noMoreMessages": "No more messages",
-  "syncForOlder": "There may be older messages — run Sync to fetch them from the providers",
   "content": "Message content",
   "reply": "Reply",
   "star": "Star",
