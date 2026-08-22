@@ -29,5 +29,12 @@ const inputClass = computed(() =>
 </script>
 
 <template>
-  <input :type="type" :value="modelValue" :placeholder="placeholder" :class="inputClass" :data-slot="'input'" @input="onInput" />
+  <input
+    :type="type"
+    :value="modelValue"
+    :placeholder="placeholder"
+    :class="inputClass"
+    :data-slot="'input'"
+    @input="onInput"
+  />
 </template>

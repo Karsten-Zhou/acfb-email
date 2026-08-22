@@ -42,7 +42,10 @@ export interface Envelope {
 }
 
 export class ImapError extends Error {
-  constructor(message: string, readonly imapCode?: string) {
+  constructor(
+    message: string,
+    readonly imapCode?: string,
+  ) {
     super(message);
     this.name = "ImapError";
   }
@@ -204,8 +207,11 @@ export class ImapClient {
         continue;
       }
       const rest = line.slice(tag.length + 1);
-      const status: "ok" | "no" | "bad" =
-        rest.startsWith("OK") ? "ok" : rest.startsWith("NO") ? "no" : "bad";
+      const status: "ok" | "no" | "bad" = rest.startsWith("OK")
+        ? "ok"
+        : rest.startsWith("NO")
+          ? "no"
+          : "bad";
       const m = /\[([^\]]+)\]/.exec(rest);
       const code = m ? m[1] : null;
       const literals = this.wire.takeLiterals();
@@ -256,7 +262,9 @@ export class ImapClient {
     }
     for (const line of res.lines) {
       if (!line.startsWith("* LIST")) continue;
-      const m = /^\* LIST \(([^)]*)\) "(.*)" (.+)$/.exec(line) || /^\* LIST \(([^)]*)\) NIL (.+)$/.exec(line);
+      const m =
+        /^\* LIST \(([^)]*)\) "(.*)" (.+)$/.exec(line) ||
+        /^\* LIST \(([^)]*)\) NIL (.+)$/.exec(line);
       if (!m) continue;
       const flags = m[1].split(" ").filter(Boolean);
       const delimiterRaw = m[2] ?? null;
@@ -273,7 +281,9 @@ export class ImapClient {
 
   async select(mailbox: string): Promise<SelectResult> {
     const res = await this.command("SELECT", `"${mailbox}"`);
-    let total = 0, unseen = 0, uidValidity = 0;
+    let total = 0,
+      unseen = 0,
+      uidValidity = 0;
     for (const line of res.lines) {
       const t = /^\* (\d+) EXISTS/.exec(line);
       if (t) total = parseInt(t[1], 10);
@@ -417,12 +427,7 @@ export class ImapClient {
     const res = await this.command("UID SEARCH", "ALL");
     const line = res.lines.find((l) => l.startsWith("* SEARCH"));
     if (!line) return [];
-    return line
-      .slice("* SEARCH ".length)
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(Number);
+    return line.slice("* SEARCH ".length).trim().split(/\s+/).filter(Boolean).map(Number);
   }
 
   /** Search UIDs newer than a given UID (excluding already known ones). */
@@ -444,12 +449,7 @@ export class ImapClient {
     const res = await this.command("UID SEARCH", `UID 1:${Math.max(beforeUid - 1, 1)}`);
     const line = res.lines.find((l) => l.startsWith("* SEARCH"));
     if (!line) return [];
-    return line
-      .slice("* SEARCH ".length)
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(Number);
+    return line.slice("* SEARCH ".length).trim().split(/\s+/).filter(Boolean).map(Number);
   }
 
   /** Fetch the full raw message bytes for a UID (literal). */
@@ -483,10 +483,7 @@ export class ImapClient {
   }
 
   /** Set flags on a set of UIDs. */
-  async setFlags(
-    uids: number[],
-    flags: { read?: boolean; starred?: boolean },
-  ): Promise<void> {
+  async setFlags(uids: number[], flags: { read?: boolean; starred?: boolean }): Promise<void> {
     if (uids.length === 0) return;
     const setParts: string[] = [];
     if (flags.read === true) setParts.push("\\Seen");
@@ -575,22 +572,29 @@ export function unquote(s: string): string | null {
 
 export function decodeMimeWord(s: string | null): string | null {
   if (s === null) return null;
-  return s.replace(/=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g, (_m: string, _cs: string, enc: string, data: string) => {
-    try {
-      if (enc.toLowerCase() === "b") {
-        const bin = atob(data);
-        return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  return s.replace(
+    /=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g,
+    (_m: string, _cs: string, enc: string, data: string) => {
+      try {
+        if (enc.toLowerCase() === "b") {
+          const bin = atob(data);
+          return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+        }
+        return data
+          .replace(/_/g, " ")
+          .replace(/=([0-9A-Fa-f]{2})/g, (_x: string, h: string) =>
+            String.fromCharCode(parseInt(h, 16)),
+          );
+      } catch {
+        return data;
       }
-      return data.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_x: string, h: string) =>
-        String.fromCharCode(parseInt(h, 16)),
-      );
-    } catch {
-      return data;
-    }
-  });
+    },
+  );
 }
 
-export function parseAddressList(s: string | null): { name: string | null; address: string | null }[] {
+export function parseAddressList(
+  s: string | null,
+): { name: string | null; address: string | null }[] {
   if (!s || s.trim() === "NIL") return [];
   const inner = s.trim();
   if (!inner.startsWith("(") || !inner.endsWith(")")) return [];

@@ -15,8 +15,14 @@ export async function providerGet(
   let errorText: string | undefined;
   if (!res.ok) {
     const detail =
-      (json && typeof json === "object" && "error" in json && (json as { error?: { message?: string } }).error?.message) ||
-      (json && typeof json === "object" && "errorDescription" in json && (json as { errorDescription?: string }).errorDescription) ||
+      (json &&
+        typeof json === "object" &&
+        "error" in json &&
+        (json as { error?: { message?: string } }).error?.message) ||
+      (json &&
+        typeof json === "object" &&
+        "errorDescription" in json &&
+        (json as { errorDescription?: string }).errorDescription) ||
       "";
     errorText = `${res.status}${detail ? ` — ${detail}` : ""}`;
   }
@@ -43,7 +49,9 @@ export async function providerJson(
       (errObj && typeof errObj.error === "object" && errObj.error !== null
         ? (errObj.error as { message?: string }).message
         : undefined) ||
-      (errObj && typeof errObj.errorDescription === "string" ? errObj.errorDescription : undefined) ||
+      (errObj && typeof errObj.errorDescription === "string"
+        ? errObj.errorDescription
+        : undefined) ||
       "";
     errorText = `${res.status}${detail ? ` — ${detail}` : ""}`;
   }

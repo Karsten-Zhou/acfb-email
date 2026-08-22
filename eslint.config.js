@@ -1,13 +1,24 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import pluginVue from "eslint-plugin-vue";
+import prettier from "eslint-config-prettier";
 import globals from "globals";
+
+// Formatting is owned by Prettier (enforced by lefthook pre-commit), so we
+// disable the vue layout/style rules that fight it. eslint-config-prettier
+// already turns off exactly the conflicting set (max-attributes-per-line,
+// singleline-html-element-content-newline, html-self-closing, ...), applied
+// last so it wins over the recommended configs.
+const vueRecommended = pluginVue.configs["flat/recommended"];
 
 export default tseslint.config(
   { ignores: ["dist/**", "node_modules/**", "**/*.d.ts"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  ...pluginVue.configs["flat/recommended"],
+  ...vueRecommended.map((cfg) => ({
+    ...cfg,
+    rules: { ...cfg.rules, ...prettier.rules },
+  })),
   {
     files: ["**/*.vue"],
     languageOptions: {
@@ -32,9 +43,7 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
-      "vue/max-attributes-per-line": "off",
-      "vue/singleline-html-element-content-newline": "off",
-      "vue/html-self-closing": "off",
     },
-  }
+  },
+  prettier,
 );

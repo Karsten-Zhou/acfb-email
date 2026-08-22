@@ -56,9 +56,7 @@ sendRoutes.post("/send", async (c) => {
   }
 
   // Delete any saved draft with matching subject (simple heuristic: clear drafts for this account+subject)
-  await c.env.DB.prepare(
-    `DELETE FROM drafts WHERE user_id = ? AND account_id = ? AND subject = ?`,
-  )
+  await c.env.DB.prepare(`DELETE FROM drafts WHERE user_id = ? AND account_id = ? AND subject = ?`)
     .bind(user.id, input.accountId, input.subject)
     .run();
 
@@ -70,9 +68,7 @@ sendRoutes.post("/drafts", async (c) => {
   const user = currentUser(c);
   const input = await readJson(c, DraftInputSchema);
   const id = input.id ?? randomUUID();
-  const existing = await c.env.DB.prepare(
-    `SELECT id FROM drafts WHERE id = ? AND user_id = ?`,
-  )
+  const existing = await c.env.DB.prepare(`SELECT id FROM drafts WHERE id = ? AND user_id = ?`)
     .bind(id, user.id)
     .first();
   if (existing) {
@@ -152,8 +148,6 @@ sendRoutes.get("/drafts", async (c) => {
 sendRoutes.delete("/drafts/:id", async (c) => {
   const user = currentUser(c);
   const id = c.req.param("id");
-  await c.env.DB.prepare(`DELETE FROM drafts WHERE id = ? AND user_id = ?`)
-    .bind(id, user.id)
-    .run();
+  await c.env.DB.prepare(`DELETE FROM drafts WHERE id = ? AND user_id = ?`).bind(id, user.id).run();
   return c.json({ ok: true });
 });

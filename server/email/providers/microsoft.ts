@@ -11,7 +11,13 @@ import type {
   ProviderSyncOptions,
   SendOptions,
 } from "./types";
-import { providerGet, providerJson, providerJsonPatch, base64url, b64urlToBytes } from "./oauth-util";
+import {
+  providerGet,
+  providerJson,
+  providerJsonPatch,
+  base64url,
+  b64urlToBytes,
+} from "./oauth-util";
 import type { OAuthToken } from "../../oauth/client";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -56,9 +62,12 @@ export class MicrosoftProvider implements IEmailProvider {
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
-    const { status, json, errorText } = await providerGet(`${GRAPH}/me/mailFolders?$select=id,displayName,parentFolderId`, this.token.access_token);
+    const { status, json, errorText } = await providerGet(
+      `${GRAPH}/me/mailFolders?$select=id,displayName,parentFolderId`,
+      this.token.access_token,
+    );
     if (status !== 200) throw new Error(`Failed to list Outlook folders (${errorText ?? status})`);
-    const folders = ((json as { value?: { id: string; displayName: string }[] }).value ?? []);
+    const folders = (json as { value?: { id: string; displayName: string }[] }).value ?? [];
     // Include standard well-known folders plus favorites; use displayName as path.
     return folders.map((f) => ({ name: f.displayName, delimiter: "/", flags: [] }));
   }
@@ -82,9 +91,12 @@ export class MicrosoftProvider implements IEmailProvider {
       };
       const known = wellKnown[mailboxPath];
       if (!known) return { messages: [], highestUid: 0, uidValidity: null, total: 0 };
-      const { status, json } = await providerGet(`${GRAPH}/me/mailFolders/${known}?$select=id,displayName`, this.token.access_token);
+      const { status, json } = await providerGet(
+        `${GRAPH}/me/mailFolders/${known}?$select=id,displayName`,
+        this.token.access_token,
+      );
       if (status !== 200) return { messages: [], highestUid: 0, uidValidity: null, total: 0 };
-      const f = (json as { id: string; displayName: string });
+      const f = json as { id: string; displayName: string };
       void f;
       return this.syncFolder(known, options);
     }
@@ -94,14 +106,20 @@ export class MicrosoftProvider implements IEmailProvider {
   }
 
   private async folderIdByName(name: string): Promise<string | null> {
-    const { status, json } = await providerGet(`${GRAPH}/me/mailFolders?$select=id,displayName`, this.token.access_token);
+    const { status, json } = await providerGet(
+      `${GRAPH}/me/mailFolders?$select=id,displayName`,
+      this.token.access_token,
+    );
     if (status !== 200) return null;
-    const folders = ((json as { value?: { id: string; displayName: string }[] }).value ?? []);
+    const folders = (json as { value?: { id: string; displayName: string }[] }).value ?? [];
     const f = folders.find((x) => x.displayName === name);
     return f?.id ?? null;
   }
 
-  private async syncFolder(folderId: string, options: ProviderSyncOptions): Promise<ProviderFetchResult> {
+  private async syncFolder(
+    folderId: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderFetchResult> {
     const top = Math.min(options.fetchLimit ?? 100, 50);
     let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$orderby=sentDateTime%20desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
     if (options.sinceUid) {
@@ -112,16 +130,13 @@ export class MicrosoftProvider implements IEmailProvider {
     }
     const { status, json, errorText } = await providerGet(url, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
-    const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
+    const msgs = (json as { value?: GraphMessage[] }).value ?? [];
     const out: ProviderMessage[] = msgs.map(mapGraphMessage);
     const highestUid = out.length ? Math.max(...out.map((o) => o.remoteUid)) : 0;
     return { messages: out, highestUid, uidValidity: null, total: msgs.length };
   }
 
-  async fetchOlder(
-    mailboxPath: string,
-    options: ProviderSyncOptions,
-  ): Promise<ProviderPageResult> {
+  async fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult> {
     const folders = await this.listMailboxes();
     const folder = folders.find((f) => f.name === mailboxPath);
     const folderId = folder ? await this.folderIdByName(mailboxPath) : null;
@@ -137,7 +152,7 @@ export class MicrosoftProvider implements IEmailProvider {
     }
     const { status, json, errorText } = await providerGet(url, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
-    const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
+    const msgs = (json as { value?: GraphMessage[] }).value ?? [];
     // Graph returns @odata.nextLink when more pages exist.
     const nextLink = (json as { "@odata.nextLink"?: string })["@odata.nextLink"];
     const out: ProviderMessage[] = msgs.map(mapGraphMessage);
@@ -149,8 +164,8 @@ export class MicrosoftProvider implements IEmailProvider {
     const { status, json, errorText } = await providerGet(url, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to fetch Outlook message (${errorText ?? status})`);
     const m = json as GraphMessage;
-    const bodyHtml = m.body?.contentType === "html" ? m.body.content ?? null : null;
-    const bodyText = m.body?.contentType === "text" ? m.body.content ?? null : null;
+    const bodyHtml = m.body?.contentType === "html" ? (m.body.content ?? null) : null;
+    const bodyText = m.body?.contentType === "text" ? (m.body.content ?? null) : null;
     return { html: bodyHtml, text: bodyText, attachments: [] };
   }
 
@@ -162,28 +177,38 @@ export class MicrosoftProvider implements IEmailProvider {
     for (const id of providerIds) {
       const patch: Record<string, unknown> = {};
       if (flags.read !== undefined) patch.isRead = flags.read;
-      if (flags.starred !== undefined) patch.flag = { flagStatus: flags.starred ? "flagged" : "notFlagged" };
-      await providerJsonPatch(`${GRAPH}/me/messages/${encodeURIComponent(id)}`, this.token.access_token, patch);
+      if (flags.starred !== undefined)
+        patch.flag = { flagStatus: flags.starred ? "flagged" : "notFlagged" };
+      await providerJsonPatch(
+        `${GRAPH}/me/messages/${encodeURIComponent(id)}`,
+        this.token.access_token,
+        patch,
+      );
     }
   }
 
-  async move(
-    mailboxPath: string,
-    providerIds: string[],
-    targetMailboxPath: string,
-  ): Promise<void> {
+  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
     const targetId = await this.folderIdByName(targetMailboxPath);
     if (!targetId) throw new Error("Target Outlook folder not found");
     for (const id of providerIds) {
-      await providerJson(`${GRAPH}/me/messages/${encodeURIComponent(id)}/move`, this.token.access_token, {
-        destinationId: targetId,
-      });
+      await providerJson(
+        `${GRAPH}/me/messages/${encodeURIComponent(id)}/move`,
+        this.token.access_token,
+        {
+          destinationId: targetId,
+        },
+      );
     }
   }
 
   async delete(mailboxPath: string, providerIds: string[]): Promise<void> {
     for (const id of providerIds) {
-      await providerJson(`${GRAPH}/me/messages/${encodeURIComponent(id)}`, this.token.access_token, {}, "DELETE");
+      await providerJson(
+        `${GRAPH}/me/messages/${encodeURIComponent(id)}`,
+        this.token.access_token,
+        {},
+        "DELETE",
+      );
     }
   }
 
@@ -198,7 +223,12 @@ export class MicrosoftProvider implements IEmailProvider {
       ccRecipients: (opts.cc ?? []).map((a) => ({ emailAddress: { address: a } })),
       bccRecipients: (opts.bcc ?? []).map((a) => ({ emailAddress: { address: a } })),
     };
-    const { status, json } = await providerJson(`${GRAPH}/me/sendMail`, this.token.access_token, { message }, "POST");
+    const { status, json } = await providerJson(
+      `${GRAPH}/me/sendMail`,
+      this.token.access_token,
+      { message },
+      "POST",
+    );
     if (status !== 202 && status !== 201) throw new Error(`Outlook send failed (${status})`);
     void json;
     void base64url;
@@ -212,9 +242,17 @@ function mapGraphMessage(m: GraphMessage): ProviderMessage {
     remoteUid: oidToUid(m.id),
     messageId: m.internetMessageId ?? null,
     subject: m.subject ?? null,
-    from: m.from?.emailAddress ? { name: m.from.emailAddress.name ?? null, address: m.from.emailAddress.address ?? null } : null,
-    to: (m.toRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
-    cc: (m.ccRecipients ?? []).map((r) => ({ name: r.emailAddress?.name ?? null, address: r.emailAddress?.address ?? null })),
+    from: m.from?.emailAddress
+      ? { name: m.from.emailAddress.name ?? null, address: m.from.emailAddress.address ?? null }
+      : null,
+    to: (m.toRecipients ?? []).map((r) => ({
+      name: r.emailAddress?.name ?? null,
+      address: r.emailAddress?.address ?? null,
+    })),
+    cc: (m.ccRecipients ?? []).map((r) => ({
+      name: r.emailAddress?.name ?? null,
+      address: r.emailAddress?.address ?? null,
+    })),
     date: m.sentDateTime ?? null,
     internalDate: m.receivedDateTime ?? null,
     flags: m.isRead ? ["\\Seen"] : [],

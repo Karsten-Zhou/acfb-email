@@ -34,11 +34,9 @@ export function initTheme() {
   state.setting = saved;
   applyTheme();
   // React to system changes while in auto mode.
-  window
-    .matchMedia?.("(prefers-color-scheme: dark)")
-    .addEventListener?.("change", () => {
-      if (state.setting === "auto") applyTheme();
-    });
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    if (state.setting === "auto") applyTheme();
+  });
 }
 
 export { state as themeState };

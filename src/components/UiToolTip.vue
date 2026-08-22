@@ -81,7 +81,11 @@ function place() {
 
   const requested = props.side === "auto" ? null : (props.side as Side);
   const priority: Side[] = requested
-    ? [requested, OPPOSITE[requested], ...ALL_SIDES.filter((s) => s !== requested && s !== OPPOSITE[requested])]
+    ? [
+        requested,
+        OPPOSITE[requested],
+        ...ALL_SIDES.filter((s) => s !== requested && s !== OPPOSITE[requested]),
+      ]
     : [...ALL_SIDES].sort((a, b) => space[b] - space[a]);
 
   const offset = (side: Side): { x: number; y: number } => {
@@ -154,10 +158,12 @@ onUnmounted(() => {
           v-if="open"
           ref="bubbleEl"
           role="tooltip"
-          :class="cn(
-            'pointer-events-none fixed z-[100] whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm',
-            props.class,
-          )"
+          :class="
+            cn(
+              'pointer-events-none fixed z-[100] whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm',
+              props.class,
+            )
+          "
           :style="pos ? { left: `${pos.x}px`, top: `${pos.y}px` } : undefined"
         >
           {{ label }}

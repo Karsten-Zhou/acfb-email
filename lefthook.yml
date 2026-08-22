@@ -1,0 +1,20 @@
+# Lefthook git hooks configuration.
+# Formatting and static checks run automatically before each commit.
+# Docs: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: '*.{ts,vue,js,json,jsonc,md}'
+      run: bunx prettier --write {staged_files}
+    lint:
+      glob: '*.{ts,vue,js}'
+      run: bun run lint
+    typecheck:
+      run: bun run typecheck
+    test:
+      run: bun run test
+#
+#     - script: "hello.go"
+#       runner: go run

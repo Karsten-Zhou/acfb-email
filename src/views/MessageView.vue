@@ -57,7 +57,10 @@ function reply() {
   if (!msg.value) return;
   const m = msg.value;
   router.push({
-    query: { to: m.from?.address ?? "", subject: m.subject ? (m.subject.startsWith("Re:") ? m.subject : `Re: ${m.subject}`) : "" },
+    query: {
+      to: m.from?.address ?? "",
+      subject: m.subject ? (m.subject.startsWith("Re:") ? m.subject : `Re: ${m.subject}`) : "",
+    },
   });
 }
 
@@ -91,40 +94,62 @@ function sanitizeHtml(s: string): string {
         </UiButton>
       </UiToolTip>
       <UiToolTip :label="t('delete')">
-        <UiButton variant="ghost" size="icon" class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white" @click="askDelete">
+        <UiButton
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
+          @click="askDelete"
+        >
           <Trash2 class="h-5 w-5" />
         </UiButton>
       </UiToolTip>
     </header>
 
     <main class="flex-1 overflow-y-auto p-4">
-      <div v-if="loading" class="py-10 text-center text-sm text-muted-foreground">{{ t('content') }}…</div>
+      <div v-if="loading" class="py-10 text-center text-sm text-muted-foreground">
+        {{ t("content") }}…
+      </div>
       <div v-else-if="error" class="py-10 text-center text-sm text-destructive">{{ error }}</div>
       <template v-else-if="msg">
-        <h1 class="text-xl font-semibold">{{ msg.subject || '(no subject)' }}</h1>
+        <h1 class="text-xl font-semibold">{{ msg.subject || "(no subject)" }}</h1>
         <div class="mt-3 flex items-center gap-2 text-sm">
-          <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {{ (msg.from?.name || msg.from?.address || '?').charAt(0).toUpperCase() }}
+          <div
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+          >
+            {{ (msg.from?.name || msg.from?.address || "?").charAt(0).toUpperCase() }}
           </div>
           <div class="min-w-0">
             <div class="truncate font-medium">{{ msg.from?.name || msg.from?.address }}</div>
             <div class="truncate text-xs text-muted-foreground">{{ msg.from?.address }}</div>
           </div>
-          <div class="ml-auto shrink-0 text-xs text-muted-foreground">{{ formatDateTime(msg.receivedAt) }}</div>
-        </div>
-
-        <div v-if="msg.to.length" class="mt-2 text-xs text-muted-foreground">
-          To: <span v-for="(recip, i) in msg.to" :key="i">{{ recip.name || recip.address }}<span v-if="i < msg.to.length - 1">, </span></span>
-        </div>
-
-        <div v-if="msg.attachments?.length" class="mt-3 flex flex-wrap gap-2">
-          <div v-for="a in msg.attachments" :key="a.id" class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs">
-            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-            <span class="max-w-[180px] truncate">{{ a.filename || 'attachment' }}</span>
+          <div class="ml-auto shrink-0 text-xs text-muted-foreground">
+            {{ formatDateTime(msg.receivedAt) }}
           </div>
         </div>
 
-        <div class="email-body mt-5 text-[15px]" v-html="sanitizeHtml(msg.html || msg.text || '')" /><!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
+        <div v-if="msg.to.length" class="mt-2 text-xs text-muted-foreground">
+          To:
+          <span v-for="(recip, i) in msg.to" :key="i"
+            >{{ recip.name || recip.address }}<span v-if="i < msg.to.length - 1">, </span></span
+          >
+        </div>
+
+        <div v-if="msg.attachments?.length" class="mt-3 flex flex-wrap gap-2">
+          <div
+            v-for="a in msg.attachments"
+            :key="a.id"
+            class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs"
+          >
+            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
+            <span class="max-w-[180px] truncate">{{ a.filename || "attachment" }}</span>
+          </div>
+        </div>
+
+        <div
+          class="email-body mt-5 text-[15px]"
+          v-html="sanitizeHtml(msg.html || msg.text || '')"
+        />
+        <!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
       </template>
     </main>
 
@@ -135,11 +160,13 @@ function sanitizeHtml(s: string): string {
       :busy="deleting"
       @close="confirmDelete = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t('confirmDeleteMessages') }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteMessages") }}</p>
       <template #footer>
-        <UiButton variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{ t('cancelAction') }}</UiButton>
+        <UiButton variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{
+          t("cancelAction")
+        }}</UiButton>
         <UiButton variant="destructive" size="sm" :disabled="deleting" @click="remove">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t('ok') }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
         </UiButton>
       </template>
     </UiDialog>

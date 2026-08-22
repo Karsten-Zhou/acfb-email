@@ -12,7 +12,8 @@ import {
 
 describe("IMAP raw-header parsing", () => {
   it("parses standard headers incl. folded continuation", () => {
-    const raw = "From: Alice <alice@example.com>\r\nTo: Bob <bob@example.com>, c@example.com\r\nSubject: Hello\r\nDate: 2026-01-01\r\nMessage-ID: <x@y>\r\n";
+    const raw =
+      "From: Alice <alice@example.com>\r\nTo: Bob <bob@example.com>, c@example.com\r\nSubject: Hello\r\nDate: 2026-01-01\r\nMessage-ID: <x@y>\r\n";
     const h = parseHeaderText(raw);
     expect(h["from"]).toContain("alice@example.com");
     expect(h["subject"]).toBe("Hello");
@@ -27,7 +28,9 @@ describe("IMAP raw-header parsing", () => {
   });
 
   it("parses address header with names and bare addresses", () => {
-    const addrs = parseAddressListBySemicolon('"Alice Example" <alice@example.com>, Bob <bob@other.org>, c@example.com');
+    const addrs = parseAddressListBySemicolon(
+      '"Alice Example" <alice@example.com>, Bob <bob@other.org>, c@example.com',
+    );
     expect(addrs).toHaveLength(3);
     expect(addrs[0]).toEqual({ name: "Alice Example", address: "alice@example.com" });
     expect(addrs[1]).toEqual({ name: "Bob", address: "bob@other.org" });
@@ -50,7 +53,8 @@ describe("IMAP ENVELOPE parsing helpers", () => {
   });
 
   it("splits top-level parenthesized tokens", () => {
-    const s = '"date" "subject" NIL ("From Name" NIL "from" "example.com") NIL NIL NIL NIL NIL "msg@id"';
+    const s =
+      '"date" "subject" NIL ("From Name" NIL "from" "example.com") NIL NIL NIL NIL NIL "msg@id"';
     const parts = splitTopLevel(s);
     expect(parts).toHaveLength(10);
     expect(parts[0]).toBe('"date"');
@@ -141,7 +145,9 @@ describe("WireReader (byte-accurate literal parsing)", () => {
     expect(lines[lines.length - 1]).toBe("A1 OK FETCH completed");
     const gotLen = lits.reduce((x, y) => x + y.byteLength, 0);
     expect(gotLen).toBe(body.byteLength);
-    expect(new TextDecoder().decode(lits[0])).toBe("连接到 Microsoft 帐户的新应用 你好 world 中文内容");
+    expect(new TextDecoder().decode(lits[0])).toBe(
+      "连接到 Microsoft 帐户的新应用 你好 world 中文内容",
+    );
   });
 
   it("returns null when the stream ends without data", async () => {

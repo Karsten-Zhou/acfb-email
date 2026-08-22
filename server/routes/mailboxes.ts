@@ -17,9 +17,7 @@ mailboxRoutes.get("/", async (c) => {
   if (!accountId) throw new HttpError(400, "accountId is required");
 
   // ownership check
-  const acct = await c.env.DB.prepare(
-    `SELECT id FROM accounts WHERE id = ? AND user_id = ?`,
-  )
+  const acct = await c.env.DB.prepare(`SELECT id FROM accounts WHERE id = ? AND user_id = ?`)
     .bind(accountId, user.id)
     .first();
   if (!acct) throw new HttpError(404, "Account not found");

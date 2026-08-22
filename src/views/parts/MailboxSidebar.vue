@@ -5,7 +5,18 @@ import { accountsState } from "../../stores/accounts";
 import { t } from "../../lib/i18n";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
-import { Inbox, Send, FileText, Trash2, Archive, AlertTriangle, RefreshCw, Plus, Mail as MailIcon, Settings } from "lucide-vue-next";
+import {
+  Inbox,
+  Send,
+  FileText,
+  Trash2,
+  Archive,
+  AlertTriangle,
+  RefreshCw,
+  Plus,
+  Mail as MailIcon,
+  Settings,
+} from "lucide-vue-next";
 import type { Mailbox } from "@shared/types";
 
 defineProps<{
@@ -40,12 +51,23 @@ const roleIcon: Record<string, typeof Inbox> = {
       <span class="text-sm font-semibold tracking-tight">Mail</span>
       <div class="flex items-center gap-1">
         <AppTooltip :label="t('syncNow')">
-          <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="emit('sync-all')">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8"
+            :disabled="syncing"
+            @click="emit('sync-all')"
+          >
             <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" />
           </Button>
         </AppTooltip>
         <AppTooltip :label="t('settings')">
-          <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'settings' })">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8"
+            @click="router.push({ name: 'settings' })"
+          >
             <Settings class="h-4 w-4" />
           </Button>
         </AppTooltip>
@@ -65,11 +87,13 @@ const roleIcon: Record<string, typeof Inbox> = {
         @click="emit('select', 'unified')"
       >
         <MailIcon class="h-4 w-4 shrink-0" />
-        <span class="flex-grow text-left">{{ t('unifiedInbox') }}</span>
+        <span class="flex-grow text-left">{{ t("unifiedInbox") }}</span>
       </button>
 
       <template v-for="acct in accountsState.accounts" :key="acct.id">
-        <div class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div
+          class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
           {{ acct.name }}
           <AppTooltip :label="t('syncNow')">
             <button
@@ -91,7 +115,10 @@ const roleIcon: Record<string, typeof Inbox> = {
         >
           <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4 shrink-0" />
           <span class="flex-grow truncate text-left">{{ item.mailbox.name }}</span>
-          <span v-if="unread(item)" class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+          <span
+            v-if="unread(item)"
+            class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground"
+          >
             {{ unread(item) }}
           </span>
         </button>

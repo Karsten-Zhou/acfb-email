@@ -81,9 +81,15 @@ export const api = {
   accounts: () => request<{ accounts: AccountSummary[] }>("/accounts"),
   account: (id: string) => request<{ account: AccountDetail }>(`/accounts/${id}`),
   addAccount: (input: AddAccountInput) =>
-    request<{ account: AccountSummary }>("/accounts", { method: "POST", body: JSON.stringify(input) }),
+    request<{ account: AccountSummary }>("/accounts", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   testAccount: (input: AddAccountInput) =>
-    request<{ ok: boolean; message?: string }>("/accounts/test", { method: "POST", body: JSON.stringify(input) }),
+    request<{ ok: boolean; message?: string }>("/accounts/test", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   deleteAccount: (id: string) => request<{ ok: boolean }>(`/accounts/${id}`, { method: "DELETE" }),
   syncAccount: (id: string) =>
     request<{ ok: boolean; mailboxesSynced?: number; messagesSeen?: number; message?: string }>(
@@ -92,26 +98,42 @@ export const api = {
     ),
 
   // mailboxes
-  mailboxes: (accountId: string) => request<{ mailboxes: Mailbox[] }>(`/mailboxes?accountId=${encodeURIComponent(accountId)}`),
+  mailboxes: (accountId: string) =>
+    request<{ mailboxes: Mailbox[] }>(`/mailboxes?accountId=${encodeURIComponent(accountId)}`),
 
   // messages
   messages: (mailboxId: string, limit = 50, offset = 0, beforeUid?: number, beforeDate?: number) =>
-    request<{ messages: Message[]; hasMore?: boolean }>(`/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`),
+    request<{ messages: Message[]; hasMore?: boolean }>(
+      `/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`,
+    ),
   unified: (limit = 50, offset = 0) =>
-    request<{ messages: Message[]; hasMore?: boolean }>(`/messages/unified?limit=${limit}&offset=${offset}`),
-  message: (id: string) => request<{ message: MessageDetail }>(`/messages/${encodeURIComponent(id)}`),
+    request<{ messages: Message[]; hasMore?: boolean }>(
+      `/messages/unified?limit=${limit}&offset=${offset}`,
+    ),
+  message: (id: string) =>
+    request<{ message: MessageDetail }>(`/messages/${encodeURIComponent(id)}`),
   flags: (ids: string[], flags: { read?: boolean; starred?: boolean }) =>
-    request<{ ok: boolean }>("/messages/flags", { method: "PATCH", body: JSON.stringify({ ids, ...flags }) }),
+    request<{ ok: boolean }>("/messages/flags", {
+      method: "PATCH",
+      body: JSON.stringify({ ids, ...flags }),
+    }),
   move: (ids: string[], targetMailboxId: string) =>
-    request<{ ok: boolean }>("/messages/move", { method: "POST", body: JSON.stringify({ ids, targetMailboxId }) }),
+    request<{ ok: boolean }>("/messages/move", {
+      method: "POST",
+      body: JSON.stringify({ ids, targetMailboxId }),
+    }),
   delete: (ids: string[]) =>
     request<{ ok: boolean }>("/messages/delete", { method: "POST", body: JSON.stringify({ ids }) }),
 
   // send / drafts
-  send: (input: SendMessageInput) => request<{ ok: boolean }>("/send/send", { method: "POST", body: JSON.stringify(input) }),
+  send: (input: SendMessageInput) =>
+    request<{ ok: boolean }>("/send/send", { method: "POST", body: JSON.stringify(input) }),
   drafts: () => request<{ drafts: Draft[] }>("/send/drafts"),
   saveDraft: (draft: Partial<DraftInput>) =>
-    request<{ ok: boolean; id: string }>("/send/drafts", { method: "POST", body: JSON.stringify(draft) }),
+    request<{ ok: boolean; id: string }>("/send/drafts", {
+      method: "POST",
+      body: JSON.stringify(draft),
+    }),
   deleteDraft: (id: string) => request<{ ok: boolean }>(`/send/drafts/${id}`, { method: "DELETE" }),
 
   // settings

@@ -105,7 +105,11 @@ export function formatRelativeDate(iso: string | number | Date): string {
     return new Intl.DateTimeFormat(timeTag(), { hour: "2-digit", minute: "2-digit" }).format(d);
   }
   const sameYear = d.getFullYear() === today.getFullYear();
-  return new Intl.DateTimeFormat(timeTag(), { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) }).format(d);
+  return new Intl.DateTimeFormat(timeTag(), {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(d);
 }
 
 /** Full date + time, e.g. for the reading pane / build time. */

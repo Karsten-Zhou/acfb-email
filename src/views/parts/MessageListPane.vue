@@ -57,11 +57,7 @@ const actionsVisible = computed(() => props.selectedCount > 0);
       <div class="flex items-center gap-1">
         <button
           class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
-          :class="
-            onlyUnread
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground'
-          "
+          :class="onlyUnread ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'"
           :title="t('showOnlyUnread')"
           @click="emit('toggleUnread')"
         >
@@ -114,18 +110,12 @@ const actionsVisible = computed(() => props.selectedCount > 0);
       </div>
     </div>
     <div v-else class="flex min-h-0 flex-1 flex-col">
-      <div
-        class="flex-1 divide-y divide-border overflow-y-auto"
-        @scroll="emit('scroll', $event)"
-      >
+      <div class="flex-1 divide-y divide-border overflow-y-auto" @scroll="emit('scroll', $event)">
         <button
           v-for="m in messages"
           :key="m.id"
           class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60"
-          :class="[
-            selectedId === m.id ? 'bg-accent' : '',
-            m.isRead ? '' : 'bg-accent/20',
-          ]"
+          :class="[selectedId === m.id ? 'bg-accent' : '', m.isRead ? '' : 'bg-accent/20']"
           @click="emit('open', m)"
         >
           <input
@@ -139,9 +129,7 @@ const actionsVisible = computed(() => props.selectedCount > 0);
             <div class="flex items-baseline justify-between gap-2">
               <span
                 class="truncate text-sm"
-                :class="
-                  m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'
-                "
+                :class="m.isRead ? 'font-normal text-foreground/70' : 'font-semibold'"
               >
                 {{ m.from?.name || m.from?.address || "(unknown)" }}
               </span>
@@ -171,13 +159,8 @@ const actionsVisible = computed(() => props.selectedCount > 0);
            a spinner while fetching older, or an explicit "no more messages"
            line once everything is exhausted. Nothing is shown while more
            pages exist but none are being loaded (e.g. at the top of the list). -->
-        <div
-          class="flex items-center justify-center border-border bg-background/80 px-4 py-2"
-        >
-          <div
-            v-if="loadingOlder"
-            class="flex items-center gap-2 text-xs text-muted-foreground"
-          >
+        <div class="flex items-center justify-center border-border bg-background/80 px-4 py-2">
+          <div v-if="loadingOlder" class="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 class="h-3.5 w-3.5 animate-spin" />
             {{ t("loadingOlder") }}
           </div>

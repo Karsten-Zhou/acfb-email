@@ -6,7 +6,15 @@ import { mailState } from "../../stores/mail";
 import { t, formatDateTime } from "../../lib/i18n";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
-import { Star, Reply, ChevronLeft, Paperclip, Mail as MailIcon, RefreshCw, Trash2 } from "lucide-vue-next";
+import {
+  Star,
+  Reply,
+  ChevronLeft,
+  Paperclip,
+  Mail as MailIcon,
+  RefreshCw,
+  Trash2,
+} from "lucide-vue-next";
 
 defineProps<{
   loading: boolean;
@@ -26,12 +34,21 @@ function sanitizeHtml(s: string): string {
 </script>
 
 <template>
-  <section class="min-w-0 flex-1 flex-col bg-background" :class="mailState.selected ? 'flex md:flex' : 'hidden md:flex'">
-    <div v-if="!mailState.selected" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-      {{ t('selectToRead') }}
+  <section
+    class="min-w-0 flex-1 flex-col bg-background"
+    :class="mailState.selected ? 'flex md:flex' : 'hidden md:flex'"
+  >
+    <div
+      v-if="!mailState.selected"
+      class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
+    >
+      {{ t("selectToRead") }}
     </div>
-    <div v-else-if="loading" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t('content') }}…
+    <div
+      v-else-if="loading"
+      class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
+    >
+      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("content") }}…
     </div>
     <template v-else>
       <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
@@ -41,10 +58,16 @@ function sanitizeHtml(s: string): string {
           </Button>
         </AppTooltip>
         <div class="min-w-0 flex-1">
-          <h1 class="truncate text-base font-semibold leading-tight">{{ mailState.selected.subject || '(no subject)' }}</h1>
+          <h1 class="truncate text-base font-semibold leading-tight">
+            {{ mailState.selected.subject || "(no subject)" }}
+          </h1>
           <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-            <span class="font-medium text-foreground">{{ mailState.selected.from?.name || mailState.selected.from?.address }}</span>
-            <span v-if="mailState.selected.from?.address" class="text-xs">&lt;{{ mailState.selected.from.address }}&gt;</span>
+            <span class="font-medium text-foreground">{{
+              mailState.selected.from?.name || mailState.selected.from?.address
+            }}</span>
+            <span v-if="mailState.selected.from?.address" class="text-xs"
+              >&lt;{{ mailState.selected.from.address }}&gt;</span
+            >
             <span class="text-xs">{{ formatDateTime(mailState.selected.receivedAt) }}</span>
           </div>
         </div>
@@ -55,22 +78,15 @@ function sanitizeHtml(s: string): string {
             </Button>
           </AppTooltip>
           <AppTooltip :label="t('star')">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              @click="emit('toggle-star')"
-            >
-              <Star class="h-4 w-4" :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggle-star')">
+              <Star
+                class="h-4 w-4"
+                :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
+              />
             </Button>
           </AppTooltip>
           <AppTooltip :label="mailState.selected.isRead ? t('markUnread') : t('markRead')">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              @click="emit('toggle-read')"
-            >
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggle-read')">
               <MailIcon class="h-4 w-4" />
             </Button>
           </AppTooltip>
@@ -87,22 +103,36 @@ function sanitizeHtml(s: string): string {
         </div>
       </header>
 
-      <div v-if="mailState.selected.to.length" class="border-b border-border px-5 py-1.5 text-xs text-muted-foreground">
-        To: <span v-for="(recip, i) in mailState.selected.to" :key="i">{{ recip.name || recip.address }}<span v-if="i < mailState.selected.to.length - 1">, </span></span>
+      <div
+        v-if="mailState.selected.to.length"
+        class="border-b border-border px-5 py-1.5 text-xs text-muted-foreground"
+      >
+        To:
+        <span v-for="(recip, i) in mailState.selected.to" :key="i"
+          >{{ recip.name || recip.address
+          }}<span v-if="i < mailState.selected.to.length - 1">, </span></span
+        >
       </div>
-      <div v-if="mailState.selected.attachments?.length" class="flex flex-wrap gap-2 border-b border-border px-5 py-2">
+      <div
+        v-if="mailState.selected.attachments?.length"
+        class="flex flex-wrap gap-2 border-b border-border px-5 py-2"
+      >
         <div
           v-for="a in mailState.selected.attachments"
           :key="a.id"
           class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
         >
           <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-          <span class="max-w-[200px] truncate">{{ a.filename || 'attachment' }}</span>
+          <span class="max-w-[200px] truncate">{{ a.filename || "attachment" }}</span>
         </div>
       </div>
 
       <div class="flex-1 overflow-y-auto px-5 py-5">
-        <div class="email-body text-[15px]" v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')" /><!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
+        <div
+          class="email-body text-[15px]"
+          v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')"
+        />
+        <!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
       </div>
     </template>
   </section>

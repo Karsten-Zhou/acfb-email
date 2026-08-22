@@ -26,10 +26,7 @@ const SCOPE_DELIMITERS = {
 } as const;
 
 /** Build the /authorize URL (authorization-code flow). */
-export function buildAuthorizeUrl(
-  cfg: OAuthProviderConfig,
-  state: string,
-): string {
+export function buildAuthorizeUrl(cfg: OAuthProviderConfig, state: string): string {
   const qs = new URLSearchParams({
     client_id: cfg.clientId,
     response_type: "code",
@@ -104,7 +101,10 @@ export async function refreshToken(
     throw new HttpError(502, `Provider token refresh failed: ${providerMsg}`);
   }
   // Preserve the original refresh token if the provider didn't rotate it.
-  return { ...normalizeToken(data), refresh_token: (data.refresh_token as string) ?? refreshTokenValue };
+  return {
+    ...normalizeToken(data),
+    refresh_token: (data.refresh_token as string) ?? refreshTokenValue,
+  };
 }
 
 function normalizeToken(data: Record<string, unknown>): OAuthToken {
@@ -121,7 +121,7 @@ function normalizeToken(data: Record<string, unknown>): OAuthToken {
 /** Compute whether an access token is (likely) still valid. */
 export function tokenValid(tok: OAuthToken, slackMs = 60_000): boolean {
   if (!tok.expires_in) return true; // unknown -> assume valid
-  return Date.now() - tok.obtained_at < (tok.expires_in * 1000) - slackMs;
+  return Date.now() - tok.obtained_at < tok.expires_in * 1000 - slackMs;
 }
 
 /** Build redirect_uri for a provider from the app base URL. */

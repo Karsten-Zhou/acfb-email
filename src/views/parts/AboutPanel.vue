@@ -11,12 +11,21 @@ const APP_REPO_URL = "https://github.com/XiaoSong-CPE/cloudflare-email-client";
 <template>
   <div class="card-surface p-4">
     <h2 class="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-      <Info class="h-4 w-4" /> {{ t('about') }}
+      <Info class="h-4 w-4" /> {{ t("about") }}
     </h2>
     <dl class="space-y-1.5 text-sm">
-      <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('appName') }}</dt><dd class="font-medium">Cloudflare Email Client</dd></div>
-      <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('version') }}</dt><dd class="font-medium">{{ appVersion }}</dd></div>
-      <div class="flex justify-between"><dt class="text-muted-foreground">{{ t('buildTime') }}</dt><dd class="font-medium">{{ formatDateTime(appBuildTime) }}</dd></div>
+      <div class="flex justify-between">
+        <dt class="text-muted-foreground">{{ t("appName") }}</dt>
+        <dd class="font-medium">Cloudflare Email Client</dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-muted-foreground">{{ t("version") }}</dt>
+        <dd class="font-medium">{{ appVersion }}</dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-muted-foreground">{{ t("buildTime") }}</dt>
+        <dd class="font-medium">{{ formatDateTime(appBuildTime) }}</dd>
+      </div>
     </dl>
     <a
       :href="APP_REPO_URL"
@@ -24,7 +33,7 @@ const APP_REPO_URL = "https://github.com/XiaoSong-CPE/cloudflare-email-client";
       rel="noopener noreferrer"
       class="mt-3 inline-flex items-center gap-1.5 text-sm text-primary underline-offset-4 hover:underline"
     >
-      <ExternalLink class="h-4 w-4" /> {{ t('viewSource') }}
+      <ExternalLink class="h-4 w-4" /> {{ t("viewSource") }}
     </a>
   </div>
 </template>

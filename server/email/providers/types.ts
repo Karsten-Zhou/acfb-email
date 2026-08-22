@@ -99,16 +99,10 @@ export interface IEmailProvider {
   /**
    * Incrementally sync a single mailbox folder. Returns new/changed messages.
    */
-  syncMailbox(
-    mailboxPath: string,
-    options: ProviderSyncOptions,
-  ): Promise<ProviderFetchResult>;
+  syncMailbox(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderFetchResult>;
 
   /** Fetch an older page of messages (below `beforeUid`). */
-  fetchOlder(
-    mailboxPath: string,
-    options: ProviderSyncOptions,
-  ): Promise<ProviderPageResult>;
+  fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult>;
 
   /** Fetch the full body & attachments of a message. */
   fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;
@@ -121,11 +115,7 @@ export interface IEmailProvider {
   ): Promise<void>;
 
   /** Move provider message ids to another mailbox. */
-  move(
-    mailboxPath: string,
-    providerMessageIds: string[],
-    targetMailboxPath: string,
-  ): Promise<void>;
+  move(mailboxPath: string, providerMessageIds: string[], targetMailboxPath: string): Promise<void>;
 
   /** Delete provider message ids from a mailbox. */
   delete(mailboxPath: string, providerMessageIds: string[]): Promise<void>;

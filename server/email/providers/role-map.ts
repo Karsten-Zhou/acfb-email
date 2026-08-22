@@ -4,10 +4,7 @@ import type { MailboxRole } from "@shared/constants";
  * Map an IMAP mailbox name (+ delimiter + flags) to our canonical role.
  * Order matters: more specific checks first.
  */
-export function roleFromImapName(
-  name: string,
-  flags: string[],
-): MailboxRole {
+export function roleFromImapName(name: string, flags: string[]): MailboxRole {
   const upper = name.toUpperCase();
   const path = upper;
 

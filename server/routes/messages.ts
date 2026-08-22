@@ -47,7 +47,14 @@ messageRoutes.get("/", async (c) => {
   if (offset > 0 && rows.length < limit && (beforeUid > 0 || beforeDate > 0)) {
     const account = await repo.accountById(c.env, box.account_id);
     if (account) {
-      const res = await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, beforeUid, limit, beforeDate || undefined).catch(() => ({ imported: 0, hasMore: false }));
+      const res = await importOlderPage(
+        c.env,
+        { id: account.id, provider: account.provider },
+        box.provider_path,
+        beforeUid,
+        limit,
+        beforeDate || undefined,
+      ).catch(() => ({ imported: 0, hasMore: false }));
       rows = await repo.listMessages(c.env, mailboxId, limit, offset);
       // Signal the client: the provider still has older mail we imported, so
       // the "No more messages" line must not appear — a further scroll should
@@ -76,7 +83,12 @@ messageRoutes.get("/unified", async (c) => {
   )
     .bind(user.id)
     .all<{ id: string }>();
-  let rows = await repo.unifiedMessages(c.env, boxes.results.map((b) => b.id), limit, offset);
+  let rows = await repo.unifiedMessages(
+    c.env,
+    boxes.results.map((b) => b.id),
+    limit,
+    offset,
+  );
   let hasMore = rows.length === limit;
 
   if (offset > 0 && rows.length < limit && boxes.results.length > 0) {
@@ -100,10 +112,22 @@ messageRoutes.get("/unified", async (c) => {
       )
         .bind(boxRow.id)
         .first<{ remote_uid: number | null }>();
-      const res = await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, uids?.remote_uid ?? 0, Math.ceil(limit / Math.max(boxes.results.length, 1)), beforeDate).catch(() => ({ imported: 0, hasMore: false }));
+      const res = await importOlderPage(
+        c.env,
+        { id: account.id, provider: account.provider },
+        box.provider_path,
+        uids?.remote_uid ?? 0,
+        Math.ceil(limit / Math.max(boxes.results.length, 1)),
+        beforeDate,
+      ).catch(() => ({ imported: 0, hasMore: false }));
       imported += res.imported;
     }
-    rows = await repo.unifiedMessages(c.env, boxes.results.map((b) => b.id), limit, offset);
+    rows = await repo.unifiedMessages(
+      c.env,
+      boxes.results.map((b) => b.id),
+      limit,
+      offset,
+    );
     hasMore = imported > 0;
   }
 
@@ -235,9 +259,15 @@ async function rowsToMessages(env: Env, rows: MessageRow[]): Promise<Message[]> 
   const out: Message[] = [];
   for (const r of rows) {
     const recips = await repo.recipients(env, r.id);
-    const to = recips.filter((x) => x.type === "to").map((x) => ({ name: x.name, address: x.address }));
-    const cc = recips.filter((x) => x.type === "cc").map((x) => ({ name: x.name, address: x.address }));
-    const bcc = recips.filter((x) => x.type === "bcc").map((x) => ({ name: x.name, address: x.address }));
+    const to = recips
+      .filter((x) => x.type === "to")
+      .map((x) => ({ name: x.name, address: x.address }));
+    const cc = recips
+      .filter((x) => x.type === "cc")
+      .map((x) => ({ name: x.name, address: x.address }));
+    const bcc = recips
+      .filter((x) => x.type === "bcc")
+      .map((x) => ({ name: x.name, address: x.address }));
     out.push(
       MessageSchema.parse({
         id: r.id,
@@ -262,7 +292,12 @@ async function rowsToMessages(env: Env, rows: MessageRow[]): Promise<Message[]> 
   return out;
 }
 
-async function rowToDetail(env: Env, row: MessageRow, html: string | null, text: string | null): Promise<MessageDetail> {
+async function rowToDetail(
+  env: Env,
+  row: MessageRow,
+  html: string | null,
+  text: string | null,
+): Promise<MessageDetail> {
   const recips = await repo.recipients(env, row.id);
   const attachments = await repo.attachments(env, row.id);
   return MessageDetailSchema.parse({

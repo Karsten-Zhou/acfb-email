@@ -80,7 +80,12 @@ export async function fetchGitHubUser(token: string): Promise<{
     name?: string | null;
     avatar_url?: string | null;
   };
-  return { id: data.id, login: data.login, name: data.name ?? null, avatar_url: data.avatar_url ?? null };
+  return {
+    id: data.id,
+    login: data.login,
+    name: data.name ?? null,
+    avatar_url: data.avatar_url ?? null,
+  };
 }
 
 export function isAllowedUser(env: Env, githubId: number): boolean {
@@ -119,9 +124,7 @@ export async function createSession(env: Env, userId: string): Promise<string> {
   const token = randomToken();
   const hashed = await sha256Hex(token);
   const exp = sessionExpiry(env);
-  await env.DB.prepare(
-    `INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)`,
-  )
+  await env.DB.prepare(`INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)`)
     .bind(hashed, userId, exp.toISOString())
     .run();
   return token;
@@ -181,9 +184,7 @@ export async function upsertUser(
   )
     .bind(id, gh.id, gh.login, gh.name, gh.avatar_url)
     .run();
-  await env.DB.prepare(`INSERT INTO app_settings (user_id, data) VALUES (?, '{}')`)
-    .bind(id)
-    .run();
+  await env.DB.prepare(`INSERT INTO app_settings (user_id, data) VALUES (?, '{}')`).bind(id).run();
   return id;
 }
 

@@ -21,7 +21,14 @@ const app = new Hono<AppEnv>();
 
 // ----- global middleware -----
 app.use("*", logger());
-app.use("/api/*", cors({ origin: "*", allowHeaders: ["Content-Type", "x-csrf-token"], allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }));
+app.use(
+  "/api/*",
+  cors({
+    origin: "*",
+    allowHeaders: ["Content-Type", "x-csrf-token"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  }),
+);
 app.use("/api/*", csrfGuard);
 
 // ----- api routes -----

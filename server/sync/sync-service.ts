@@ -93,9 +93,10 @@ export async function syncAccount(
     return result;
   } catch (err) {
     if (timer) clearTimeout(timer);
-    const message = err instanceof Error && err.message === "sync_timeout"
-      ? "Synchronization timed out. The mail server may be slow or unreachable."
-      : classifyError(err);
+    const message =
+      err instanceof Error && err.message === "sync_timeout"
+        ? "Synchronization timed out. The mail server may be slow or unreachable."
+        : classifyError(err);
     await setAccountState(env, accountId, "unavailable", message);
     await env.DB.prepare(
       `UPDATE sync_state SET state = 'error', last_error = ?, error_count = error_count + 1 WHERE account_id = ?`,
@@ -142,13 +143,17 @@ async function syncOneMailbox(
        last_sync_at = excluded.last_sync_at,
        state = 'idle'`,
   )
-    .bind(account.id, mailbox.id, result.uidValidity ?? uidValidity, result.highestUid, new Date().toISOString())
+    .bind(
+      account.id,
+      mailbox.id,
+      result.uidValidity ?? uidValidity,
+      result.highestUid,
+      new Date().toISOString(),
+    )
     .run();
 
   // Update mailbox stats.
-  await env.DB.prepare(
-    `UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`,
-  )
+  await env.DB.prepare(`UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`)
     .bind(result.total ?? null, await unseenForBox(env, mailbox.id), mailbox.id)
     .run();
 
@@ -177,9 +182,7 @@ async function upsertMessage(
   const threadId = msg.messageId ? msg.messageId : null;
 
   // Compute a sync fingerprint to detect changes.
-  const hash = simpleHash(
-    [uidValidity, msg.remoteUid, isRead, isStarred, subject, date].join("|"),
-  );
+  const hash = simpleHash([uidValidity, msg.remoteUid, isRead, isStarred, subject, date].join("|"));
 
   // remote_message_id holds the provider's id for this message in this mailbox
   // (IMAP UID, Gmail message id, Outlook message id). We use it as the stable
@@ -249,11 +252,7 @@ async function upsertMessage(
   }
 }
 
-async function upsertMailbox(
-  env: Env,
-  accountId: string,
-  path: string,
-): Promise<{ id: string }> {
+async function upsertMailbox(env: Env, accountId: string, path: string): Promise<{ id: string }> {
   const existing = await env.DB.prepare(
     `SELECT id, provider_path FROM mailboxes WHERE account_id = ? AND provider_path = ?`,
   )
@@ -311,9 +310,7 @@ async function setAccountState(
   state: string,
   message: string | null,
 ): Promise<void> {
-  await env.DB.prepare(
-    `UPDATE accounts SET state = ?, state_message = ? WHERE id = ?`,
-  )
+  await env.DB.prepare(`UPDATE accounts SET state = ?, state_message = ? WHERE id = ?`)
     .bind(state, message, accountId)
     .run();
 }
@@ -339,17 +336,23 @@ export async function importOlderPage(
     credential ? { credential: credential.credential } : null,
     env,
   );
-  const result = await provider.fetchOlder(mailboxPath, { beforeUid, beforeDate, fetchLimit: limit });
+  const result = await provider.fetchOlder(mailboxPath, {
+    beforeUid,
+    beforeDate,
+    fetchLimit: limit,
+  });
   const mailbox = await upsertMailbox(env, account.id, mailboxPath);
   for (const msg of result.messages) {
     await upsertMessage(env, fullAccount, mailbox, null, msg);
   }
   // Refresh the aggregate counts (unseen changed as older messages arrive).
-  await env.DB.prepare(
-    `UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`,
-  )
+  await env.DB.prepare(`UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`)
     .bind(
-      (await env.DB.prepare(`SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ?`).bind(mailbox.id).first<{ n: number }>())?.n ?? 0,
+      (
+        await env.DB.prepare(`SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ?`)
+          .bind(mailbox.id)
+          .first<{ n: number }>()
+      )?.n ?? 0,
       await unseenForBox(env, mailbox.id),
       mailbox.id,
     )

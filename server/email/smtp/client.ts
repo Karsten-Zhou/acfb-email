@@ -14,7 +14,10 @@ export interface SmtpConfig {
 }
 
 export class SmtpError extends Error {
-  constructor(message: string, readonly code?: number) {
+  constructor(
+    message: string,
+    readonly code?: number,
+  ) {
     super(message);
     this.name = "SmtpError";
   }
@@ -144,7 +147,10 @@ class SmtpClientCore {
     await this.readReply(354);
     // Dot-stuff: lines starting with "." get an extra "." prepended.
     const text = new TextDecoder().decode(raw);
-    const stuffed = text.split("\r\n").map((l) => (l.startsWith(".") ? "." + l : l)).join("\r\n");
+    const stuffed = text
+      .split("\r\n")
+      .map((l) => (l.startsWith(".") ? "." + l : l))
+      .join("\r\n");
     // Ensure trailing CRLF then terminator.
     await this.send(stuffed + (stuffed.endsWith("\r\n") ? "" : "\r\n") + ".");
     await this.readReply(250);

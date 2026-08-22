@@ -51,7 +51,7 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
     <div class="grid gap-4 sm:grid-cols-2">
       <div class="space-y-2">
         <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Languages class="h-3.5 w-3.5" /> {{ t('language') }}
+          <Languages class="h-3.5 w-3.5" /> {{ t("language") }}
         </label>
         <!-- Nice language dropdown (Intl-named options) -->
         <div ref="languageMenuRef" class="relative">
@@ -78,7 +78,7 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
                 :class="localeValue === 'auto' ? 'bg-accent text-accent-foreground' : ''"
                 @click="pickLanguage('auto')"
               >
-                <span>{{ languageLabel('auto') }}</span>
+                <span>{{ languageLabel("auto") }}</span>
                 <Check v-if="localeValue === 'auto'" class="h-4 w-4 text-primary" />
               </button>
               <button
@@ -96,33 +96,45 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
         </div>
       </div>
       <div class="space-y-2">
-        <label class="text-xs font-medium text-muted-foreground">{{ t('theme') }}</label>
+        <label class="text-xs font-medium text-muted-foreground">{{ t("theme") }}</label>
         <div class="flex gap-1.5">
           <UiToolTip :label="t('themeAuto')">
             <button
               class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="themeValue === 'auto' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
+              :class="
+                themeValue === 'auto'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'hover:bg-accent'
+              "
               @click="themeValue = 'auto'"
             >
-              <Monitor class="h-3.5 w-3.5" /> {{ t('themeAuto') }}
+              <Monitor class="h-3.5 w-3.5" /> {{ t("themeAuto") }}
             </button>
           </UiToolTip>
           <UiToolTip :label="t('themeLight')">
             <button
               class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="themeValue === 'light' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
+              :class="
+                themeValue === 'light'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'hover:bg-accent'
+              "
               @click="themeValue = 'light'"
             >
-              <Sun class="h-3.5 w-3.5" /> {{ t('themeLight') }}
+              <Sun class="h-3.5 w-3.5" /> {{ t("themeLight") }}
             </button>
           </UiToolTip>
           <UiToolTip :label="t('themeDark')">
             <button
               class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="themeValue === 'dark' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'"
+              :class="
+                themeValue === 'dark'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'hover:bg-accent'
+              "
               @click="themeValue = 'dark'"
             >
-              <Moon class="h-3.5 w-3.5" /> {{ t('themeDark') }}
+              <Moon class="h-3.5 w-3.5" /> {{ t("themeDark") }}
             </button>
           </UiToolTip>
         </div>

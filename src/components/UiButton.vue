@@ -44,7 +44,9 @@ const props = withDefaults(
   { variant: "default", size: "default", type: "button", class: undefined },
 );
 
-const computedClass = computed(() => cn(buttonVariants({ variant: props.variant, size: props.size }), props.class));
+const computedClass = computed(() =>
+  cn(buttonVariants({ variant: props.variant, size: props.size }), props.class),
+);
 </script>
 
 <template>

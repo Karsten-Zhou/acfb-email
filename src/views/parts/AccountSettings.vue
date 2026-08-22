@@ -48,11 +48,51 @@ const deleting = ref(false);
 
 // IMAP host suggestions (common providers) — the form itself starts empty.
 const IMAP_HOSTS = [
-  { label: "Gmail", imap: "imap.gmail.com", smtp: "smtp.gmail.com", imapPort: 993, smtpPort: 465, imapSecure: true, smtpSecure: true },
-  { label: "Outlook.com", imap: "outlook.office365.com", smtp: "smtp.office365.com", imapPort: 993, smtpPort: 587, imapSecure: true, smtpSecure: false },
-  { label: "Yahoo", imap: "imap.mail.yahoo.com", smtp: "smtp.mail.yahoo.com", imapPort: 993, smtpPort: 465, imapSecure: true, smtpSecure: true },
-  { label: "iCloud", imap: "imap.mail.me.com", smtp: "smtp.mail.me.com", imapPort: 993, smtpPort: 587, imapSecure: true, smtpSecure: false },
-  { label: "Zoho", imap: "imap.zoho.com", smtp: "smtp.zoho.com", imapPort: 993, smtpPort: 465, imapSecure: true, smtpSecure: true },
+  {
+    label: "Gmail",
+    imap: "imap.gmail.com",
+    smtp: "smtp.gmail.com",
+    imapPort: 993,
+    smtpPort: 465,
+    imapSecure: true,
+    smtpSecure: true,
+  },
+  {
+    label: "Outlook.com",
+    imap: "outlook.office365.com",
+    smtp: "smtp.office365.com",
+    imapPort: 993,
+    smtpPort: 587,
+    imapSecure: true,
+    smtpSecure: false,
+  },
+  {
+    label: "Yahoo",
+    imap: "imap.mail.yahoo.com",
+    smtp: "smtp.mail.yahoo.com",
+    imapPort: 993,
+    smtpPort: 465,
+    imapSecure: true,
+    smtpSecure: true,
+  },
+  {
+    label: "iCloud",
+    imap: "imap.mail.me.com",
+    smtp: "smtp.mail.me.com",
+    imapPort: 993,
+    smtpPort: 587,
+    imapSecure: true,
+    smtpSecure: false,
+  },
+  {
+    label: "Zoho",
+    imap: "imap.zoho.com",
+    smtp: "smtp.zoho.com",
+    imapPort: 993,
+    smtpPort: 465,
+    imapSecure: true,
+    smtpSecure: true,
+  },
 ] as const;
 
 /** Hosts offered when the host boxes are empty or prefix-matched. */
@@ -164,39 +204,76 @@ async function syncOne(id: string) {
 <template>
   <div>
     <div class="mb-3 flex items-center justify-between">
-      <h2 class="text-sm font-semibold">{{ t('emailAccounts') }}</h2>
+      <h2 class="text-sm font-semibold">{{ t("emailAccounts") }}</h2>
       <UiToolTip :label="t('addAccount')">
         <UiButton variant="default" size="sm" @click="showAdd = !showAdd">
-          <Plus class="h-4 w-4" /> {{ t('addAccount') }}
+          <Plus class="h-4 w-4" /> {{ t("addAccount") }}
         </UiButton>
       </UiToolTip>
     </div>
 
-    <div v-if="notice" class="mb-3 flex items-center justify-between gap-2 card-surface border-emerald-500/40 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400">
+    <div
+      v-if="notice"
+      class="mb-3 flex items-center justify-between gap-2 card-surface border-emerald-500/40 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400"
+    >
       <span>{{ notice }}</span>
-      <button class="text-muted-foreground hover:text-foreground" @click="emit('dismissNotice')">✕</button>
+      <button class="text-muted-foreground hover:text-foreground" @click="emit('dismissNotice')">
+        ✕
+      </button>
     </div>
 
     <!-- OAuth providers -->
     <div class="card-surface mb-4 grid gap-3 p-4 sm:grid-cols-2">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="text-sm font-medium">{{ t('connectGmail') }}</div>
-          <div v-if="meta?.config.gmailOauth" class="text-xs text-muted-foreground">{{ t('connectGmailHint') }}</div>
-          <div v-else class="text-xs text-muted-foreground">{{ t('oauthNotConfigured', { name: 'Google' }) }}</div>
+          <div class="text-sm font-medium">{{ t("connectGmail") }}</div>
+          <div v-if="meta?.config.gmailOauth" class="text-xs text-muted-foreground">
+            {{ t("connectGmailHint") }}
+          </div>
+          <div v-else class="text-xs text-muted-foreground">
+            {{ t("oauthNotConfigured", { name: "Google" }) }}
+          </div>
         </div>
-        <UiToolTip :label="meta?.config.gmailOauth ? t('connectGmailHint') : t('oauthNotConfigured', { name: 'Google' })">
-          <UiButton variant="outline" size="sm" :disabled="!meta?.config.gmailOauth" @click="connectOAuth('google')">{{ t('connect') }}</UiButton>
+        <UiToolTip
+          :label="
+            meta?.config.gmailOauth
+              ? t('connectGmailHint')
+              : t('oauthNotConfigured', { name: 'Google' })
+          "
+        >
+          <UiButton
+            variant="outline"
+            size="sm"
+            :disabled="!meta?.config.gmailOauth"
+            @click="connectOAuth('google')"
+            >{{ t("connect") }}</UiButton
+          >
         </UiToolTip>
       </div>
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="text-sm font-medium">{{ t('connectOutlook') }}</div>
-          <div v-if="meta?.config.outlookOauth" class="text-xs text-muted-foreground">{{ t('connectOutlookHint') }}</div>
-          <div v-else class="text-xs text-muted-foreground">{{ t('oauthNotConfigured', { name: 'Microsoft' }) }}</div>
+          <div class="text-sm font-medium">{{ t("connectOutlook") }}</div>
+          <div v-if="meta?.config.outlookOauth" class="text-xs text-muted-foreground">
+            {{ t("connectOutlookHint") }}
+          </div>
+          <div v-else class="text-xs text-muted-foreground">
+            {{ t("oauthNotConfigured", { name: "Microsoft" }) }}
+          </div>
         </div>
-        <UiToolTip :label="meta?.config.outlookOauth ? t('connectOutlookHint') : t('oauthNotConfigured', { name: 'Microsoft' })">
-          <UiButton variant="outline" size="sm" :disabled="!meta?.config.outlookOauth" @click="connectOAuth('microsoft')">{{ t('connect') }}</UiButton>
+        <UiToolTip
+          :label="
+            meta?.config.outlookOauth
+              ? t('connectOutlookHint')
+              : t('oauthNotConfigured', { name: 'Microsoft' })
+          "
+        >
+          <UiButton
+            variant="outline"
+            size="sm"
+            :disabled="!meta?.config.outlookOauth"
+            @click="connectOAuth('microsoft')"
+            >{{ t("connect") }}</UiButton
+          >
         </UiToolTip>
       </div>
     </div>
@@ -204,7 +281,9 @@ async function syncOne(id: string) {
     <!-- IMAP / SMTP add form -->
     <div v-if="showAdd" class="card-surface mb-4 space-y-4 p-4">
       <div>
-        <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ t('imapSection') }}</div>
+        <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {{ t("imapSection") }}
+        </div>
         <div class="mb-2 flex flex-wrap gap-1.5">
           <button
             v-for="p in IMAP_HOSTS"
@@ -219,23 +298,28 @@ async function syncOne(id: string) {
         <!-- Account basics -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('label') }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
             <UiInput v-model="form.name" class="w-full" placeholder="e.g. Work" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('email') }}</label>
-            <UiInput v-model="form.email" type="email" class="w-full" placeholder="you@example.com" />
+            <label class="text-xs font-medium text-muted-foreground">{{ t("email") }}</label>
+            <UiInput
+              v-model="form.email"
+              type="email"
+              class="w-full"
+              placeholder="you@example.com"
+            />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('displayName') }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
             <UiInput v-model="form.displayName" class="w-full" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('username') }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t("username") }}</label>
             <UiInput v-model="form.username" class="w-full" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('password') }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t("password") }}</label>
             <div class="relative">
               <UiInput
                 v-model="form.password"
@@ -258,15 +342,25 @@ async function syncOne(id: string) {
 
         <!-- IMAP group -->
         <div class="mt-3 rounded-lg border border-border p-3">
-          <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Inbox class="h-3.5 w-3.5" /> {{ t('imapGroup') }}
+          <div
+            class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            <Inbox class="h-3.5 w-3.5" /> {{ t("imapGroup") }}
           </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="space-y-1 sm:col-span-2">
-              <label class="text-xs font-medium text-muted-foreground">{{ t('imapHost') }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{ t("imapHost") }}</label>
               <div class="relative">
-                <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <UiInput v-model="form.imapHost" class="w-full pl-8" :placeholder="'imap.example.com'" @focus="focusedHost = 'imap'" @blur="focusedHost = null" />
+                <Search
+                  class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                />
+                <UiInput
+                  v-model="form.imapHost"
+                  class="w-full pl-8"
+                  :placeholder="'imap.example.com'"
+                  @focus="focusedHost = 'imap'"
+                  @blur="focusedHost = null"
+                />
                 <div
                   v-if="focusedHost === 'imap' && showOptions(form.imapHost)"
                   class="absolute top-full left-0 z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
@@ -275,7 +369,10 @@ async function syncOne(id: string) {
                     v-for="opt in hostOptions(form.imapHost)"
                     :key="opt.value"
                     class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
-                    @mousedown.prevent="form.imapHost = opt.value; focusedHost = null"
+                    @mousedown.prevent="
+                      form.imapHost = opt.value;
+                      focusedHost = null;
+                    "
                   >
                     <span>{{ opt.value }}</span>
                     <span class="text-muted-foreground">{{ opt.provider }}</span>
@@ -284,11 +381,13 @@ async function syncOne(id: string) {
               </div>
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground">{{ t('port') }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{ t("port") }}</label>
               <UiInput v-model.number="form.imapPort" type="number" class="w-full" />
             </div>
             <div class="flex items-end gap-2 pb-1">
-              <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{ t('secure') }}</label>
+              <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{
+                t("secure")
+              }}</label>
               <UiSwitch v-model="form.imapSecure" />
             </div>
           </div>
@@ -296,15 +395,25 @@ async function syncOne(id: string) {
 
         <!-- SMTP group -->
         <div class="mt-3 rounded-lg border border-border p-3">
-          <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Send class="h-3.5 w-3.5" /> {{ t('smtpGroup') }}
+          <div
+            class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            <Send class="h-3.5 w-3.5" /> {{ t("smtpGroup") }}
           </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="space-y-1 sm:col-span-2">
-              <label class="text-xs font-medium text-muted-foreground">{{ t('smtpHost') }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{ t("smtpHost") }}</label>
               <div class="relative">
-                <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <UiInput v-model="form.smtpHost" class="w-full pl-8" :placeholder="'smtp.example.com'" @focus="focusedHost = 'smtp'" @blur="focusedHost = null" />
+                <Search
+                  class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                />
+                <UiInput
+                  v-model="form.smtpHost"
+                  class="w-full pl-8"
+                  :placeholder="'smtp.example.com'"
+                  @focus="focusedHost = 'smtp'"
+                  @blur="focusedHost = null"
+                />
                 <div
                   v-if="focusedHost === 'smtp' && showOptions(form.smtpHost)"
                   class="absolute top-full left-0 z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
@@ -313,7 +422,10 @@ async function syncOne(id: string) {
                     v-for="opt in hostOptions(form.smtpHost)"
                     :key="opt.value"
                     class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
-                    @mousedown.prevent="form.smtpHost = opt.value; focusedHost = null"
+                    @mousedown.prevent="
+                      form.smtpHost = opt.value;
+                      focusedHost = null;
+                    "
                   >
                     <span>{{ opt.value }}</span>
                     <span class="text-muted-foreground">{{ opt.provider }}</span>
@@ -322,17 +434,23 @@ async function syncOne(id: string) {
               </div>
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground">{{ t('port') }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{ t("port") }}</label>
               <UiInput v-model.number="form.smtpPort" type="number" class="w-full" />
             </div>
             <div class="flex items-end gap-2 pb-1">
-              <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{ t('secure') }}</label>
+              <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{
+                t("secure")
+              }}</label>
               <UiSwitch v-model="form.smtpSecure" />
             </div>
           </div>
         </div>
 
-        <div v-if="testResult" class="mt-3 flex items-center gap-1.5 text-xs" :class="testResult.ok ? 'text-emerald-600' : 'text-destructive'">
+        <div
+          v-if="testResult"
+          class="mt-3 flex items-center gap-1.5 text-xs"
+          :class="testResult.ok ? 'text-emerald-600' : 'text-destructive'"
+        >
           <CheckCircle2 v-if="testResult.ok" class="h-4 w-4" />
           <XCircle v-else class="h-4 w-4" />
           {{ testResult.message }}
@@ -341,46 +459,78 @@ async function syncOne(id: string) {
 
         <div class="mt-3 flex gap-2">
           <UiButton variant="outline" size="sm" :disabled="testing" @click="testConnection">
-            <Loader2 v-if="testing" class="h-4 w-4 animate-spin" /> {{ testing ? t('testing') : t('testConnection') }}
+            <Loader2 v-if="testing" class="h-4 w-4 animate-spin" />
+            {{ testing ? t("testing") : t("testConnection") }}
           </UiButton>
           <UiButton variant="default" size="sm" :disabled="adding" @click="addAccount">
-            <Loader2 v-if="adding" class="h-4 w-4 animate-spin" /> {{ t('addAccount') }}
+            <Loader2 v-if="adding" class="h-4 w-4 animate-spin" /> {{ t("addAccount") }}
           </UiButton>
-          <UiButton variant="ghost" size="sm" @click="showAdd = false">{{ t('cancel') }}</UiButton>
+          <UiButton variant="ghost" size="sm" @click="showAdd = false">{{ t("cancel") }}</UiButton>
         </div>
       </div>
     </div>
 
     <!-- Account list -->
-    <div v-if="accountsState.accounts.length === 0 && !showAdd" class="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-      {{ t('emailAccounts') }}
+    <div
+      v-if="accountsState.accounts.length === 0 && !showAdd"
+      class="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+    >
+      {{ t("emailAccounts") }}
     </div>
-    <div v-for="a in accountsState.accounts" :key="a.id" class="card-surface mb-2 flex items-center gap-3 p-3">
-      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+    <div
+      v-for="a in accountsState.accounts"
+      :key="a.id"
+      class="card-surface mb-2 flex items-center gap-3 p-3"
+    >
+      <div
+        class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary"
+      >
         {{ a.name.charAt(0).toUpperCase() }}
       </div>
       <div class="min-w-0 flex-1">
-        <div class="truncate text-sm font-medium">{{ a.name }} <span class="text-muted-foreground">&lt;{{ a.email }}&gt;</span></div>
-        <div class="text-xs text-muted-foreground">
-          <span v-if="a.state === 'healthy'" class="text-emerald-600">{{ t('healthy') }}</span>
-          <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{ a.stateMessage || t('unavailable') }}</span>
-          <span v-else-if="a.state === 'auth_required'" class="text-destructive">{{ t('authRequired') }}</span>
-          <span v-else>{{ a.state }}</span>
-          <span v-if="a.lastSyncedAt" class="ml-2">{{ t('syncedOn') }} {{ formatDate(a.lastSyncedAt) }}</span>
+        <div class="truncate text-sm font-medium">
+          {{ a.name }} <span class="text-muted-foreground">&lt;{{ a.email }}&gt;</span>
         </div>
-        <div v-if="syncErrorMap[a.id]" class="mt-0.5 flex items-center gap-1.5 text-xs text-destructive">
+        <div class="text-xs text-muted-foreground">
+          <span v-if="a.state === 'healthy'" class="text-emerald-600">{{ t("healthy") }}</span>
+          <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{
+            a.stateMessage || t("unavailable")
+          }}</span>
+          <span v-else-if="a.state === 'auth_required'" class="text-destructive">{{
+            t("authRequired")
+          }}</span>
+          <span v-else>{{ a.state }}</span>
+          <span v-if="a.lastSyncedAt" class="ml-2"
+            >{{ t("syncedOn") }} {{ formatDate(a.lastSyncedAt) }}</span
+          >
+        </div>
+        <div
+          v-if="syncErrorMap[a.id]"
+          class="mt-0.5 flex items-center gap-1.5 text-xs text-destructive"
+        >
           <XCircle class="h-3.5 w-3.5 shrink-0" />
           <span class="min-w-0 truncate">{{ syncErrorMap[a.id] }}</span>
         </div>
       </div>
       <UiToolTip :label="t('syncNow')">
-        <UiButton variant="ghost" size="icon" class="h-8 w-8" :disabled="syncingId === a.id" @click="syncOne(a.id)">
+        <UiButton
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8"
+          :disabled="syncingId === a.id"
+          @click="syncOne(a.id)"
+        >
           <Loader2 v-if="syncingId === a.id" class="h-4 w-4 animate-spin" />
           <RefreshCw v-else class="h-4 w-4" />
         </UiButton>
       </UiToolTip>
       <UiToolTip :label="t('removeAccount')">
-        <UiButton variant="ghost" size="icon" class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white" @click="askRemoveAccount(a.id)">
+        <UiButton
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
+          @click="askRemoveAccount(a.id)"
+        >
           <Trash2 class="h-4 w-4" />
         </UiButton>
       </UiToolTip>
@@ -393,11 +543,17 @@ async function syncOne(id: string) {
       :busy="deleting"
       @close="deleteDialogOpen = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t('confirmDeleteAccount') }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteAccount") }}</p>
       <template #footer>
-        <UiButton variant="ghost" size="sm" :disabled="deleting" @click="deleteDialogOpen = false">{{ t('cancelAction') }}</UiButton>
+        <UiButton
+          variant="ghost"
+          size="sm"
+          :disabled="deleting"
+          @click="deleteDialogOpen = false"
+          >{{ t("cancelAction") }}</UiButton
+        >
         <UiButton variant="destructive" size="sm" :disabled="deleting" @click="confirmRemove">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t('ok') }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
         </UiButton>
       </template>
     </UiDialog>

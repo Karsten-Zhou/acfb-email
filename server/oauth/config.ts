@@ -34,9 +34,6 @@ export function microsoftConfig(env: Env): OAuthProviderConfig {
   };
 }
 
-export function configFor(
-  env: Env,
-  provider: "google" | "microsoft",
-): OAuthProviderConfig {
+export function configFor(env: Env, provider: "google" | "microsoft"): OAuthProviderConfig {
   return provider === "google" ? googleConfig(env) : microsoftConfig(env);
 }

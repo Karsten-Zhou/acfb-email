@@ -11,7 +11,13 @@ import { HttpError } from "../http-error";
 import { requireAuth, randomToken, safeEqual } from "../auth";
 import { currentUser } from "../auth/session";
 import { decryptCredential, encryptCredential } from "../security/crypto";
-import { buildAuthorizeUrl, exchangeCode, providerGet, refreshToken, tokenValid } from "../oauth/client";
+import {
+  buildAuthorizeUrl,
+  exchangeCode,
+  providerGet,
+  refreshToken,
+  tokenValid,
+} from "../oauth/client";
 import type { OAuthToken } from "../oauth/client";
 import { configFor } from "../oauth/config";
 
@@ -109,7 +115,10 @@ async function fetchOwnerInfo(
   accessToken: string,
 ): Promise<{ email: string; name: string | null }> {
   if (provider === "google") {
-    const { status, json } = await providerGet("https://www.googleapis.com/oauth2/v2/userinfo", accessToken);
+    const { status, json } = await providerGet(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      accessToken,
+    );
     if (status === 401) throw new HttpError(502, "Provider rejected token");
     const d = json as { email?: string; name?: string };
     if (!d.email) throw new HttpError(502, "Could not determine Gmail address");
@@ -123,11 +132,7 @@ async function fetchOwnerInfo(
   return { email, name: d.displayName ?? null };
 }
 
-async function existingAccountId(
-  env: Env,
-  userId: string,
-  email: string,
-): Promise<string | null> {
+async function existingAccountId(env: Env, userId: string, email: string): Promise<string | null> {
   const row = await env.DB.prepare(
     `SELECT id FROM accounts WHERE user_id = ? AND lower(email) = lower(?)`,
   )
@@ -157,7 +162,12 @@ export async function loadOauthToken(
   } catch {
     return null;
   }
-  const parsed = JSON.parse(plain) as { type?: string; token?: OAuthToken; username?: string; password?: string };
+  const parsed = JSON.parse(plain) as {
+    type?: string;
+    token?: OAuthToken;
+    username?: string;
+    password?: string;
+  };
   if (parsed.type !== "oauth" || !parsed.token) return null;
 
   let tok = parsed.token;
@@ -167,9 +177,7 @@ export async function loadOauthToken(
     // Persist the refreshed token.
     const tokenBlob = JSON.stringify({ type: "oauth", token: tok });
     const encrypted = await encryptCredential(tokenBlob, env.CREDENTIAL_ENCRYPTION_KEY);
-    await env.DB.prepare(
-      `UPDATE account_credentials SET credential = ? WHERE account_id = ?`,
-    )
+    await env.DB.prepare(`UPDATE account_credentials SET credential = ? WHERE account_id = ?`)
       .bind(encrypted, accountIdOf(account))
       .run();
   }

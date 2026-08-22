@@ -75,7 +75,9 @@ export const repo = {
   },
 
   async credential(env: Env, accountId: string): Promise<string | null> {
-    const row = await env.DB.prepare(`SELECT credential FROM account_credentials WHERE account_id = ?`)
+    const row = await env.DB.prepare(
+      `SELECT credential FROM account_credentials WHERE account_id = ?`,
+    )
       .bind(accountId)
       .first<{ credential: string }>();
     return row?.credential ?? null;
@@ -166,7 +168,14 @@ export const repo = {
     env: Env,
     userId: string,
     ids: string[],
-  ): Promise<{ id: string; mailbox_id: string; remote_message_id: string | null; remote_uid: number | null }[]> {
+  ): Promise<
+    {
+      id: string;
+      mailbox_id: string;
+      remote_message_id: string | null;
+      remote_uid: number | null;
+    }[]
+  > {
     if (ids.length === 0) return [];
     const ph = ids.map(() => "?").join(",");
     const rows = await env.DB.prepare(
@@ -175,11 +184,19 @@ export const repo = {
        WHERE m.id IN (${ph}) AND a.user_id = ?`,
     )
       .bind(...ids, userId)
-      .all<{ id: string; mailbox_id: string; remote_message_id: string | null; remote_uid: number | null }>();
+      .all<{
+        id: string;
+        mailbox_id: string;
+        remote_message_id: string | null;
+        remote_uid: number | null;
+      }>();
     return rows.results;
   },
 
-  async recipients(env: Env, messageId: string): Promise<{ type: string; name: string | null; address: string }[]> {
+  async recipients(
+    env: Env,
+    messageId: string,
+  ): Promise<{ type: string; name: string | null; address: string }[]> {
     const rows = await env.DB.prepare(
       `SELECT type, name, address FROM message_recipients WHERE message_id = ?`,
     )
@@ -188,14 +205,19 @@ export const repo = {
     return rows.results;
   },
 
-  async attachments(env: Env, messageId: string): Promise<{
-    id: string;
-    filename: string | null;
-    mime_type: string;
-    size: number;
-    is_inline: number;
-    content_id: string | null;
-  }[]> {
+  async attachments(
+    env: Env,
+    messageId: string,
+  ): Promise<
+    {
+      id: string;
+      filename: string | null;
+      mime_type: string;
+      size: number;
+      is_inline: number;
+      content_id: string | null;
+    }[]
+  > {
     const rows = await env.DB.prepare(
       `SELECT id, filename, mime_type, size, is_inline, content_id FROM attachments WHERE message_id = ?`,
     )
@@ -204,7 +226,12 @@ export const repo = {
     return rows.results as never;
   },
 
-  async markBodyFetched(env: Env, messageId: string, html: string | null, text: string | null): Promise<void> {
+  async markBodyFetched(
+    env: Env,
+    messageId: string,
+    html: string | null,
+    text: string | null,
+  ): Promise<void> {
     await env.DB.prepare(
       `UPDATE messages SET html_preview = ?, text_preview = ?, body_fetched = 1 WHERE id = ?`,
     )
@@ -212,7 +239,11 @@ export const repo = {
       .run();
   },
 
-  async updateFlags(env: Env, messageId: string, flags: { read?: boolean; starred?: boolean }): Promise<void> {
+  async updateFlags(
+    env: Env,
+    messageId: string,
+    flags: { read?: boolean; starred?: boolean },
+  ): Promise<void> {
     const sets: string[] = [];
     const vals: (string | number)[] = [];
     if (flags.read !== undefined) {
@@ -225,7 +256,9 @@ export const repo = {
     }
     if (sets.length === 0) return;
     vals.push(messageId);
-    await env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+    await env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ?`)
+      .bind(...vals)
+      .run();
   },
 
   /** Recompute a mailbox's unseen count from its current messages. */
@@ -241,7 +274,9 @@ export const repo = {
   },
 
   async moveMessage(env: Env, messageId: string, mailboxId: string): Promise<void> {
-    await env.DB.prepare(`UPDATE messages SET mailbox_id = ? WHERE id = ?`).bind(mailboxId, messageId).run();
+    await env.DB.prepare(`UPDATE messages SET mailbox_id = ? WHERE id = ?`)
+      .bind(mailboxId, messageId)
+      .run();
   },
 
   async deleteMessage(env: Env, messageId: string): Promise<void> {

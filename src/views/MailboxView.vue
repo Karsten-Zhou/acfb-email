@@ -5,7 +5,14 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
-import { loadUnified, loadMessages, deleteMessages, updateFlags, openMessage, mailState } from "../stores/mail";
+import {
+  loadUnified,
+  loadMessages,
+  deleteMessages,
+  updateFlags,
+  openMessage,
+  mailState,
+} from "../stores/mail";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import Button from "../components/UiButton.vue";
@@ -44,7 +51,9 @@ const roleLabel: Record<string, string> = {
   trash: "Trash",
 };
 
-const mailboxTree = ref<{ accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[]>([]);
+const mailboxTree = ref<
+  { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[]
+>([]);
 
 /**
  * Unread count per mailbox, derived from *loaded* messages so badges react
@@ -61,15 +70,32 @@ const unreadByMailbox = computed<Record<string, number>>(() => {
 
 async function refresh() {
   await loadAccounts();
-  const tree: { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[] = [];
+  const tree: { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[] =
+    [];
   for (const acct of accountsState.accounts) {
     const { mailboxes: boxes } = await api.mailboxes(acct.id);
     for (const b of boxes) {
-      tree.push({ accountId: acct.id, accountName: acct.name, accountEmail: acct.email, mailbox: b });
+      tree.push({
+        accountId: acct.id,
+        accountName: acct.name,
+        accountEmail: acct.email,
+        mailbox: b,
+      });
     }
   }
-  const order: Record<string, number> = { inbox: 0, all: 1, sent: 2, drafts: 3, archive: 4, spam: 5, trash: 6, other: 100 };
-  mailboxTree.value = tree.sort((a, b) => (order[a.mailbox.role] ?? 100) - (order[b.mailbox.role] ?? 100));
+  const order: Record<string, number> = {
+    inbox: 0,
+    all: 1,
+    sent: 2,
+    drafts: 3,
+    archive: 4,
+    spam: 5,
+    trash: 6,
+    other: 100,
+  };
+  mailboxTree.value = tree.sort(
+    (a, b) => (order[a.mailbox.role] ?? 100) - (order[b.mailbox.role] ?? 100),
+  );
   await loadInto();
 }
 
@@ -83,7 +109,11 @@ async function syncNow() {
   syncing.value = true;
   syncError.value = null;
   try {
-    const results = await Promise.all(accountsState.accounts.map((a) => api.syncAccount(a.id).catch(() => ({ ok: false as const, message: undefined }))));
+    const results = await Promise.all(
+      accountsState.accounts.map((a) =>
+        api.syncAccount(a.id).catch(() => ({ ok: false as const, message: undefined })),
+      ),
+    );
     const failed = results.find((r) => !r.ok);
     if (failed && failed.message) syncError.value = failed.message;
     await refresh();
@@ -187,7 +217,9 @@ async function loadOlder() {
     // provider when the local DB page is exhausted.
     const remoteUids = mailState.messages.map((m) => m.remoteUid).filter((x): x is number => !!x);
     const beforeUid = remoteUids.length ? Math.min(...remoteUids) : 0;
-    const dates = mailState.messages.map((m) => new Date(m.receivedAt).getTime()).filter((n) => !Number.isNaN(n));
+    const dates = mailState.messages
+      .map((m) => new Date(m.receivedAt).getTime())
+      .filter((n) => !Number.isNaN(n));
     const beforeDate = dates.length ? Math.min(...dates) : 0;
     const incoming =
       activeMailboxId.value === "unified"
@@ -214,7 +246,10 @@ function onListScroll(e: Event) {
 function replyTo() {
   const m = mailState.selected;
   if (!m) return;
-  router.push({ name: "compose", query: { to: m.from?.address ?? "", subject: m.subject ? `Re: ${m.subject}` : "" } });
+  router.push({
+    name: "compose",
+    query: { to: m.from?.address ?? "", subject: m.subject ? `Re: ${m.subject}` : "" },
+  });
 }
 
 // ---- route-driven reading pane ----
@@ -288,29 +323,53 @@ const listTitle = computed(() => {
       :loading="loadingMessage"
       @back="router.replace('/mail')"
       @reply="replyTo"
-      @toggle-star="updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })"
+      @toggle-star="
+        updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })
+      "
       @toggle-read="updateFlags([mailState.selected!.id], { read: !mailState.selected!.isRead })"
       @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
     />
 
     <!-- Mobile top bar (when no message open) -->
-    <div v-if="!reading" class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">
+    <div
+      v-if="!reading"
+      class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden"
+    >
       <span class="text-sm font-semibold">Mail</span>
       <div class="flex items-center gap-1">
-        <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" /></Button>
-        <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push({ name: 'settings' })"><Settings class="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"
+          ><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }"
+        /></Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8"
+          @click="router.push({ name: 'settings' })"
+          ><Settings class="h-4 w-4"
+        /></Button>
       </div>
     </div>
 
     <!-- Mobile bottom nav -->
-    <nav class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-card py-1.5 md:hidden">
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70" @click="router.push({ name: 'mailbox' })">
+    <nav
+      class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-card py-1.5 md:hidden"
+    >
+      <button
+        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70"
+        @click="router.push({ name: 'mailbox' })"
+      >
         <MailIcon class="h-5 w-5" /> Mail
       </button>
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-primary" @click="router.push({ name: 'compose' })">
+      <button
+        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-primary"
+        @click="router.push({ name: 'compose' })"
+      >
         <Plus class="h-5 w-5" /> Compose
       </button>
-      <button class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70" @click="router.push({ name: 'settings' })">
+      <button
+        class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs text-foreground/70"
+        @click="router.push({ name: 'settings' })"
+      >
         <Settings class="h-5 w-5" /> Settings
       </button>
     </nav>
@@ -322,11 +381,13 @@ const listTitle = computed(() => {
       :busy="deleting"
       @close="confirmDelete = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t('confirmDeleteMessages') }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteMessages") }}</p>
       <template #footer>
-        <Button variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{ t('cancelAction') }}</Button>
+        <Button variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{
+          t("cancelAction")
+        }}</Button>
         <Button variant="destructive" size="sm" :disabled="deleting" @click="doDeleteSelected">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t('ok') }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
         </Button>
       </template>
     </UiDialog>

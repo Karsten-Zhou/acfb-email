@@ -39,13 +39,9 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export async function encryptCredential(plaintext: string, keyHex: string): Promise<string> {
-  const rawKey = await crypto.subtle.importKey(
-    "raw",
-    toBytes(keyHex),
-    { name: "AES-GCM" },
-    false,
-    ["encrypt"],
-  );
+  const rawKey = await crypto.subtle.importKey("raw", toBytes(keyHex), { name: "AES-GCM" }, false, [
+    "encrypt",
+  ]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
@@ -63,13 +59,9 @@ export async function decryptCredential(stored: string, keyHex: string): Promise
     throw new Error("Unsupported credential blob format");
   }
   const [ivB64, dataB64] = rest.split(".");
-  const rawKey = await crypto.subtle.importKey(
-    "raw",
-    toBytes(keyHex),
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"],
-  );
+  const rawKey = await crypto.subtle.importKey("raw", toBytes(keyHex), { name: "AES-GCM" }, false, [
+    "decrypt",
+  ]);
   const pt = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: base64ToBytes(ivB64) },
     rawKey,
