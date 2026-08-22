@@ -95,7 +95,7 @@ function onTouchEnd() {
     :class="reading ? 'hidden md:flex' : 'flex'"
   >
     <header
-      class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5"
+      class="hidden flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 md:flex"
     >
       <h2 class="truncate text-sm font-semibold">{{ title }}</h2>
       <div class="flex items-center gap-1">
@@ -154,6 +154,30 @@ function onTouchEnd() {
       </div>
     </div>
     <div v-else class="flex min-h-0 flex-1 flex-col">
+      <!-- Pull-to-refresh indicator: a real block ABOVE the scrollable list
+           (not translated inside it), so rows shift down instead of being
+           overlapped. Its height follows the drag while pulling; while the
+           parent sync runs it keeps a comfortable fixed height. -->
+      <div
+        class="overflow-hidden"
+        :style="{
+          height: refreshing ? '2.75rem' : pullDistance > 0 ? `${pullDistance}px` : '0px',
+        }"
+      >
+        <div
+          class="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground transition-opacity"
+          :style="{ opacity: refreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1) }"
+        >
+          <Loader2 v-if="refreshing" class="h-4 w-4 animate-spin" />
+          <ArrowDownToLine
+            v-else
+            class="h-4 w-4"
+            :class="pullDistance >= PULL_THRESHOLD ? 'rotate-180' : ''"
+          />
+          <span>{{ refreshing ? t("syncing") : t("refreshPull") }}</span>
+        </div>
+      </div>
+
       <div
         class="flex-1 divide-y divide-border overflow-y-auto touch-pan-y"
         @scroll="emit('scroll', $event)"
@@ -162,17 +186,6 @@ function onTouchEnd() {
         @touchend="onTouchEnd"
         @touchcancel="onTouchEnd"
       >
-        <!-- Pull-to-refresh indicator (visible while dragging down at the top
-             or while the parent sync is running). -->
-        <div
-          v-if="pullDistance > 0 || refreshing"
-          class="flex items-center justify-center gap-2 text-xs text-muted-foreground"
-          :style="refreshing ? undefined : { transform: `translateY(${pullDistance * 0.6}px)`, opacity: Math.min(pullDistance / PULL_THRESHOLD, 1) }"
-        >
-          <Loader2 v-if="refreshing" class="h-4 w-4 animate-spin" />
-          <ArrowDownToLine v-else class="h-4 w-4" :class="pullDistance >= PULL_THRESHOLD ? 'rotate-180' : ''" />
-          <span>{{ refreshing ? t("syncing") : t("refreshPull") }}</span>
-        </div>
         <button
           v-for="m in messages"
           :key="m.id"

@@ -21,7 +21,7 @@ import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
 import MessageListPane from "./parts/MessageListPane.vue";
 import MessageReaderPane from "./parts/MessageReaderPane.vue";
-import { RefreshCw, Plus, Settings, Loader2, Menu } from "lucide-vue-next";
+import { RefreshCw, Plus, Settings, Loader2, Menu, MailOpen } from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
@@ -406,6 +406,15 @@ const listTitle = computed(() => {
         <span class="text-sm font-semibold">Mail</span>
       </div>
       <div class="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8"
+          :class="onlyUnread ? 'bg-accent text-accent-foreground' : ''"
+          :aria-label="t('showOnlyUnread')"
+          @click="onlyUnread = !onlyUnread"
+          ><MailOpen class="h-4 w-4"
+        /></Button>
         <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"
           ><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }"
         /></Button>

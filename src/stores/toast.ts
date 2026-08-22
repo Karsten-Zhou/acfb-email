@@ -30,11 +30,7 @@ export function dismissToast(id: number): void {
   toastState.items = toastState.items.filter((item) => item.id !== id);
 }
 
-export function pushToast(
-  kind: ToastKind,
-  message: string,
-  description?: string,
-): number {
+export function pushToast(kind: ToastKind, message: string, description?: string): number {
   const id = ++nextId;
   toastState.items.push({ id, kind, message, description });
   const timer = setTimeout(() => dismissToast(id), AUTO_DISMISS_MS);
