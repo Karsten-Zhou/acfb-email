@@ -255,6 +255,30 @@ function replyTo() {
   });
 }
 
+/**
+ * Toggle read/unread from the reader. When marking a message *unread*, on
+ * success deselect it (close the reader) so it disappears from the read view
+ * and stays visible in the unread filter. Shows a loading state while the
+ * flag update is in flight.
+ */
+async function toggleReadFromReader() {
+  const m = mailState.selected;
+  if (!m) return;
+  loadingMessage.value = true;
+  try {
+    const unread = !m.isRead;
+    await updateFlags([m.id], { read: unread });
+    if (unread) {
+      // Deselect: back to the "select a message" state.
+      mailState.selected = null;
+      if (route.params.id) await router.replace("/mail");
+      reading.value = false;
+    }
+  } finally {
+    loadingMessage.value = false;
+  }
+}
+
 // ---- route-driven reading pane ----
 watch(
   () => route.params.id,
@@ -331,7 +355,7 @@ const listTitle = computed(() => {
       @toggle-star="
         updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })
       "
-      @toggle-read="updateFlags([mailState.selected!.id], { read: !mailState.selected!.isRead })"
+      @toggle-read="toggleReadFromReader"
       @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
     />
 

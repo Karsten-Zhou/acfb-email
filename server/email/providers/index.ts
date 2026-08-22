@@ -3,7 +3,7 @@ import { decryptCredential } from "../../security/crypto";
 import { ImapProvider } from "./imap";
 import { GmailProvider } from "./gmail";
 import { MicrosoftProvider } from "./microsoft";
-import type { OAuthToken } from "../../oauth/client";
+import { loadOauthToken } from "../../routes/oauth";
 import type { IEmailProvider } from "./types";
 import type { Env } from "../../env";
 
@@ -48,15 +48,18 @@ export async function buildProvider(
         account.email,
       );
     }
-    case "gmail": {
-      if (!credential) throw new Error("Missing OAuth token for Gmail");
-      const token = await decryptedOAuthToken(credential.credential, env);
-      return new GmailProvider(token, account.email);
-    }
+    case "gmail":
     case "microsoft": {
-      if (!credential) throw new Error("Missing OAuth token for Outlook");
-      const token = await decryptedOAuthToken(credential.credential, env);
-      return new MicrosoftProvider(token, account.email);
+      if (!credential) throw new Error(`Missing OAuth token for ${account.provider}`);
+      // Refresh an expired access token (and persist the fresh one) so the
+      // provider never runs with a stale token. Graph/Gmail access tokens
+      // expire after ~1h (Microsoft: expires_in ≈ 3600s), and without this
+      // the account silently fails auth every few hours.
+      const token = await loadOauthToken(env, account, credential.credential);
+      if (!token) throw new Error(`Invalid stored OAuth token for ${account.provider}`);
+      return account.provider === "gmail"
+        ? new GmailProvider(token, account.email)
+        : new MicrosoftProvider(token, account.email);
     }
     default:
       throw new Error(`Provider "${account.provider}" is not implemented yet`);
@@ -79,17 +82,4 @@ async function decryptedImap(blob: string, env: Env): Promise<ImapPlainCreds> {
     /* invalid */
   }
   throw new Error("Invalid stored credential format");
-}
-
-async function decryptedOAuthToken(blob: string, env: Env): Promise<OAuthToken> {
-  const plain = await decryptCredential(blob, env.CREDENTIAL_ENCRYPTION_KEY);
-  try {
-    const parsed = JSON.parse(plain) as { type?: string; token?: OAuthToken };
-    if (parsed.type === "oauth" && parsed.token && parsed.token.access_token) {
-      return parsed.token;
-    }
-  } catch {
-    /* invalid */
-  }
-  throw new Error("Invalid stored OAuth token");
 }

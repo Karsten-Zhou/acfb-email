@@ -36,19 +36,22 @@ function sanitizeHtml(s: string): string {
 <template>
   <section
     class="min-w-0 flex-1 flex-col bg-background"
-    :class="mailState.selected ? 'flex md:flex' : 'hidden md:flex'"
+    :class="mailState.selected || loading ? 'flex md:flex' : 'hidden md:flex'"
   >
+    <!-- Loading takes priority: on the first click the route triggers and
+         `selected` isn't set yet, so the spinner must show immediately
+         instead of the "select a message" placeholder. -->
     <div
-      v-if="!mailState.selected"
-      class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
-    >
-      {{ t("selectToRead") }}
-    </div>
-    <div
-      v-else-if="loading"
+      v-if="loading"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
       <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("content") }}…
+    </div>
+    <div
+      v-else-if="!mailState.selected"
+      class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
+    >
+      {{ t("selectToRead") }}
     </div>
     <template v-else>
       <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
