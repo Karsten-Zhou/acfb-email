@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // MessageReaderPane — the rightmost reading column: header actions
 // (back/reply/star/read/delete), meta rows, and the sanitized body.
-import DOMPurify from "dompurify";
 import { mailState } from "../../stores/mail";
+import { sanitizeHtml } from "../../lib/sanitize";
 import { t, formatDateTime } from "../../lib/i18n";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
@@ -28,9 +28,9 @@ const emit = defineEmits<{
   "confirm-delete": [];
 }>();
 
-function sanitizeHtml(s: string): string {
-  return DOMPurify.sanitize(s);
-}
+// `sanitizeHtml` is the imported helper from lib/sanitize; it's used directly
+// in the template's v-html binding (safe: our DOMPurify config preserves email
+// centering attributes like td[align=center]).
 </script>
 
 <template>

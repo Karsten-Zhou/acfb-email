@@ -2,8 +2,8 @@
 // Message detail view (primarily for mobile; desktop renders in MailboxView).
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import DOMPurify from "dompurify";
 import { openMessage, updateFlags, deleteMessages } from "../stores/mail";
+import { sanitizeHtml } from "../lib/sanitize";
 import { t, formatDateTime } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
@@ -62,10 +62,6 @@ function reply() {
       subject: m.subject ? (m.subject.startsWith("Re:") ? m.subject : `Re: ${m.subject}`) : "",
     },
   });
-}
-
-function sanitizeHtml(s: string): string {
-  return DOMPurify.sanitize(s);
 }
 </script>
 

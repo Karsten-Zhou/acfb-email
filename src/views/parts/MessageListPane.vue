@@ -46,8 +46,10 @@ const actionsVisible = computed(() => props.selectedCount > 0);
 </script>
 
 <template>
+  <!-- Desktop: cap the list width so the reading pane gets comfortable room
+       (max-w-xl ≈ 36rem; more than that doesn't add row readability). -->
   <section
-    class="flex min-w-0 flex-1 flex-col border-r border-border bg-background"
+    class="flex min-w-0 flex-1 flex-col border-r border-border bg-background md:max-w-xl"
     :class="reading ? 'hidden md:flex' : 'flex'"
   >
     <header
