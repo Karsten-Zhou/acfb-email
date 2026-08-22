@@ -115,17 +115,18 @@ const actionsVisible = computed(() => props.selectedCount > 0);
         </button>
       </div>
 
-      <!-- End-of-list footer: loading indicator while fetching older, then an
-           explicit "no more messages" line when the list is exhausted. -->
-      <div class="flex items-center justify-center border-t border-border bg-background/80 px-4 py-2">
+      <!-- End-of-list footer: only present when there's something to say —
+           a spinner while fetching older, or an explicit "no more messages"
+           line once the folder is exhausted. Nothing is shown while more
+           pages exist but none are being loaded (e.g. at the top of the list). -->
+      <div v-if="loadingOlder || !hasOlder" class="flex items-center justify-center border-t border-border bg-background/80 px-4 py-2">
         <div v-if="loadingOlder" class="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 class="h-3.5 w-3.5 animate-spin" />
           {{ t('loadingOlder') }}…
         </div>
-        <span v-else-if="!hasOlder" class="text-xs text-muted-foreground/70">
+        <span v-else class="text-xs text-muted-foreground/70">
           {{ t('noMoreMessages') }}
         </span>
-        <span v-else class="text-xs text-muted-foreground/40">{{ t('endOfList') }}</span>
       </div>
     </div>
   </section>
