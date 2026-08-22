@@ -13,6 +13,16 @@ import type {
 const CSRF_HEADER = "x-csrf-token";
 const CSRF_COOKIE = "ec_csrf";
 
+/**
+ * Registered by main.ts: called on any 401 so the app can reset auth state
+ * and redirect to /login. Kept as a hook instead of importing the auth store
+ * / router here to avoid an import cycle (auth.ts and router both import api).
+ */
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -50,39 +60,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       /* non-json */
     }
-    // Session gone (GitHub credential missing/revoked/expired): return the
-    // user to the login page instead of leaving a broken authed view up.
-    if (res.status === 401) await handleUnauthorized();
+    // Session gone (GitHub credential missing/revoked/expired): let the app
+    // reset auth state and route to the login page.
+    if (res.status === 401) unauthorizedHandler?.();
     throw new ApiError(message, res.status, code);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
-}
-
-/**
- * Session is no longer valid — reset auth state and navigate to /login.
- * Uses dynamic imports to avoid a circular dependency (auth store / router
- * both import from this module's `api`).
- *
- * The navigation is deferred to the next microtask so it never re-enters a
- * vue-router navigation that's currently in flight (e.g. the initial guard
- * running `bootstrap()` after a reload).
- */
-async function handleUnauthorized(): Promise<void> {
-  const { authState } = await import("../stores/auth");
-  if (authState.user !== null || authState.ready) {
-    authState.user = null;
-    authState.ready = true;
-  }
-  const { router } = await import("../router");
-  const current = router.currentRoute.value?.name;
-  if (current && current !== "login") {
-    // Defer so we don't navigate mid-guard.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (router.currentRoute.value.name !== "login" && !authState.user) {
-      await router.replace({ name: "login" });
-    }
-  }
 }
 
 export const api = {
@@ -112,9 +96,9 @@ export const api = {
 
   // messages
   messages: (mailboxId: string, limit = 50, offset = 0, beforeUid?: number, beforeDate?: number) =>
-    request<{ messages: Message[] }>(`/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`),
+    request<{ messages: Message[]; hasMore?: boolean }>(`/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`),
   unified: (limit = 50, offset = 0) =>
-    request<{ messages: Message[] }>(`/messages/unified?limit=${limit}&offset=${offset}`),
+    request<{ messages: Message[]; hasMore?: boolean }>(`/messages/unified?limit=${limit}&offset=${offset}`),
   message: (id: string) => request<{ message: MessageDetail }>(`/messages/${encodeURIComponent(id)}`),
   flags: (ids: string[], flags: { read?: boolean; starred?: boolean }) =>
     request<{ ok: boolean }>("/messages/flags", { method: "PATCH", body: JSON.stringify({ ids, ...flags }) }),

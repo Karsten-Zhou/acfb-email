@@ -103,9 +103,10 @@ export class MicrosoftProvider implements IEmailProvider {
 
   private async syncFolder(folderId: string, options: ProviderSyncOptions): Promise<ProviderFetchResult> {
     const top = Math.min(options.fetchLimit ?? 100, 50);
-    let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
+    let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$orderby=sentDateTime%20desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
     if (options.sinceUid) {
-      // approximate incremental: use sentDateTime filter (ISO from uid marker)
+      // approximate incremental: use sentDateTime filter (ISO from uid marker);
+      // $filter and $orderby both reference sentDateTime (Graph requirement).
       const sinceDate = new Date(Math.max(options.sinceUid, 0)).toISOString();
       url += `&$filter=sentDateTime gt ${sinceDate}`;
     }
@@ -126,8 +127,10 @@ export class MicrosoftProvider implements IEmailProvider {
     const folderId = folder ? await this.folderIdByName(mailboxPath) : null;
     if (!folderId) return { messages: [], hasMore: false };
     const top = Math.min(options.fetchLimit ?? 50, 50);
-    let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
+    let url = `${GRAPH}/me/mailFolders/${folderId}/messages?$top=${top}&$orderby=receivedDateTime%20desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,internetMessageId,conversationId,hasAttachments`;
     if (options.beforeDate) {
+      // Per Graph docs, $filter and $orderby must reference the same property
+      // (receivedDateTime here) or the request fails with InefficientFilter.
       url += `&$filter=receivedDateTime lt ${new Date(options.beforeDate).toISOString()}`;
     } else if (options.beforeUid) {
       url += `&$filter=receivedDateTime lt ${new Date(options.beforeUid).toISOString()}`;
@@ -135,8 +138,10 @@ export class MicrosoftProvider implements IEmailProvider {
     const { status, json, errorText } = await providerGet(url, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
     const msgs = ((json as { value?: GraphMessage[] }).value ?? []);
+    // Graph returns @odata.nextLink when more pages exist.
+    const nextLink = (json as { "@odata.nextLink"?: string })["@odata.nextLink"];
     const out: ProviderMessage[] = msgs.map(mapGraphMessage);
-    return { messages: out, hasMore: msgs.length === top };
+    return { messages: out, hasMore: !!nextLink || msgs.length === top };
   }
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {

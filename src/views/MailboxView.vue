@@ -196,6 +196,9 @@ async function loadOlder() {
     const seen = new Set(mailState.messages.map((m) => m.id));
     const fresh = incoming.messages.filter((m) => !seen.has(m.id));
     hasOlder.value = incoming.messages.length === pageSize;
+    // When the local DB page is short but the server says the provider still
+    // has older mail (it imported some), allow another scroll to import more.
+    if (incoming.messages.length < pageSize && incoming.hasMore) hasOlder.value = true;
     mailState.messages = [...mailState.messages, ...fresh];
   } finally {
     loadingOlder.value = false;
@@ -269,6 +272,7 @@ const listTitle = computed(() => {
       :loading="mailState.loading"
       :loading-older="loadingOlder"
       :has-older="hasOlder"
+      :unified="activeMailboxId === 'unified'"
       :selected-id="mailState.selected?.id ?? null"
       :selected-ids="mailState.selectedIds"
       :selected-count="selectedCount"

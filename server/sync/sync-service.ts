@@ -330,10 +330,10 @@ export async function importOlderPage(
   beforeUid: number,
   limit: number,
   beforeDate?: number,
-): Promise<void> {
+): Promise<{ imported: number; hasMore: boolean }> {
   const credential = await getCredential(env, account.id);
   const fullAccount = await getAccount(env, account.id);
-  if (!fullAccount) return;
+  if (!fullAccount) return { imported: 0, hasMore: false };
   const provider = await buildProvider(
     fullAccount,
     credential ? { credential: credential.credential } : null,
@@ -354,6 +354,7 @@ export async function importOlderPage(
       mailbox.id,
     )
     .run();
+  return { imported: result.messages.length, hasMore: result.messages.length > 0 };
 }
 
 async function unseenForBox(env: Env, mailboxId: string): Promise<number> {

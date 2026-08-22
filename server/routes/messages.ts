@@ -39,6 +39,7 @@ messageRoutes.get("/", async (c) => {
   if (!box) throw new HttpError(404, "Mailbox not found");
 
   let rows = await repo.listMessages(c.env, mailboxId, limit, offset);
+  let hasMore = rows.length === limit;
 
   // If this is a load-older request and we ran out of local rows, ask the
   // provider for older messages and import them (so scrolling keeps working
@@ -46,13 +47,17 @@ messageRoutes.get("/", async (c) => {
   if (offset > 0 && rows.length < limit && (beforeUid > 0 || beforeDate > 0)) {
     const account = await repo.accountById(c.env, box.account_id);
     if (account) {
-      await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, beforeUid, limit, beforeDate || undefined).catch(() => {});
+      const res = await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, beforeUid, limit, beforeDate || undefined).catch(() => ({ imported: 0, hasMore: false }));
       rows = await repo.listMessages(c.env, mailboxId, limit, offset);
+      // Signal the client: the provider still has older mail we imported, so
+      // the "No more messages" line must not appear — a further scroll should
+      // import another page.
+      hasMore = res.imported > 0;
     }
   }
 
   const messages = await rowsToMessages(c.env, rows);
-  return c.json({ messages });
+  return c.json({ messages, hasMore });
 });
 
 // GET /api/messages/unified?limit=...&offset=...
@@ -61,15 +66,49 @@ messageRoutes.get("/unified", async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
   const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
 
+  // For the unified inbox we only page the local DB (each provider's inbox is
+  // imported when its own folder is scrolled). If the DB page runs short,
+  // import one older page per account's inbox so the unified list keeps
+  // growing instead of stopping at the local aggregate.
   const boxes = await c.env.DB.prepare(
     `SELECT m.id FROM mailboxes m JOIN accounts a ON a.id = m.account_id
      WHERE a.user_id = ? AND (m.role = 'inbox' OR m.role = 'all')`,
   )
     .bind(user.id)
     .all<{ id: string }>();
-  const rows = await repo.unifiedMessages(c.env, boxes.results.map((b) => b.id), limit, offset);
+  let rows = await repo.unifiedMessages(c.env, boxes.results.map((b) => b.id), limit, offset);
+  let hasMore = rows.length === limit;
+
+  if (offset > 0 && rows.length < limit && boxes.results.length > 0) {
+    let imported = 0;
+    // Import one older page from each inbox so older mail shows up in the
+    // unified list. Cursor = the oldest message in that inbox.
+    for (const boxRow of boxes.results) {
+      const oldest = await c.env.DB.prepare(
+        `SELECT received_at FROM messages WHERE mailbox_id = ? ORDER BY received_at ASC LIMIT 1`,
+      )
+        .bind(boxRow.id)
+        .first<{ received_at: string }>();
+      if (!oldest) continue;
+      const box = await repo.mailboxById(c.env, boxRow.id);
+      if (!box) continue;
+      const account = await repo.accountById(c.env, box.account_id);
+      if (!account) continue;
+      const beforeDate = new Date(oldest.received_at).getTime();
+      const uids = await c.env.DB.prepare(
+        `SELECT remote_uid FROM messages WHERE mailbox_id = ? ORDER BY received_at ASC LIMIT 1`,
+      )
+        .bind(boxRow.id)
+        .first<{ remote_uid: number | null }>();
+      const res = await importOlderPage(c.env, { id: account.id, provider: account.provider }, box.provider_path, uids?.remote_uid ?? 0, Math.ceil(limit / Math.max(boxes.results.length, 1)), beforeDate).catch(() => ({ imported: 0, hasMore: false }));
+      imported += res.imported;
+    }
+    rows = await repo.unifiedMessages(c.env, boxes.results.map((b) => b.id), limit, offset);
+    hasMore = imported > 0;
+  }
+
   const messages = await rowsToMessages(c.env, rows);
-  return c.json({ messages });
+  return c.json({ messages, hasMore });
 });
 
 // GET /api/messages/:id
