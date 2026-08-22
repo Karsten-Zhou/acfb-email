@@ -357,7 +357,10 @@ export class ImapClient {
     const size = sizeM ? parseInt(sizeM[1], 10) : null;
     const internalM = /INTERNALDATE "([^"]*)"/.exec(line);
     const internalDate = internalM ? internalM[1] : null;
-    const headerText = new TextDecoder().decode(body);
+    // Raw header bytes: decoded with any declared Content-Type charset, else
+    // UTF-8 with a GB18030 fallback (Chinese providers often ship GBK bytes
+    // without encoded-words — naive UTF-8 decoding turns them into mojibake).
+    const headerText = decodeHeaderBytes(body);
     const headers = parseHeaderText(headerText);
     return {
       uid,
@@ -570,21 +573,66 @@ export function unquote(s: string): string | null {
   return s;
 }
 
+/**
+ * Decode raw bytes of a header/header-field using the most likely charset.
+ *
+ * Email from Chinese providers is frequently GBK/GB2312/GB18030 (rarely
+ * labeled), and blindly UTF-8-decoding those bytes yields mojibake like
+ * "æ¨åå»ºçš„" (UTF-8 bytes read as Latin-1). An explicit charset from
+ * Content-Type wins; otherwise try UTF-8 first (replacement chars ⇒ not
+ * UTF-8) and fall back to GB18030, which covers GBK/GB2312 too.
+ */
+export function decodeHeaderBytes(bytes: Uint8Array, declaredCharset?: string | null): string {
+  const tryDecode = (enc: string): string => {
+    try {
+      return new TextDecoder(enc, { fatal: false }).decode(bytes);
+    } catch {
+      return "";
+    }
+  };
+
+  if (declaredCharset) {
+    const d = tryDecode(declaredCharset);
+    if (d && !d.includes("\uFFFD")) return d;
+  }
+  // UTF-8 first; if any replacement char appears, it's not valid UTF-8.
+  const utf8 = tryDecode("utf-8");
+  if (utf8 && !utf8.includes("\uFFFD")) return utf8;
+  // Fall back to GB18030 (superset of GBK/GB2312) — covers the Chinese case.
+  const gb = tryDecode("gb18030");
+  if (gb) return gb;
+  return utf8 || "";
+}
+
 export function decodeMimeWord(s: string | null): string | null {
   if (s === null) return null;
   return s.replace(
     /=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g,
-    (_m: string, _cs: string, enc: string, data: string) => {
+    (_m: string, cs: string, enc: string, data: string) => {
       try {
+        const charset = cs.trim() || undefined;
         if (enc.toLowerCase() === "b") {
           const bin = atob(data);
-          return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+          const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+          return decodeHeaderBytes(bytes, charset);
         }
-        return data
-          .replace(/_/g, " ")
-          .replace(/=([0-9A-Fa-f]{2})/g, (_x: string, h: string) =>
-            String.fromCharCode(parseInt(h, 16)),
-          );
+        // Q-encoding: =XX hex bytes (may be multi-byte in GBK/GB18030), and
+        // any other char is literal ASCII. Build the raw byte sequence, then
+        // decode as raw bytes with the declared charset.
+        const bytes: number[] = [];
+        let i = 0;
+        const q = data.replace(/_/g, " ");
+        while (i < q.length) {
+          const ch = q[i];
+          if (ch === "=" && /^[0-9A-Fa-f]{2}$/.test(q.slice(i + 1, i + 3))) {
+            bytes.push(parseInt(q.slice(i + 1, i + 3), 16));
+            i += 3;
+          } else {
+            bytes.push(ch.charCodeAt(0));
+            i += 1;
+          }
+        }
+        return decodeHeaderBytes(Uint8Array.from(bytes), charset);
       } catch {
         return data;
       }

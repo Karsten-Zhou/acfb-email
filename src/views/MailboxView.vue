@@ -343,10 +343,7 @@ const listTitle = computed(() => {
   <!-- Mobile: the fixed top bar overlays the top of the window (it's
        `v-if=!reading`), so pad the layout on small screens while the bar is
        shown to keep the first list row below it. -->
-  <div
-    class="flex h-full bg-background text-foreground"
-    :class="reading ? '' : 'pt-12 md:pt-0'"
-  >
+  <div class="flex h-full bg-background text-foreground" :class="reading ? '' : 'pt-12 md:pt-0'">
     <MailboxSidebar
       :mailboxes="mailboxTree"
       :active-mailbox-id="activeMailboxId"

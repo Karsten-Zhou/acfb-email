@@ -7,6 +7,7 @@ import {
   extractBalanced,
   parseHeaderText,
   parseAddressListBySemicolon,
+  decodeHeaderBytes,
   WireReader,
 } from "./client";
 
@@ -25,6 +26,23 @@ describe("IMAP raw-header parsing", () => {
     const raw = "Subject: =?utf-8?B?SGVsbG8gV29ybGQ=?=\r\n";
     const h = parseHeaderText(raw);
     expect(h["subject"]).toBe("Hello World");
+  });
+
+  it("decodes GBK encoded-word (B) to proper Chinese", () => {
+    // GBK bytes for "你好世界" (你=c4 e3 好=ba c3 世=ca c0 界=bd e7).
+    const base64 = btoa(String.fromCharCode(0xc4, 0xe3, 0xba, 0xc3, 0xca, 0xc0, 0xbd, 0xe7));
+    const raw = `Subject: =?gbk?B?${base64}?=\r\n`;
+    const h = parseHeaderText(raw);
+    expect(h["subject"]).toBe("你好世界");
+  });
+
+  it("decodes GB18030 raw header bytes (no encoded-word)", () => {
+    const bytes = Uint8Array.from([0xc4, 0xe3, 0xba, 0xc3]); // GBK "你好"
+    expect(decodeHeaderBytes(bytes)).toBe("你好");
+  });
+
+  it("keeps plain ASCII headers intact", () => {
+    expect(decodeHeaderBytes(new TextEncoder().encode("Hello"))).toBe("Hello");
   });
 
   it("parses address header with names and bare addresses", () => {
