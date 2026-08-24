@@ -142,7 +142,9 @@ const emit = defineEmits<{
         >
           <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
           <span class="max-w-[200px] truncate">{{ a.filename || "attachment" }}</span>
-          <span v-if="a.size > 0" class="text-muted-foreground">({{ formatAttachmentSize(a.size) }})</span>
+          <span v-if="a.size > 0" class="text-muted-foreground"
+            >({{ formatAttachmentSize(a.size) }})</span
+          >
         </a>
       </div>
 
@@ -151,7 +153,6 @@ const emit = defineEmits<{
           class="email-body text-[15px]"
           v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')"
         />
-        <!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
       </div>
     </template>
   </section>

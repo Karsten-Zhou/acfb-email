@@ -145,7 +145,6 @@ function reply() {
           class="email-body mt-5 text-[15px]"
           v-html="sanitizeHtml(msg.html || msg.text || '')"
         />
-        <!-- eslint-disable-line vue/no-v-html -- sanitized with DOMPurify -->
       </template>
     </main>
 

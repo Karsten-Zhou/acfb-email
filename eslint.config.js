@@ -45,5 +45,13 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
+  // Email bodies are rendered with `v-html` *only* through our DOMPurify
+  // sanitizer (src/lib/sanitize.ts) in the message-reading components. The
+  // warning is noise for this deliberately-sanitized case; keep it enabled
+  // everywhere else so new unsanitized v-html still fails CI.
+  {
+    files: ["src/views/parts/MessageReaderPane.vue", "src/views/MessageView.vue"],
+    rules: { "vue/no-v-html": "off" },
+  },
   prettier,
 );
