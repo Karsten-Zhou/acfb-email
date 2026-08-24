@@ -69,7 +69,7 @@ async function pollAccountStates(): Promise<boolean> {
       // While fast mode is armed we may have optimistically set 'running' (in
       // markAccountSyncing) before the server has flipped it. Don't let a
       // premature 'healthy' response clobber it — keep showing the spinner
-      // until the server truth reports running (or settles after the sync).
+      // until the server truth reports running (or the sync request resolves).
       if (fastUntilHealthy && acc.state === "running" && fresh.state !== "running") {
         anyRunning = true;
         continue;
@@ -140,6 +140,24 @@ export function markAccountSyncing(accountId: string) {
   }
   if (active) void run();
   else startAccountStatePolling();
+}
+
+/**
+ * Called when the sync request the UI started has finished (success or
+ * failure). The server has settled the account state by now, so disarm fast
+ * mode and let the next poll apply the server's truth (healthy/unavailable)
+ * instead of keeping the optimistic 'running' forever.
+ */
+export function clearAccountSyncing() {
+  fastUntilHealthy = false;
+  // Poll immediately; the next poll applies the server's settled state.
+  if (active) {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    void run();
+  }
 }
 
 export async function loadMailboxes(accountId: string) {

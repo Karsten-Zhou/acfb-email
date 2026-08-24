@@ -11,6 +11,7 @@ import {
   updateAccount,
   syncAccount,
   markAccountSyncing,
+  clearAccountSyncing,
 } from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
 import { t, formatDate } from "../../lib/i18n";
@@ -254,11 +255,18 @@ async function syncOne(id: string) {
   // Optimistic: mark running immediately so the row spinner + "Syncing…"
   // appear right away and the poller switches to 1s cadence.
   markAccountSyncing(id);
-  const res = await syncAccount(id);
-  if (!res.ok && res.message) {
-    syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
-  } else {
-    syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
+  try {
+    const res = await syncAccount(id);
+    if (!res.ok && res.message) {
+      syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
+    } else {
+      syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
+    }
+  } finally {
+    // Always drop fast mode — on success the server has settled the state and
+    // the next poll applies its truth; on failure the state never went
+    // 'running' server-side so fast polling must not persist (else 1s forever).
+    clearAccountSyncing();
   }
 }
 </script>
@@ -557,7 +565,10 @@ async function syncOne(id: string) {
         </div>
         <div class="text-xs text-muted-foreground">
           <span v-if="a.state === 'healthy'" class="text-emerald-600">{{ t("healthy") }}</span>
-          <span v-else-if="a.state === 'running'" class="inline-flex items-center gap-1 text-sky-600">
+          <span
+            v-else-if="a.state === 'running'"
+            class="inline-flex items-center gap-1 text-sky-600"
+          >
             <Loader2 class="h-3 w-3 animate-spin" /> {{ t("syncing") }}
           </span>
           <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{

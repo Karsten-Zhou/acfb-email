@@ -4,7 +4,12 @@
 //   MessageReaderPane (rightmost reader). Mobile top/bottom bars live here.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { accountsState, loadAccounts, markAccountSyncing } from "../stores/accounts";
+import {
+  accountsState,
+  loadAccounts,
+  markAccountSyncing,
+  clearAccountSyncing,
+} from "../stores/accounts";
 import {
   loadUnified,
   loadMessages,
@@ -146,10 +151,17 @@ async function syncAccountNow(id: string) {
   // Optimistic: the sidebar spinner follows store state (running), set now so
   // it appears instantly and the poller switches to 1s cadence.
   markAccountSyncing(id);
-  const res = await api.syncAccount(id);
-  if (!res.ok && res.message) {
-    syncError.value = res.message;
-    toastError(res.message);
+  try {
+    const res = await api.syncAccount(id);
+    if (!res.ok && res.message) {
+      syncError.value = res.message;
+      toastError(res.message);
+    }
+  } finally {
+    // Always drop fast mode — on success the server has settled the state and
+    // the next poll applies its truth; on failure the state never went
+    // 'running' server-side so fast polling must not persist (else 1s forever).
+    clearAccountSyncing();
   }
   await refresh();
 }
