@@ -52,6 +52,8 @@ const IDLE_POLL_MS = 60_000;
 
 let active = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+/** True while a poll request is in flight (reentrancy guard for run()). */
+let runInFlight = false;
 // While armed, poll at 1s even if a single /states response happens to arrive
 // before the server has set 'running' (a poll racing the sync's state write
 // would otherwise see idle and drop to 60s, missing the whole sync).
@@ -62,7 +64,12 @@ async function pollAccountStates(): Promise<boolean> {
   try {
     const { accounts } = await api.accountStates();
     const byId = new Map(accounts.map((a) => [a.id, a]));
-    let anyRunning = false;
+    // Fast mode follows the SERVER truth, not the local list: on a fresh page
+    // load the accounts list may not be populated yet when the first poll
+    // runs, so an account still 'running' server-side must keep the loop at
+    // 1s regardless (otherwise entering the page mid-sync shows a stale
+    // spinner until the next idle poll — up to a minute later).
+    let anyRunning = accounts.some((a) => a.state === "running");
     for (const acc of accountsState.accounts) {
       const fresh = byId.get(acc.id);
       if (!fresh) continue;
@@ -92,15 +99,24 @@ function scheduleNext(delay: number) {
 }
 
 async function run() {
+  // Reentrancy guard: markAccountSyncing / clearAccountSyncing / sync-all can
+  // call run() while a poll is already awaiting its fetch (e.g. sync-all marks
+  // one account per iteration). Without this, two overlapping run() calls both
+  // scheduleNext() on completion → two independent poll chains poll forever.
+  if (!active || runInFlight) return;
+  runInFlight = true;
   pollTimer = null;
-  if (!active) return;
-  const anyRunning = await pollAccountStates();
-  if (!active) return; // stopped while awaiting
-  // Stay fast while a sync is observed OR we've been told one is starting
-  // (server may not have flipped 'running' yet when this poll raced it).
-  const fast = anyRunning || fastUntilHealthy;
-  if (!anyRunning) fastUntilHealthy = false; // settled → disarm
-  scheduleNext(fast ? RUNNING_POLL_MS : IDLE_POLL_MS);
+  try {
+    const anyRunning = await pollAccountStates();
+    if (!active) return; // stopped while awaiting
+    // Stay fast while a sync is observed OR we've been told one is starting
+    // (server may not have flipped 'running' yet when this poll raced it).
+    const fast = anyRunning || fastUntilHealthy;
+    if (!anyRunning) fastUntilHealthy = false; // settled → disarm
+    scheduleNext(fast ? RUNNING_POLL_MS : IDLE_POLL_MS);
+  } finally {
+    runInFlight = false;
+  }
 }
 
 /** Start adaptive state polling (idempotent). Call from main.ts on boot. */

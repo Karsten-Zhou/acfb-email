@@ -119,6 +119,10 @@ async function loadInto() {
 async function syncNow() {
   syncing.value = true;
   syncError.value = null;
+  // Optimistic: mark every account syncing so sidebar spinners appear
+  // instantly and the poller switches to 1s cadence for the whole run (the
+  // per-account spinners + "Syncing…" follow store state === 'running').
+  for (const a of accountsState.accounts) markAccountSyncing(a.id);
   try {
     const results = await Promise.all(
       accountsState.accounts.map((a) =>
@@ -133,6 +137,9 @@ async function syncNow() {
     await refresh();
   } finally {
     syncing.value = false;
+    // All sync requests resolved — the server has settled each account; drop
+    // fast mode so polling returns to the 60s idle cadence.
+    clearAccountSyncing();
   }
 }
 
