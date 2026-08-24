@@ -5,7 +5,7 @@
 //   PreferencesPanel (language/theme),
 //   AboutPanel.
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { logout } from "../stores/auth";
 import { loadAccounts } from "../stores/accounts";
 import { api, type HealthPayload } from "../lib/api";
@@ -18,6 +18,7 @@ import AboutPanel from "./parts/AboutPanel.vue";
 import { ChevronLeft } from "lucide-vue-next";
 
 const router = useRouter();
+const route = useRoute();
 
 const notice = ref<string | null>(null);
 const meta = ref<HealthPayload | null>(null);
@@ -30,7 +31,9 @@ onMounted(async () => {
       .then((h) => (meta.value = h))
       .catch(() => null),
   ]);
-  const connected = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("connected");
+  // OAuth callback lands on /settings?connected=google|microsoft and shows
+  // a success notice.
+  const connected = route.query.connected;
   if (connected === "google" || connected === "microsoft") {
     notice.value = connected === "google" ? t("connectGmail") + " ✓" : t("connectOutlook") + " ✓";
   }

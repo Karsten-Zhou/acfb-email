@@ -52,7 +52,7 @@ authRoutes.get("/callback", async (c) => {
   const sessionToken = await createSession(c.env, userId);
   setSessionCookie(c, sessionToken);
   setCsrfCookie(c);
-  return c.redirect(`${c.env.APP_URL}/#/mail`);
+  return c.redirect(`${c.env.APP_URL}/mail`);
 });
 
 // GET /api/auth/me -> current user (or 401)

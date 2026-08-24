@@ -73,7 +73,7 @@ Cloudflare Worker
      - stores SHA-256 hash in D1 sessions (DB leak does not grant sessions)
      - sets httpOnly Secure SameSite=Lax cookie (ec_session)
 6. Sets CSRF cookie (ec_csrf, non-httpOnly so JS can read it back as a header)
-7. Redirect to /#/mail
+7. Redirect to /mail
 ```
 
 ### Add account + first sync

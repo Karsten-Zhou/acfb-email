@@ -112,8 +112,8 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   // sync itself is time-bounded.
   c.executionCtx.waitUntil(syncAccount(c.env, accountId).catch(() => {}));
 
-  // Redirect back to settings with a success hash.
-  return c.redirect(`${c.env.APP_URL}/#/settings?connected=${provider}`);
+  // Back to Settings with a query flag so the page shows a success notice.
+  return c.redirect(`${c.env.APP_URL}/settings?connected=${provider}`);
 });
 
 async function fetchOwnerInfo(
