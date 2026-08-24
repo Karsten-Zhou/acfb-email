@@ -5,6 +5,7 @@
 // only wires them up. Adding a new locale = add a JSON file + extend the
 // types below (the union lists are compile-time checked by t()).
 
+import { match } from "@formatjs/intl-localematcher";
 import { reactive, computed } from "vue";
 import en from "../locales/en.json";
 import de from "../locales/de.json";
@@ -15,12 +16,8 @@ export type LocaleSetting = "auto" | Locale;
 
 export const supportedLocales: Locale[] = ["en", "de", "zh"];
 
-function detectBrowser(): Locale {
-  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || "en";
-  const lang = nav.toLowerCase();
-  if (lang.startsWith("de")) return "de";
-  if (lang.startsWith("zh")) return "zh";
-  return "en";
+function resolveAutoLocale(): Locale {
+  return match(navigator.languages, supportedLocales, "en") as Locale;
 }
 
 export const dict = {
@@ -36,13 +33,13 @@ const state = reactive<{
   locale: Locale;
 }>({
   setting: "auto",
-  locale: detectBrowser(),
+  locale: resolveAutoLocale(),
 });
 
 /** Set the locale preference ("auto" resolves by browser). */
 export function setLocale(setting: LocaleSetting) {
   state.setting = setting;
-  state.locale = setting === "auto" ? detectBrowser() : setting;
+  state.locale = setting === "auto" ? resolveAutoLocale() : setting;
   localStorage.setItem("ec_locale", setting);
   document.documentElement.lang = state.locale;
 }
