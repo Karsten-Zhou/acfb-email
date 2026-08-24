@@ -10,6 +10,7 @@ import {
   moveAccount,
   updateAccount,
   syncAccount,
+  markAccountSyncing,
 } from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
 import { t, formatDate } from "../../lib/i18n";
@@ -48,7 +49,6 @@ const adding = ref(false);
 const testing = ref(false);
 const testResult = ref<{ ok: boolean; message: string } | null>(null);
 const error = ref<string | null>(null);
-const syncingId = ref<string | null>(null);
 /** Last sync failure message per account id (shown under the row). */
 const syncErrorMap = ref<Record<string, string>>({});
 const confirmDeleteId = ref<string | null>(null);
@@ -251,17 +251,14 @@ async function confirmRemove() {
 }
 
 async function syncOne(id: string) {
-  syncingId.value = id;
-  try {
-    const res = await syncAccount(id);
-    if (!res.ok && res.message) {
-      syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
-    } else {
-      syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
-    }
-    await loadAccounts();
-  } finally {
-    syncingId.value = null;
+  // Optimistic: mark running immediately so the row spinner + "Syncing…"
+  // appear right away and the poller switches to 1s cadence.
+  markAccountSyncing(id);
+  const res = await syncAccount(id);
+  if (!res.ok && res.message) {
+    syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
+  } else {
+    syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
   }
 }
 </script>
@@ -587,13 +584,10 @@ async function syncOne(id: string) {
           variant="ghost"
           size="icon"
           class="h-8 w-8"
-          :disabled="syncingId === a.id || a.state === 'running'"
+          :disabled="a.state === 'running'"
           @click="syncOne(a.id)"
         >
-          <Loader2
-            v-if="syncingId === a.id || a.state === 'running'"
-            class="h-4 w-4 animate-spin"
-          />
+          <Loader2 v-if="a.state === 'running'" class="h-4 w-4 animate-spin" />
           <RefreshCw v-else class="h-4 w-4" />
         </UiButton>
       </UiToolTip>

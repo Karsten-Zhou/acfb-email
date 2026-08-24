@@ -40,16 +40,22 @@ export async function loadAccounts() {
 // settings spinners follow `state === 'running'` automatically, for ANY sync
 // origin (auto-sync after add/reconnect, manual Sync-now, pull-to-refresh).
 //
-// The interval adapts to activity: 1s while a sync is in flight (so the
-// sidebar/settings flip to healthy the moment it finishes), 60s when idle
-// (cheap background freshness for e.g. new accounts after reconnect). Each
-// poll schedules the next only after it completes, so requests never overlap.
+// The interval adapts to activity: 1s while a sync is in flight, 60s when
+// idle. Each poll schedules the next only after it completes, so requests
+// never overlap. Crucially, starting a sync locally calls `markAccountSyncing`
+// which (a) sets the account's state to 'running' immediately (instant UI
+// feedback — no waiting for a poll) and (b) forces the loop into fast 1s
+// mode right away, so the settled state shows up promptly.
 // ---------------------------------------------------------------------------
 const RUNNING_POLL_MS = 1000;
 const IDLE_POLL_MS = 60_000;
 
 let active = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+// While armed, poll at 1s even if a single /states response happens to arrive
+// before the server has set 'running' (a poll racing the sync's state write
+// would otherwise see idle and drop to 60s, missing the whole sync).
+let fastUntilHealthy = false;
 
 /** Fetch + merge server state; returns true if any account is still syncing. */
 async function pollAccountStates(): Promise<boolean> {
@@ -60,6 +66,14 @@ async function pollAccountStates(): Promise<boolean> {
     for (const acc of accountsState.accounts) {
       const fresh = byId.get(acc.id);
       if (!fresh) continue;
+      // While fast mode is armed we may have optimistically set 'running' (in
+      // markAccountSyncing) before the server has flipped it. Don't let a
+      // premature 'healthy' response clobber it — keep showing the spinner
+      // until the server truth reports running (or settles after the sync).
+      if (fastUntilHealthy && acc.state === "running" && fresh.state !== "running") {
+        anyRunning = true;
+        continue;
+      }
       acc.state = fresh.state as AccountState;
       acc.stateMessage = fresh.stateMessage;
       acc.lastSyncedAt = fresh.lastSyncedAt;
@@ -82,14 +96,18 @@ async function run() {
   if (!active) return;
   const anyRunning = await pollAccountStates();
   if (!active) return; // stopped while awaiting
-  scheduleNext(anyRunning ? RUNNING_POLL_MS : IDLE_POLL_MS);
+  // Stay fast while a sync is observed OR we've been told one is starting
+  // (server may not have flipped 'running' yet when this poll raced it).
+  const fast = anyRunning || fastUntilHealthy;
+  if (!anyRunning) fastUntilHealthy = false; // settled → disarm
+  scheduleNext(fast ? RUNNING_POLL_MS : IDLE_POLL_MS);
 }
 
-/** Start adaptive state polling (idempotent). Call from top-level layouts. */
+/** Start adaptive state polling (idempotent). Call from main.ts on boot. */
 export function startAccountStatePolling() {
   if (active) return;
   active = true;
-  void run(); // immediate first poll, then adapts its cadence
+  void run();
 }
 
 /** Stop polling (e.g. on logout / route teardown). */
@@ -99,6 +117,29 @@ export function stopAccountStatePolling() {
     clearTimeout(pollTimer);
     pollTimer = null;
   }
+}
+
+/**
+ * Optimistically mark an account as syncing and switch the poller to fast
+ * (1s) mode immediately. Call right after starting a sync from the UI so the
+ * spinner/"Syncing…" label appears instantly instead of waiting for the next
+ * poll, and the settled result is picked up without the 60s idle gap.
+ */
+export function markAccountSyncing(accountId: string) {
+  const acc = accountsState.accounts.find((a) => a.id === accountId);
+  if (acc) {
+    acc.state = "running";
+    acc.stateMessage = null;
+  }
+  fastUntilHealthy = true;
+  // Cancel any pending idle wait and poll right now; the loop now holds the
+  // 1s cadence until a poll observes the settled (non-running) state.
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  if (active) void run();
+  else startAccountStatePolling();
 }
 
 export async function loadMailboxes(accountId: string) {

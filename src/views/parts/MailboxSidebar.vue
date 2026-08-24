@@ -25,7 +25,6 @@ defineProps<{
   mailboxes: { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[];
   activeMailboxId: string | null;
   syncing: boolean;
-  syncingAccountId: string | null;
   unread: (item: { mailbox: Mailbox }) => number;
   /** Mobile drawer open state (ignored on md+). */
   open: boolean;
@@ -128,13 +127,10 @@ const roleIcon: Record<string, typeof Inbox> = {
           <AppTooltip :label="acct.state === 'running' ? t('syncing') : t('syncNow')">
             <button
               class="rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              :disabled="acct.state === 'running' || syncingAccountId === acct.id"
+              :disabled="acct.state === 'running'"
               @click.stop="emit('sync-account', acct.id)"
             >
-              <RefreshCw
-                v-if="acct.state === 'running' || syncingAccountId === acct.id"
-                class="h-3 w-3 animate-spin"
-              />
+              <RefreshCw v-if="acct.state === 'running'" class="h-3 w-3 animate-spin" />
               <RefreshCw v-else class="h-3 w-3" />
             </button>
           </AppTooltip>

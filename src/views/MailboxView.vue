@@ -4,7 +4,7 @@
 //   MessageReaderPane (rightmost reader). Mobile top/bottom bars live here.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { accountsState, loadAccounts } from "../stores/accounts";
+import { accountsState, loadAccounts, markAccountSyncing } from "../stores/accounts";
 import {
   loadUnified,
   loadMessages,
@@ -39,7 +39,6 @@ const pageSize = 50;
 const hasOlder = ref(true);
 const confirmDelete = ref(false);
 const deleting = ref(false);
-const syncingAccountId = ref<string | null>(null);
 const loadingMessage = ref(false);
 /** Read-toggle in flight: spinner shows on the reader's mark-read button. */
 const togglingRead = ref(false);
@@ -143,18 +142,16 @@ async function pullRefresh() {
 }
 
 async function syncAccountNow(id: string) {
-  syncingAccountId.value = id;
   syncError.value = null;
-  try {
-    const res = await api.syncAccount(id);
-    if (!res.ok && res.message) {
-      syncError.value = res.message;
-      toastError(res.message);
-    }
-    await refresh();
-  } finally {
-    syncingAccountId.value = null;
+  // Optimistic: the sidebar spinner follows store state (running), set now so
+  // it appears instantly and the poller switches to 1s cadence.
+  markAccountSyncing(id);
+  const res = await api.syncAccount(id);
+  if (!res.ok && res.message) {
+    syncError.value = res.message;
+    toastError(res.message);
   }
+  await refresh();
 }
 
 function selectMailbox(id: string) {
@@ -348,7 +345,6 @@ const listTitle = computed(() => {
       :mailboxes="mailboxTree"
       :active-mailbox-id="activeMailboxId"
       :syncing="syncing"
-      :syncing-account-id="syncingAccountId"
       :unread="unreadBadge"
       :open="sidebarOpen"
       @select="selectMailbox"

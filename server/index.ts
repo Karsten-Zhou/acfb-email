@@ -2,7 +2,6 @@
 // Workers Assets (wrangler config: not_found_handling = single-page-application).
 
 import { Hono } from "hono";
-import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import type { Env } from "./env";
 import { HttpError } from "./http-error";
@@ -20,7 +19,14 @@ type AppEnv = { Bindings: Env };
 const app = new Hono<AppEnv>();
 
 // ----- global middleware -----
-app.use("*", logger());
+// Request logger with wall-clock timestamps (for debugging sync/poll timings).
+app.use("*", async (c, next) => {
+  const started = Date.now();
+  await next();
+  const ms = Date.now() - started;
+  const ts = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
+  console.log(`${ts} ${c.req.method} ${c.req.path} ${c.res.status} ${ms}ms`);
+});
 app.use(
   "/api/*",
   cors({
