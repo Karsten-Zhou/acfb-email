@@ -32,45 +32,71 @@ export async function loadAccounts() {
 }
 
 // ---------------------------------------------------------------------------
-// Live account-state polling.
+// Adaptive live account-state polling.
 //
 // Sync runs server-side in the background (waitUntil), so the client can't
 // know when an account leaves `running` without asking. We poll a lightweight
 // endpoint and merge the result into the reactive list — the sidebar and
 // settings spinners follow `state === 'running'` automatically, for ANY sync
 // origin (auto-sync after add/reconnect, manual Sync-now, pull-to-refresh).
+//
+// The interval adapts to activity: 1s while a sync is in flight (so the
+// sidebar/settings flip to healthy the moment it finishes), 60s when idle
+// (cheap background freshness for e.g. new accounts after reconnect). Each
+// poll schedules the next only after it completes, so requests never overlap.
 // ---------------------------------------------------------------------------
-let pollTimer: ReturnType<typeof setInterval> | null = null;
-const POLL_MS = 3000;
+const RUNNING_POLL_MS = 1000;
+const IDLE_POLL_MS = 60_000;
 
-/** Merge fresh server state into the reactive account list (preserves order). */
-async function pollAccountStates() {
+let active = false;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Fetch + merge server state; returns true if any account is still syncing. */
+async function pollAccountStates(): Promise<boolean> {
   try {
     const { accounts } = await api.accountStates();
     const byId = new Map(accounts.map((a) => [a.id, a]));
+    let anyRunning = false;
     for (const acc of accountsState.accounts) {
       const fresh = byId.get(acc.id);
       if (!fresh) continue;
       acc.state = fresh.state as AccountState;
       acc.stateMessage = fresh.stateMessage;
       acc.lastSyncedAt = fresh.lastSyncedAt;
+      if (fresh.state === "running") anyRunning = true;
     }
+    return anyRunning;
   } catch {
-    /* transient — next tick retries */
+    // Transient failure — keep polling at the idle cadence and retry.
+    return false;
   }
 }
 
-/** Start polling account states (idempotent). Call from top-level layouts. */
+function scheduleNext(delay: number) {
+  if (!active) return;
+  pollTimer = setTimeout(run, delay);
+}
+
+async function run() {
+  pollTimer = null;
+  if (!active) return;
+  const anyRunning = await pollAccountStates();
+  if (!active) return; // stopped while awaiting
+  scheduleNext(anyRunning ? RUNNING_POLL_MS : IDLE_POLL_MS);
+}
+
+/** Start adaptive state polling (idempotent). Call from top-level layouts. */
 export function startAccountStatePolling() {
-  if (pollTimer) return;
-  void pollAccountStates();
-  pollTimer = setInterval(pollAccountStates, POLL_MS);
+  if (active) return;
+  active = true;
+  void run(); // immediate first poll, then adapts its cadence
 }
 
 /** Stop polling (e.g. on logout / route teardown). */
 export function stopAccountStatePolling() {
+  active = false;
   if (pollTimer) {
-    clearInterval(pollTimer);
+    clearTimeout(pollTimer);
     pollTimer = null;
   }
 }
