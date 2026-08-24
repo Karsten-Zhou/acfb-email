@@ -29,7 +29,10 @@ export function microsoftConfig(env: Env): OAuthProviderConfig {
     tokenUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
     clientId: env.MICROSOFT_CLIENT_ID ?? "",
     clientSecret: env.MICROSOFT_CLIENT_SECRET ?? "",
-    scopes: ["User.Read", "Mail.ReadWrite", "offline_access"],
+    // Mail.ReadWrite covers read/modify/delete + attachments. Sending mail is a
+    // SEPARATE permission: per MS docs, sendMail requires `Mail.Send` (delegated)
+    // and Mail.ReadWrite explicitly does NOT include sending. Keep both.
+    scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send", "offline_access"],
     redirectUri: () => `${env.APP_URL.replace(/\/$/, "")}/api/oauth/microsoft/callback`,
   };
 }

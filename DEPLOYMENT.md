@@ -142,6 +142,71 @@ strict SPF, mail sent via this app may fail SPF alignment. Options:
 
 ---
 
+## OAuth providers (Gmail / Outlook)
+
+Connecting Gmail or Outlook uses OAuth 2.0 instead of a password. The flow:
+**Settings → Connect** redirects to the provider, you authorize, and the app
+stores the encrypted **refresh token** in D1 (`account_credentials`). The
+provider's API (Gmail REST / Microsoft Graph) is then used for sync, flags,
+attachments, and send — no IMAP/SMTP credentials involved.
+
+The provider buttons are hidden/disabled until you configure the secrets
+(`/api/health` exposes `config.gmailOauth` / `config.outlookOauth`, which the
+UI reads). First set the secrets:
+
+```bash
+bunx wrangler secret put GOOGLE_CLIENT_ID
+bunx wrangler secret put GOOGLE_CLIENT_SECRET
+bunx wrangler secret put MICROSOFT_CLIENT_ID
+bunx wrangler secret put MICROSOFT_CLIENT_SECRET
+```
+
+Then create the app registration and set the redirect URI:
+
+| Provider | Console | Redirect URI template | Suggested OAuth scopes |
+| --- | --- | --- | --- |
+| **Google** | <https://console.cloud.google.com/apis/credentials> | `https://<your-worker>.workers.dev/api/oauth/google/callback` | `gmail.modify` (read/send/delete), plus `userinfo.email`, `userinfo.profile`, `openid` |
+| **Microsoft (Entra)** | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps> | `https://<your-worker>.workers.dev/api/oauth/microsoft/callback` | `User.Read`, `Mail.ReadWrite`, `Mail.Send`, `offline_access` |
+
+For local development use `http://localhost:5173/api/oauth/<provider>/callback`
+(the same placeholder used by GitHub OAuth).
+
+### Microsoft Entra app (Outlook)
+
+1. **App registrations → New registration**.
+2. **Supported account types**: choose **"Personal Microsoft accounts only"** for
+   a consumer Outlook.com account (this app is verified against that setup).
+   The app uses the `consumers` tenant endpoint.
+3. **Redirect URI**: the Microsoft callback above (Web platform).
+4. **API permissions → Add a permission → Microsoft Graph → Delegated** and add
+   **all three**:
+   - `User.Read` — profile/email of the signed-in user.
+   - `Mail.ReadWrite` — read, modify, move, and delete mail + attachments.
+   - `Mail.Send` — **required to send mail**. Microsoft's docs state
+     `Mail.ReadWrite` does *not* include sending; without `Mail.Send` the
+     `POST /me/sendMail` call fails with `403 Access is denied`.
+   - `offline_access` is requested automatically for refresh tokens.
+5. Grant admin consent if your tenant requires it (not needed for personal MSA).
+
+> **Important — scopes are fixed at consent time.** The refresh token only
+> carries the permissions granted when the user clicked through the consent
+> screen. If you add `Mail.Send` to the app *after* a user already connected,
+> their stored token still lacks it and send fails with 403 **even after a
+> refresh**. To pick up the new scope, remove the account in Settings and
+> **reconnect** (the consent screen will show the extra permission).
+
+### Google Cloud app (Gmail)
+
+1. **APIs & Services → OAuth consent screen** (External), add your Google
+   account as a test user.
+2. **Credentials → Create credentials → OAuth client ID** (Web), set the
+   Gmail redirect URI above.
+3. **Enable the Gmail API** (`gmail.googleapis.com`) for the project.
+4. In the consent screen, add the scope
+   `https://www.googleapis.com/auth/gmail.modify`.
+
+---
+
 ## Rollback / recovery
 
 - **Code rollback**: Wrangler keeps previous deployments; `bunx wrangler rollback`
