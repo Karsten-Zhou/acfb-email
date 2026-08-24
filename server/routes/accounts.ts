@@ -57,6 +57,31 @@ accountRoutes.get("/", async (c) => {
   return c.json({ accounts });
 });
 
+// GET /api/accounts/states — lightweight live status of each account. Polled
+// by the client so sidebar/settings reflect sync progress without a full page
+// reload (sync runs server-side in the background via waitUntil).
+accountRoutes.get("/states", async (c) => {
+  const user = currentUser(c);
+  const rows = await c.env.DB.prepare(
+    `SELECT id, state, state_message, last_synced_at FROM accounts WHERE user_id = ?`,
+  )
+    .bind(user.id)
+    .all<{
+      id: string;
+      state: string;
+      state_message: string | null;
+      last_synced_at: string | null;
+    }>();
+  return c.json({
+    accounts: rows.results.map((r) => ({
+      id: r.id,
+      state: r.state,
+      stateMessage: r.state_message,
+      lastSyncedAt: r.last_synced_at,
+    })),
+  });
+});
+
 // GET /api/accounts/:id
 accountRoutes.get("/:id", async (c) => {
   const user = currentUser(c);

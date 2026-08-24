@@ -89,6 +89,10 @@ export const api = {
 
   // accounts
   accounts: () => request<{ accounts: AccountSummary[] }>("/accounts"),
+  accountStates: () =>
+    request<{
+      accounts: { id: string; state: string; stateMessage: string | null; lastSyncedAt: string | null }[];
+    }>("/accounts/states", {}, { noToast: true }),
   account: (id: string) => request<{ account: AccountDetail }>(`/accounts/${id}`),
   addAccount: (input: AddAccountInput) =>
     request<{ account: AccountSummary }>("/accounts", {

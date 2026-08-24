@@ -560,6 +560,9 @@ async function syncOne(id: string) {
         </div>
         <div class="text-xs text-muted-foreground">
           <span v-if="a.state === 'healthy'" class="text-emerald-600">{{ t("healthy") }}</span>
+          <span v-else-if="a.state === 'running'" class="inline-flex items-center gap-1 text-sky-600">
+            <Loader2 class="h-3 w-3 animate-spin" /> {{ t("syncing") }}
+          </span>
           <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{
             a.stateMessage || t("unavailable")
           }}</span>
@@ -579,15 +582,18 @@ async function syncOne(id: string) {
           <span class="min-w-0 truncate">{{ syncErrorMap[a.id] }}</span>
         </div>
       </div>
-      <UiToolTip :label="t('syncNow')">
+      <UiToolTip :label="a.state === 'running' ? t('syncing') : t('syncNow')">
         <UiButton
           variant="ghost"
           size="icon"
           class="h-8 w-8"
-          :disabled="syncingId === a.id"
+          :disabled="syncingId === a.id || a.state === 'running'"
           @click="syncOne(a.id)"
         >
-          <Loader2 v-if="syncingId === a.id" class="h-4 w-4 animate-spin" />
+          <Loader2
+            v-if="syncingId === a.id || a.state === 'running'"
+            class="h-4 w-4 animate-spin"
+          />
           <RefreshCw v-else class="h-4 w-4" />
         </UiButton>
       </UiToolTip>

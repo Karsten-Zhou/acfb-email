@@ -125,13 +125,16 @@ const roleIcon: Record<string, typeof Inbox> = {
           class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           {{ acct.name }}
-          <AppTooltip :label="t('syncNow')">
+          <AppTooltip :label="acct.state === 'running' ? t('syncing') : t('syncNow')">
             <button
               class="rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              :disabled="syncingAccountId === acct.id"
+              :disabled="acct.state === 'running' || syncingAccountId === acct.id"
               @click.stop="emit('sync-account', acct.id)"
             >
-              <RefreshCw v-if="syncingAccountId === acct.id" class="h-3 w-3 animate-spin" />
+              <RefreshCw
+                v-if="acct.state === 'running' || syncingAccountId === acct.id"
+                class="h-3 w-3 animate-spin"
+              />
               <RefreshCw v-else class="h-3 w-3" />
             </button>
           </AppTooltip>
