@@ -11,6 +11,7 @@ import { HttpError } from "../http-error";
 import { requireAuth, randomToken, safeEqual } from "../auth";
 import { currentUser } from "../auth/session";
 import { decryptCredential, encryptCredential } from "../security/crypto";
+import { syncAccount } from "../sync/sync-service";
 import {
   buildAuthorizeUrl,
   exchangeCode,
@@ -105,6 +106,11 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   )
     .bind(accountId, encrypted)
     .run();
+
+  // Kick off the first sync (new accounts) / refresh (reconnects). waitUntil
+  // keeps it alive beyond the redirect so the Worker doesn't cancel it; the
+  // sync itself is time-bounded.
+  c.executionCtx.waitUntil(syncAccount(c.env, accountId).catch(() => {}));
 
   // Redirect back to settings with a success hash.
   return c.redirect(`${c.env.APP_URL}/#/settings?connected=${provider}`);

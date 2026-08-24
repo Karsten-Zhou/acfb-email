@@ -149,8 +149,9 @@ accountRoutes.post("/", async (c) => {
     .bind(id, encrypted)
     .run();
 
-  // Fire-and-forget first sync (bounded).
-  void syncAccount(c.env, id).catch(() => {});
+  // Fire-and-forget first sync (bounded). waitUntil keeps it alive beyond the
+  // response so the Worker doesn't cancel it mid-flight.
+  c.executionCtx.waitUntil(syncAccount(c.env, id).catch(() => {}));
 
   const summary = AccountSummarySchema.parse({
     id,
@@ -162,6 +163,7 @@ accountRoutes.post("/", async (c) => {
     stateMessage: null,
     createdAt: now,
     lastSyncedAt: null,
+    sortOrder: 0,
   });
   return c.json({ account: summary }, 201);
 });
