@@ -50,9 +50,11 @@ CREATE TABLE IF NOT EXISTS accounts (
   sync_enabled   INTEGER NOT NULL DEFAULT 1,
 
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  last_synced_at TEXT
+  last_synced_at TEXT,
+  sort_order     INTEGER NOT NULL DEFAULT 0   -- user-controlled display order
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_user_order ON accounts(user_id, sort_order, created_at);
 
 -- ------------------------------------------------------------------
 -- account_credentials: encrypted secrets (AES-GCM). Separated so the
@@ -139,7 +141,8 @@ CREATE TABLE IF NOT EXISTS attachments (
   size       INTEGER NOT NULL DEFAULT 0,
   is_inline  INTEGER NOT NULL DEFAULT 0,
   content_id TEXT,
-  disposition TEXT
+  disposition TEXT,
+  part_number TEXT                          -- provider part handle for on-demand download
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
 
