@@ -78,8 +78,16 @@ async function saveEdit() {
   savingEdit.value = true;
   editError.value = null;
   try {
+    const name = editName.value.trim();
+    if (!name) {
+      editError.value = "Label is required";
+      return;
+    }
+    // Label identifies the account in the sidebar; display name is the
+    // from-name recipients see on sent mail. They're deliberately separate
+    // (e.g. label "Work", display name "John Doe <john@example.com>").
     await updateAccount(editAccount.value.id, {
-      name: editName.value.trim() || editAccount.value.name,
+      name,
       displayName: editDisplayName.value.trim() || null,
     });
     editDialogOpen.value = false;
@@ -357,6 +365,7 @@ async function syncOne(id: string) {
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
             <UiInput v-model="form.name" class="w-full" placeholder="e.g. Work" />
+            <p class="text-xs text-muted-foreground/70">{{ t("labelHint") }}</p>
           </div>
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground">{{ t("email") }}</label>
@@ -370,6 +379,7 @@ async function syncOne(id: string) {
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
             <UiInput v-model="form.displayName" class="w-full" />
+            <p class="text-xs text-muted-foreground/70">{{ t("displayNameHint") }}</p>
           </div>
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground">{{ t("username") }}</label>
@@ -655,10 +665,12 @@ async function syncOne(id: string) {
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
           <UiInput v-model="editName" class="w-full" maxlength="100" />
+          <p class="text-xs text-muted-foreground/70">{{ t("labelHint") }}</p>
         </div>
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
           <UiInput v-model="editDisplayName" class="w-full" maxlength="100" />
+          <p class="text-xs text-muted-foreground/70">{{ t("displayNameHint") }}</p>
         </div>
         <div v-if="editError" class="text-xs text-destructive">{{ editError }}</div>
       </div>
