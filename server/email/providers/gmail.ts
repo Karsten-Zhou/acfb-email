@@ -4,6 +4,7 @@
 // messages.remote_message_id via sync).
 import type {
   IEmailProvider,
+  ProviderAttachment,
   ProviderBody,
   ProviderFetchResult,
   ProviderMailbox,
@@ -12,13 +13,7 @@ import type {
   ProviderSyncOptions,
   SendOptions,
 } from "./types";
-import {
-  b64urlToBytes,
-  base64url,
-  providerGet,
-  providerJson,
-  providerJsonPatch,
-} from "./oauth-util";
+import { b64urlToBytes, base64url, providerGet, providerJson, providerJsonPatch } from "./oauth-util";
 import type { OAuthToken } from "../../oauth/client";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -60,7 +55,7 @@ export class GmailProvider implements IEmailProvider {
   async listMailboxes(): Promise<ProviderMailbox[]> {
     const { status, json, errorText } = await providerGet(`${API}/labels`, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Gmail labels (${errorText ?? status})`);
-    const labels = (json as { labels?: { id: string; name: string }[] }).labels ?? [];
+    const labels = ((json as { labels?: { id: string; name: string }[] }).labels ?? []);
     return labels.map((l) => ({ name: l.name, delimiter: "/", flags: [] }));
   }
 
@@ -76,12 +71,9 @@ export class GmailProvider implements IEmailProvider {
       // derived from sinceUid is impossible, so use maxResults paging + newest.
       void options.sinceUid;
     }
-    const { status, json, errorText } = await providerGet(
-      `${API}/messages?${qs}`,
-      this.token.access_token,
-    );
+    const { status, json, errorText } = await providerGet(`${API}/messages?${qs}`, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Gmail messages (${errorText ?? status})`);
-    const list = (json as { messages?: { id: string; threadId: string }[] }).messages ?? [];
+    const list = ((json as { messages?: { id: string; threadId: string }[] }).messages ?? []);
 
     const out: ProviderMessage[] = [];
     for (const m of list) {
@@ -92,7 +84,10 @@ export class GmailProvider implements IEmailProvider {
     return { messages: out, highestUid, uidValidity: null, total: list.length };
   }
 
-  async fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult> {
+  async fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult> {
     // Gmail's list API is newest-first by default; we can't page *down* by
     // uid directly, so fetch a bigger list and filter below the cursor.
     const label = mailboxPath.toUpperCase() === "INBOX" ? "INBOX" : mailboxPath;
@@ -103,12 +98,9 @@ export class GmailProvider implements IEmailProvider {
     while (guard++ < 5) {
       const qs = new URLSearchParams({ labelIds: label, maxResults: String(max) });
       if (pageToken) qs.set("pageToken", pageToken);
-      const { status, json, errorText } = await providerGet(
-        `${API}/messages?${qs}`,
-        this.token.access_token,
-      );
+      const { status, json, errorText } = await providerGet(`${API}/messages?${qs}`, this.token.access_token);
       if (status !== 200) throw new Error(`Failed to list Gmail messages (${errorText ?? status})`);
-      const list = (json as { messages?: { id: string; threadId: string }[] }).messages ?? [];
+      const list = ((json as { messages?: { id: string; threadId: string }[] }).messages ?? []);
       const metas = await Promise.all(list.map((m) => this.fetchMessageMeta(m.id)));
       const withUid = metas.filter((x): x is ProviderMessage => !!x && !!x.remoteUid);
       // Stop once we've crossed below the cursor.
@@ -126,12 +118,8 @@ export class GmailProvider implements IEmailProvider {
 
   private async fetchMessageMeta(gmailId: string): Promise<ProviderMessage | null> {
     const qs = new URLSearchParams({ format: "metadata" });
-    for (const h of ["From", "To", "Cc", "Subject", "Date", "Message-ID"])
-      qs.append("metadataHeaders", h);
-    const { status, json } = await providerGet(
-      `${API}/messages/${encodeURIComponent(gmailId)}?${qs}`,
-      this.token.access_token,
-    );
+    for (const h of ["From", "To", "Cc", "Subject", "Date", "Message-ID"]) qs.append("metadataHeaders", h);
+    const { status, json } = await providerGet(`${API}/messages/${encodeURIComponent(gmailId)}?${qs}`, this.token.access_token);
     if (status !== 200) return null;
     const d = json as GmailMessage;
     const h = headerMap(d.payload?.headers ?? []);
@@ -152,16 +140,31 @@ export class GmailProvider implements IEmailProvider {
   }
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
-    const { status, json, errorText } = await providerGet(
-      `${API}/messages/${encodeURIComponent(providerId)}?format=full`,
-      this.token.access_token,
-    );
+    const { status, json, errorText } = await providerGet(`${API}/messages/${encodeURIComponent(providerId)}?format=full`, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to fetch Gmail message (${errorText ?? status})`);
     const d = json as GmailMessage;
     const html = extractBody(d.payload, "text/html");
     const text = extractBody(d.payload, "text/plain");
     const attachments = extractAttachments(d.payload);
     return { html, text, attachments };
+  }
+
+  async fetchAttachment(
+    mailboxPath: string,
+    providerId: string,
+    partNumber: string | null,
+  ): Promise<ProviderAttachment> {
+    // `partNumber` is the Gmail attachmentId (opaque provider handle).
+    if (!partNumber) throw new Error("Missing Gmail attachment id");
+    const { status, json, errorText } = await providerGet(
+      `${API}/messages/${encodeURIComponent(providerId)}/attachments/${encodeURIComponent(partNumber)}`,
+      this.token.access_token,
+    );
+    if (status !== 200) throw new Error(`Failed to fetch Gmail attachment (${errorText ?? status})`);
+    const data = b64urlToBytes(
+      ((json as { data?: string }).data ?? ""),
+    ) ?? new Uint8Array();
+    return { filename: null, mimeType: "application/octet-stream", data };
   }
 
   async setFlags(
@@ -176,42 +179,34 @@ export class GmailProvider implements IEmailProvider {
       if (flags.starred === false) remove.push("STARRED");
       if (flags.read === false) add.push("UNREAD");
       if (flags.read === true) remove.push("UNREAD");
-      await providerJsonPatch(
-        `${API}/messages/${encodeURIComponent(id)}/modify`,
-        this.token.access_token,
-        {
-          addLabelIds: add,
-          removeLabelIds: remove,
-        },
-      );
+      await providerJsonPatch(`${API}/messages/${encodeURIComponent(id)}/modify`, this.token.access_token, {
+        addLabelIds: add,
+        removeLabelIds: remove,
+      });
     }
   }
 
-  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
+  async move(
+    mailboxPath: string,
+    providerIds: string[],
+    targetMailboxPath: string,
+  ): Promise<void> {
     const target = targetMailboxPath.toUpperCase() === "TRASH" ? "TRASH" : targetMailboxPath;
     const source = mailboxPath.toUpperCase() === "INBOX" ? "INBOX" : mailboxPath;
     for (const id of providerIds) {
-      await providerJsonPatch(
-        `${API}/messages/${encodeURIComponent(id)}/modify`,
-        this.token.access_token,
-        {
-          addLabelIds: [target],
-          removeLabelIds: source === target ? [] : [source, "INBOX"],
-        },
-      );
+      await providerJsonPatch(`${API}/messages/${encodeURIComponent(id)}/modify`, this.token.access_token, {
+        addLabelIds: [target],
+        removeLabelIds: source === target ? [] : [source, "INBOX"],
+      });
     }
   }
 
   async delete(mailboxPath: string, providerIds: string[]): Promise<void> {
     for (const id of providerIds) {
-      await providerJsonPatch(
-        `${API}/messages/${encodeURIComponent(id)}/modify`,
-        this.token.access_token,
-        {
-          addLabelIds: ["TRASH"],
-          removeLabelIds: [],
-        },
-      );
+      await providerJsonPatch(`${API}/messages/${encodeURIComponent(id)}/modify`, this.token.access_token, {
+        addLabelIds: ["TRASH"],
+        removeLabelIds: [],
+      });
     }
   }
 
@@ -238,7 +233,7 @@ function splitAddresses(v: string | undefined): { name: string | null; address: 
   if (!v) return [];
   return v.split(",").map((a) => {
     const m = /<([^>]+)>/.exec(a);
-    if (m) return { name: a.slice(0, m.index).trim() || null, address: m[1].trim() };
+    if (m) return { name: (a.slice(0, m.index).trim() || null), address: m[1].trim() };
     return { name: null, address: a.trim() };
   });
 }
@@ -263,6 +258,8 @@ function extractAttachments(payload: GmailPayload | undefined): {
   isInline: boolean;
   contentId: string | null;
   contentBase64: string | null;
+  partNumber: string | null;
+  disposition: "attachment" | "inline" | null;
 }[] {
   const out: {
     filename: string | null;
@@ -271,6 +268,8 @@ function extractAttachments(payload: GmailPayload | undefined): {
     isInline: boolean;
     contentId: string | null;
     contentBase64: string | null;
+    partNumber: string | null;
+    disposition: "attachment" | "inline" | null;
   }[] = [];
   const walk = (p: GmailPayload | undefined) => {
     if (!p) return;
@@ -288,6 +287,8 @@ function extractAttachments(payload: GmailPayload | undefined): {
       isInline: inline,
       contentId: p.body?.inlineId ?? null,
       contentBase64: null, // not fetched in v1 (would need attachments.get)
+      partNumber: p.body?.attachmentId ?? null,
+      disposition: inline ? "inline" : "attachment",
     });
   };
   walk(payload);

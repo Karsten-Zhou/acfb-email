@@ -4,6 +4,8 @@
 import { mailState } from "../../stores/mail";
 import { sanitizeHtml } from "../../lib/sanitize";
 import { t, formatDateTime } from "../../lib/i18n";
+import { api } from "../../lib/api";
+import { formatAttachmentSize } from "../../lib/utils";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
 import {
@@ -131,14 +133,17 @@ const emit = defineEmits<{
         v-if="mailState.selected.attachments?.length"
         class="flex flex-wrap gap-2 border-b border-border px-5 py-2"
       >
-        <div
-          v-for="a in mailState.selected.attachments"
+        <a
+          v-for="a in mailState.selected.attachments.filter((x) => !x.isInline)"
           :key="a.id"
-          class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
+          :href="api.attachmentUrl(mailState.selected.id, a.id)"
+          :download="a.filename || 'attachment'"
+          class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs transition-colors hover:bg-accent"
         >
           <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
           <span class="max-w-[200px] truncate">{{ a.filename || "attachment" }}</span>
-        </div>
+          <span v-if="a.size > 0" class="text-muted-foreground">({{ formatAttachmentSize(a.size) }})</span>
+        </a>
       </div>
 
       <div class="flex-1 overflow-y-auto px-5 py-5">

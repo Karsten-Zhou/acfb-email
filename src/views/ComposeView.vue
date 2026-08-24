@@ -5,9 +5,10 @@ import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
+import { formatAttachmentSize } from "../lib/utils";
 import Button from "../components/UiButton.vue";
 import AppTooltip from "../components/UiToolTip.vue";
-import { ChevronLeft, Send, Trash2, FilePlus2, Loader2 } from "lucide-vue-next";
+import { ChevronLeft, Send, Trash2, FilePlus2, Loader2, Paperclip, X } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -23,6 +24,53 @@ const sending = ref(false);
 const savingDraft = ref(false);
 const draftId = ref<string | null>(null);
 const error = ref<string | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+/** Files to attach to the outgoing message (read client-side). */
+const attachments = ref<{ name: string; mimeType: string; size: number; base64: string }[]>([]);
+const addingFiles = ref(false);
+
+function pickFiles() {
+  fileInput.value?.click();
+}
+
+function onFilesChosen(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  if (files.length === 0) return;
+  addingFiles.value = true;
+  void (async () => {
+    for (const f of files) {
+      const base64 = await fileToBase64(f);
+      attachments.value.push({
+        name: f.name,
+        mimeType: f.type || "application/octet-stream",
+        size: f.size,
+        base64,
+      });
+    }
+  })().finally(() => {
+    addingFiles.value = false;
+    if (fileInput.value) fileInput.value.value = "";
+  });
+}
+
+function removeAttachment(i: number) {
+  attachments.value.splice(i, 1);
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is a data: URL — strip the prefix.
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 onMounted(async () => {
   await loadAccounts();
@@ -80,6 +128,7 @@ async function send() {
       inReplyTo: null,
       references: [],
       attachments: [],
+      newAttachments: attachments.value,
     });
     if (draftId.value) await api.deleteDraft(draftId.value);
     router.push({ name: "mailbox" });
@@ -257,6 +306,41 @@ function discard() {
           class="min-h-[280px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm placeholder:text-muted-foreground"
           :placeholder="mode === 'html' ? '<p>…</p>' : t('content')"
         />
+
+        <!-- Attachments -->
+        <div class="flex items-center gap-2">
+          <input
+            ref="fileInput"
+            type="file"
+            multiple
+            class="hidden"
+            @change="onFilesChosen"
+          />
+          <Button variant="outline" size="sm" :disabled="addingFiles" @click="pickFiles">
+            <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
+            <Paperclip v-else class="h-4 w-4" /> {{ t("attach") }}
+          </Button>
+        </div>
+        <div v-if="attachments.length" class="flex flex-wrap gap-2">
+          <div
+            v-for="(a, i) in attachments"
+            :key="i"
+            class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
+          >
+            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
+            <span class="max-w-[220px] truncate">{{ a.name }}</span>
+            <span v-if="a.size > 0" class="text-muted-foreground">
+              ({{ formatAttachmentSize(a.size) }})
+            </span>
+            <button
+              class="ml-1 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              :aria-label="t('removeAttachment')"
+              @click="removeAttachment(i)"
+            >
+              <X class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

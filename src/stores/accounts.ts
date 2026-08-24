@@ -40,6 +40,50 @@ export async function removeAccount(accountId: string) {
   accountsState.accounts = accountsState.accounts.filter((a) => a.id !== accountId);
 }
 
+export async function updateAccount(
+  accountId: string,
+  patch: {
+    name?: string;
+    displayName?: string | null;
+    syncEnabled?: boolean;
+    sortOrder?: number;
+  },
+) {
+  await api.updateAccount(accountId, patch);
+  // Apply locally (preserve order).
+  accountsState.accounts = accountsState.accounts.map((a) =>
+    a.id === accountId
+      ? {
+          ...a,
+          name: patch.name ?? a.name,
+          displayName:
+            patch.displayName !== undefined && patch.displayName !== null
+              ? patch.displayName
+              : patch.displayName === null
+                ? null
+                : a.displayName,
+        }
+      : a,
+  );
+}
+
+/** Swap two accounts in the list and persist the new order. */
+export async function moveAccount(accountId: string, direction: -1 | 1) {
+  const arr = [...accountsState.accounts];
+  const idx = arr.findIndex((a) => a.id === accountId);
+  if (idx < 0) return;
+  const target = idx + direction;
+  if (target < 0 || target >= arr.length) return;
+  [arr[idx], arr[target]] = [arr[target], arr[idx]];
+  accountsState.accounts = arr;
+  try {
+    await api.reorderAccounts(arr.map((a) => a.id));
+  } catch {
+    // Revert on failure.
+    await loadAccounts();
+  }
+}
+
 export async function syncAccount(accountId: string) {
   return api.syncAccount(accountId);
 }

@@ -154,10 +154,65 @@ messageRoutes.get("/:id", async (c) => {
     html = body.html;
     text = body.text;
     await repo.markBodyFetched(c.env, row.id, html, text);
+    // Persist attachment metadata (names/sizes only — content stays upstream).
+    const attRows = body.attachments.map((a) => ({
+      filename: a.filename,
+      mime_type: a.mimeType,
+      size: a.size,
+      is_inline: a.isInline ? 1 : 0,
+      content_id: a.contentId,
+      disposition: a.disposition,
+      part_number: a.partNumber,
+    }));
+    await repo.replaceAttachments(c.env, row.id, attRows);
+    if (attRows.length > 0) {
+      await c.env.DB.prepare(`UPDATE messages SET has_attachments = 1 WHERE id = ?`)
+        .bind(row.id)
+        .run();
+    }
   }
 
   const detail = await rowToDetail(c.env, row, html, text);
   return c.json({ message: detail });
+});
+
+// GET /api/messages/:id/attachments/:attachmentId
+// Downloads an attachment by streaming it directly from the provider. Nothing
+// is stored in Cloudflare infra — the binary travels provider -> worker ->
+// browser on demand.
+messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
+  const user = currentUser(c);
+  const id = c.req.param("id");
+  const attachmentId = c.req.param("attachmentId");
+  const row = await repo.messageForUser(c.env, user.id, id);
+  if (!row) throw new HttpError(404, "Message not found");
+  const att = await repo.attachmentById(c.env, attachmentId);
+  if (!att || att.message_id !== row.id) throw new HttpError(404, "Attachment not found");
+
+  const account = await repo.accountForUser(c.env, user.id, row.account_id);
+  if (!account) throw new HttpError(404, "Account not found");
+  const cred = await repo.credential(c.env, account.id);
+  const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
+  const providerId = providerIdFor(account.provider, row);
+  try {
+    const part = await provider.fetchAttachment(row.provider_path, providerId, att.part_number);
+    const filename = (att.filename || "attachment").replace(/[\r\n"]/g, "_");
+    const ascii = filename.replace(/[^\x20-\x7E]/g, "_");
+    const encoded = encodeURIComponent(ascii).replace(/['()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+    c.header("Content-Type", `${att.mime_type || part.mimeType || "application/octet-stream"}; charset=binary`);
+    c.header(
+      "Content-Disposition",
+      `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`,
+    );
+    c.header("Content-Length", String(part.data.byteLength));
+    c.header("Cache-Control", "private, no-store");
+    // TS's BodyInit needs a view over ArrayBuffer (Uint8Array<ArrayBuffer>).
+    const bytes = part.data as Uint8Array<ArrayBuffer>;
+    return new Response(bytes, { status: 200 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Attachment download failed";
+    throw new HttpError(502, `Failed to download attachment: ${message}`);
+  }
 });
 
 // PATCH /api/messages/flags
@@ -325,6 +380,7 @@ async function rowToDetail(
       size: a.size,
       isInline: !!a.is_inline,
       contentId: a.content_id,
+      disposition: a.disposition,
     })),
     remoteUid: row.remote_uid,
     remoteMessageId: row.remote_message_id,

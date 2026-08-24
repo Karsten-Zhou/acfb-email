@@ -29,6 +29,8 @@ export interface ProviderMessage {
   internalDate: string | null;
   flags: string[];
   size: number | null;
+  /** Provider-reported attachment presence (REST providers); IMAP unknown. */
+  hasAttachments?: boolean;
 }
 
 export interface ProviderFetchResult {
@@ -51,7 +53,17 @@ export interface ProviderBody {
     isInline: boolean;
     contentId: string | null;
     contentBase64: string | null; // base64 content (small attachments)
+    /** Provider-side handle for the attachment part (IMAP part number, Gmail attachmentId, Graph attachment id). */
+    partNumber: string | null;
+    disposition: "attachment" | "inline" | null;
   }[];
+}
+
+/** Binary attachment bytes + metadata, returned by the download route. */
+export interface ProviderAttachment {
+  filename: string | null;
+  mimeType: string;
+  data: Uint8Array;
 }
 
 export interface ProviderSyncOptions {
@@ -99,13 +111,30 @@ export interface IEmailProvider {
   /**
    * Incrementally sync a single mailbox folder. Returns new/changed messages.
    */
-  syncMailbox(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderFetchResult>;
+  syncMailbox(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderFetchResult>;
 
   /** Fetch an older page of messages (below `beforeUid`). */
-  fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult>;
+  fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult>;
 
   /** Fetch the full body & attachments of a message. */
   fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;
+
+  /**
+   * Fetch a single attachment's binary content directly from the provider
+   * (never stored in Cloudflare infra). `partNumber` is the provider-specific
+   * attachment handle captured at body-fetch time.
+   */
+  fetchAttachment(
+    mailboxPath: string,
+    providerMessageId: string,
+    partNumber: string | null,
+  ): Promise<ProviderAttachment>;
 
   /** Set flags (read/starred) for a set of provider message ids. */
   setFlags(
@@ -115,7 +144,11 @@ export interface IEmailProvider {
   ): Promise<void>;
 
   /** Move provider message ids to another mailbox. */
-  move(mailboxPath: string, providerMessageIds: string[], targetMailboxPath: string): Promise<void>;
+  move(
+    mailboxPath: string,
+    providerMessageIds: string[],
+    targetMailboxPath: string,
+  ): Promise<void>;
 
   /** Delete provider message ids from a mailbox. */
   delete(mailboxPath: string, providerMessageIds: string[]): Promise<void>;

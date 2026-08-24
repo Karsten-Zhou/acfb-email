@@ -3,7 +3,14 @@
 // cards, the IMAP/SMTP add form (with host comboboxes), the account list with
 // per-account sync/remove, and the delete-confirmation dialog.
 import { ref } from "vue";
-import { accountsState, loadAccounts, removeAccount, syncAccount } from "../../stores/accounts";
+import {
+  accountsState,
+  loadAccounts,
+  removeAccount,
+  moveAccount,
+  updateAccount,
+  syncAccount,
+} from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
 import { t, formatDate } from "../../lib/i18n";
 import UiButton from "../../components/UiButton.vue";
@@ -23,6 +30,9 @@ import {
   EyeOff,
   Inbox,
   Send,
+  ArrowUp,
+  ArrowDown,
+  Pencil,
 } from "lucide-vue-next";
 
 defineProps<{
@@ -45,6 +55,53 @@ const confirmDeleteId = ref<string | null>(null);
 /** Whether the confirm dialog is open (so the row can be deleted via modal). */
 const deleteDialogOpen = ref(false);
 const deleting = ref(false);
+
+// --- edit account (label + display name) ---
+/** The account being edited (null = dialog closed). */
+const editAccount = ref<{ id: string; name: string; displayName: string | null } | null>(null);
+const editDialogOpen = ref(false);
+const editName = ref("");
+const editDisplayName = ref("");
+const savingEdit = ref(false);
+const editError = ref<string | null>(null);
+
+function openEdit(a: { id: string; name: string; displayName: string | null }) {
+  editAccount.value = a;
+  editName.value = a.name;
+  editDisplayName.value = a.displayName ?? "";
+  editError.value = null;
+  editDialogOpen.value = true;
+}
+
+async function saveEdit() {
+  if (!editAccount.value) return;
+  savingEdit.value = true;
+  editError.value = null;
+  try {
+    await updateAccount(editAccount.value.id, {
+      name: editName.value.trim() || editAccount.value.name,
+      displayName: editDisplayName.value.trim() || null,
+    });
+    editDialogOpen.value = false;
+    editAccount.value = null;
+    await loadAccounts();
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : "Failed to update account";
+  } finally {
+    savingEdit.value = false;
+  }
+}
+
+function accountIndex(id: string): number {
+  return accountsState.accounts.findIndex((a) => a.id === id);
+}
+
+async function reorder(id: string, dir: -1 | 1) {
+  const idx = accountIndex(id);
+  const target = idx + dir;
+  if (idx < 0 || target < 0 || target >= accountsState.accounts.length) return;
+  await moveAccount(id, dir);
+}
 
 // IMAP host suggestions (common providers) — the form itself starts empty.
 const IMAP_HOSTS = [
@@ -524,6 +581,35 @@ async function syncOne(id: string) {
           <RefreshCw v-else class="h-4 w-4" />
         </UiButton>
       </UiToolTip>
+      <div class="flex flex-col">
+        <UiToolTip :label="t('moveUp')">
+          <UiButton
+            variant="ghost"
+            size="icon"
+            class="h-6 w-6"
+            :disabled="accountIndex(a.id) === 0"
+            @click="reorder(a.id, -1)"
+          >
+            <ArrowUp class="h-3.5 w-3.5" />
+          </UiButton>
+        </UiToolTip>
+        <UiToolTip :label="t('moveDown')">
+          <UiButton
+            variant="ghost"
+            size="icon"
+            class="h-6 w-6"
+            :disabled="accountIndex(a.id) === accountsState.accounts.length - 1"
+            @click="reorder(a.id, 1)"
+          >
+            <ArrowDown class="h-3.5 w-3.5" />
+          </UiButton>
+        </UiToolTip>
+      </div>
+      <UiToolTip :label="t('editAccount')">
+        <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="openEdit(a)">
+          <Pencil class="h-4 w-4" />
+        </UiButton>
+      </UiToolTip>
       <UiToolTip :label="t('removeAccount')">
         <UiButton
           variant="ghost"
@@ -554,6 +640,38 @@ async function syncOne(id: string) {
         >
         <UiButton variant="destructive" size="sm" :disabled="deleting" @click="confirmRemove">
           <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
+        </UiButton>
+      </template>
+    </UiDialog>
+
+    <!-- Modal edit account (label + display name) -->
+    <UiDialog
+      :open="editDialogOpen"
+      :title="t('editAccount')"
+      :busy="savingEdit"
+      @close="editDialogOpen = false"
+    >
+      <div class="space-y-3">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
+          <UiInput v-model="editName" class="w-full" maxlength="100" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
+          <UiInput v-model="editDisplayName" class="w-full" maxlength="100" />
+        </div>
+        <div v-if="editError" class="text-xs text-destructive">{{ editError }}</div>
+      </div>
+      <template #footer>
+        <UiButton
+          variant="ghost"
+          size="sm"
+          :disabled="savingEdit"
+          @click="editDialogOpen = false"
+          >{{ t("cancelAction") }}</UiButton
+        >
+        <UiButton variant="default" size="sm" :disabled="savingEdit" @click="saveEdit">
+          <Loader2 v-if="savingEdit" class="h-4 w-4 animate-spin" /> {{ t("save") }}
         </UiButton>
       </template>
     </UiDialog>

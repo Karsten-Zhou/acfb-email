@@ -6,6 +6,7 @@ import { ImapClient, ImapError } from "../imap/client";
 import { smtpSend } from "../smtp/client";
 import type {
   IEmailProvider,
+  ProviderAttachment,
   ProviderBody,
   ProviderFetchResult,
   ProviderMailbox,
@@ -115,7 +116,10 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult> {
+  async fetchOlder(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+  ): Promise<ProviderPageResult> {
     const imap = this.connectImap();
     try {
       await imap.connect();
@@ -167,18 +171,62 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
+  async fetchAttachment(
+    mailboxPath: string,
+    providerId: string,
+    partNumber: string | null,
+  ): Promise<ProviderAttachment> {
+    const uid = parseInt(providerId, 10);
+    if (Number.isNaN(uid)) throw new Error("Invalid IMAP message id");
+    // The handle is the index of the attachment within the message's parsed
+    // attachment list (captured at body-fetch time). We re-fetch the raw
+    // message on demand and re-parse it — nothing is stored in our infra.
+    const idx = parseInt(partNumber ?? "", 10);
+    if (Number.isNaN(idx) || idx < 0) throw new Error("Missing attachment part number");
+    const imap = this.connectImap();
+    try {
+      await imap.connect();
+      await imap.select(mailboxPath);
+      const raw = await imap.fetchRawByUid(uid);
+      const { default: PostalMime } = await import("postal-mime");
+      const email = await PostalMime.parse(raw);
+      const a = (email.attachments ?? [])[idx];
+      if (!a || !a.content) throw new Error("Attachment not found in message");
+      const data =
+        a.content instanceof Uint8Array
+          ? a.content
+          : new Uint8Array(a.content instanceof ArrayBuffer ? a.content : asciiBytes(a.content));
+      return {
+        filename: a.filename ?? null,
+        mimeType: a.mimeType ?? "application/octet-stream",
+        data,
+      };
+    } finally {
+      await imap.close().catch(() => {});
+    }
+  }
+
   private async parseBody(raw: Uint8Array): Promise<ProviderBody> {
     // MIME parsing happens in the sync/parse layer to keep this adapter slim;
     // but we need the structured body here. Import PostalMime lazily.
     const { default: PostalMime } = await import("postal-mime");
     const email = await PostalMime.parse(raw);
-    const attachments = (email.attachments ?? []).map((a) => ({
+    // Map attachments to their MIME part numbers (IMAP BODY[part] addresses):
+    // postal-mime exposes a part number on each attachment when parsing raw
+    // bytes — fall back to the attachment index if unavailable.
+    const attachments = (email.attachments ?? []).map((a, i) => ({
       filename: a.filename ?? null,
       mimeType: a.mimeType ?? "application/octet-stream",
       size: a.content ? byteLength(a.content) : 0,
       isInline: a.disposition === "inline" || !!a.contentId || !!a.related,
       contentId: a.contentId ?? null,
       contentBase64: a.content ? toBase64(a.content) : null,
+      // The deterministic index within the parsed attachment list; used to
+      // re-fetch this part directly from the provider on download.
+      partNumber: String(i),
+      disposition: (a.disposition === "attachment" || a.disposition === "inline"
+        ? a.disposition
+        : null) as "attachment" | "inline" | null,
     }));
     return {
       html: email.html ?? null,
@@ -204,7 +252,11 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
+  async move(
+    mailboxPath: string,
+    providerIds: string[],
+    targetMailboxPath: string,
+  ): Promise<void> {
     const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
     if (uids.length === 0) return;
     const imap = this.connectImap();
@@ -267,6 +319,11 @@ function bytesToBase64(bytes: Uint8Array | ArrayBuffer): string {
   let bin = "";
   for (let i = 0; i < u.length; i++) bin += String.fromCharCode(u[i]);
   return btoa(bin);
+}
+
+/** Raw bytes of a plain ASCII/UTF-8 string (for textual attachment parts). */
+function asciiBytes(s: string): Uint8Array {
+  return new TextEncoder().encode(s);
 }
 
 function byteLength(content: Uint8Array | ArrayBuffer | string): number {

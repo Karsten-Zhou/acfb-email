@@ -15,6 +15,7 @@ import {
   Mail as MailIcon,
   Star,
   Loader2,
+  Paperclip,
 } from "lucide-vue-next";
 import type { Message } from "@shared/types";
 
@@ -222,6 +223,10 @@ function onTouchEnd() {
               <Star
                 v-if="m.isStarred"
                 class="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400"
+              />
+              <Paperclip
+                v-if="m.hasAttachments"
+                class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
               />
             </div>
             <div class="truncate text-xs text-muted-foreground">

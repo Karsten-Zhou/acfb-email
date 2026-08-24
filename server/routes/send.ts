@@ -36,7 +36,12 @@ sendRoutes.post("/send", async (c) => {
     text: input.text,
     inReplyTo: input.inReplyTo,
     references: input.references,
-    attachments: [],
+    // New client-assembled files (base64) become MIME attachments.
+    attachments: (input.newAttachments ?? []).map((a) => ({
+      filename: a.name,
+      contentType: a.mimeType,
+      base64: a.base64,
+    })),
   });
 
   try {

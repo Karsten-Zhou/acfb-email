@@ -178,7 +178,9 @@ async function upsertMessage(
   const receivedAt = isoDate(msg.internalDate) ?? isoDate(msg.date) ?? new Date().toISOString();
   const isRead = msg.flags.includes("\\Seen");
   const isStarred = msg.flags.includes("\\Flagged");
-  const hasAttachments = false; // set when body fetched
+  // Attachment presence is provider-reported where available (REST providers);
+  // IMAP stays false until the body is fetched (which persists metadata).
+  const hasAttachments = msg.hasAttachments === true;
   const threadId = msg.messageId ? msg.messageId : null;
 
   // Compute a sync fingerprint to detect changes.
@@ -198,9 +200,18 @@ async function upsertMessage(
   if (existing) {
     // Update flags/read state if changed.
     await env.DB.prepare(
-      `UPDATE messages SET is_read = ?, is_starred = ?, sync_hash = ?, date = COALESCE(?, date), subject = COALESCE(?, subject), received_at = COALESCE(?, received_at) WHERE id = ?`,
+      `UPDATE messages SET is_read = ?, is_starred = ?, sync_hash = ?, date = COALESCE(?, date), subject = COALESCE(?, subject), received_at = COALESCE(?, received_at), has_attachments = MAX(has_attachments, ?) WHERE id = ?`,
     )
-      .bind(isRead ? 1 : 0, isStarred ? 1 : 0, hash, date, subject, receivedAt, existing.id)
+      .bind(
+        isRead ? 1 : 0,
+        isStarred ? 1 : 0,
+        hash,
+        date,
+        subject,
+        receivedAt,
+        hasAttachments ? 1 : 0,
+        existing.id,
+      )
       .run();
     // recipients rarely change; skip for speed
     return;

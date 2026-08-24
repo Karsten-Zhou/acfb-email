@@ -24,8 +24,8 @@ accountRoutes.use("*", requireAuth);
 accountRoutes.get("/", async (c) => {
   const user = currentUser(c);
   const rows = await c.env.DB.prepare(
-    `SELECT id, provider, name, email, display_name, state, state_message, created_at, last_synced_at
-     FROM accounts WHERE user_id = ? ORDER BY created_at ASC`,
+    `SELECT id, provider, name, email, display_name, state, state_message, created_at, last_synced_at, sort_order
+     FROM accounts WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC`,
   )
     .bind(user.id)
     .all<{
@@ -38,6 +38,7 @@ accountRoutes.get("/", async (c) => {
       state_message: string | null;
       created_at: string;
       last_synced_at: string | null;
+      sort_order: number;
     }>();
   const accounts: AccountSummary[] = rows.results.map((r) =>
     AccountSummarySchema.parse({
@@ -50,6 +51,7 @@ accountRoutes.get("/", async (c) => {
       stateMessage: r.state_message,
       createdAt: r.created_at,
       lastSyncedAt: r.last_synced_at,
+      sortOrder: r.sort_order,
     }),
   );
   return c.json({ accounts });
@@ -62,7 +64,7 @@ accountRoutes.get("/:id", async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT a.id, a.provider, a.name, a.email, a.display_name, a.state, a.state_message,
             a.created_at, a.last_synced_at, a.imap_host, a.imap_port, a.imap_secure,
-            a.smtp_host, a.smtp_port, a.smtp_secure, a.sync_enabled
+            a.smtp_host, a.smtp_port, a.smtp_secure, a.sync_enabled, a.sort_order
      FROM accounts a WHERE a.id = ? AND a.user_id = ?`,
   )
     .bind(id, user.id)
@@ -84,6 +86,7 @@ accountRoutes.get("/:id", async (c) => {
     smtpPort: row.smtp_port,
     useTls: row.imap_secure !== 0,
     syncEnabled: row.sync_enabled !== 0,
+    sortOrder: row.sort_order ?? 0,
   });
   return c.json({ account: detail });
 });
@@ -189,11 +192,16 @@ accountRoutes.post("/test", async (c) => {
   }
 });
 
-// UPDATE /api/accounts/:id (display name, sync enabled)
+// UPDATE /api/accounts/:id (display name, label, sync enabled, sort order)
 accountRoutes.patch("/:id", async (c) => {
   const user = currentUser(c);
   const id = c.req.param("id");
-  const body = await c.req.json<{ name?: string; displayName?: string; syncEnabled?: boolean }>();
+  const body = await c.req.json<{
+    name?: string;
+    displayName?: string;
+    syncEnabled?: boolean;
+    sortOrder?: number;
+  }>();
   await ensureOwned(c.env, user.id, id);
 
   const sets: string[] = [];
@@ -210,11 +218,38 @@ accountRoutes.patch("/:id", async (c) => {
     sets.push("sync_enabled = ?");
     vals.push(body.syncEnabled ? 1 : 0);
   }
+  if (body.sortOrder !== undefined) {
+    sets.push("sort_order = ?");
+    vals.push(Math.max(0, Math.floor(body.sortOrder)));
+  }
   if (sets.length === 0) return c.json({ ok: true });
   vals.push(id);
   await c.env.DB.prepare(`UPDATE accounts SET ${sets.join(", ")} WHERE id = ?`)
     .bind(...vals)
     .run();
+  return c.json({ ok: true });
+});
+
+// PUT /api/accounts/order  { orderedIds: string[] } — set the user's account
+// display order (each id's sort_order = its index).
+accountRoutes.put("/order", async (c) => {
+  const user = currentUser(c);
+  const body = await c.req.json<{ orderedIds?: string[] }>();
+  const ids = Array.isArray(body.orderedIds) ? body.orderedIds.slice(0, 50) : [];
+  if (ids.length === 0) return c.json({ ok: true });
+  // Scope: only allow ids the user owns.
+  const owned = await c.env.DB.prepare(
+    `SELECT id FROM accounts WHERE user_id = ?`,
+  )
+    .bind(user.id)
+    .all<{ id: string }>();
+  const ownedSet = new Set(owned.results.map((r) => r.id));
+  const allowed = ids.filter((x) => ownedSet.has(x));
+  for (let i = 0; i < allowed.length; i++) {
+    await c.env.DB.prepare(`UPDATE accounts SET sort_order = ? WHERE id = ? AND user_id = ?`)
+      .bind(i, allowed[i], user.id)
+      .run();
+  }
   return c.json({ ok: true });
 });
 

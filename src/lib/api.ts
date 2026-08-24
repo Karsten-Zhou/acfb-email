@@ -106,11 +106,29 @@ export const api = {
       { noToast: true },
     ),
   deleteAccount: (id: string) => request<{ ok: boolean }>(`/accounts/${id}`, { method: "DELETE" }),
+  updateAccount: (
+    id: string,
+    patch: { name?: string; displayName?: string | null; syncEnabled?: boolean; sortOrder?: number },
+  ) =>
+    request<{ ok: boolean }>(`/accounts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  reorderAccounts: (orderedIds: string[]) =>
+    request<{ ok: boolean }>("/accounts/order", {
+      method: "PUT",
+      body: JSON.stringify({ orderedIds }),
+    }),
   syncAccount: (id: string) =>
     request<{ ok: boolean; mailboxesSynced?: number; messagesSeen?: number; message?: string }>(
       `/accounts/${id}/sync`,
       { method: "POST" },
     ),
+
+  // attachments
+  /** Absolute URL that streams an attachment from its provider. */
+  attachmentUrl: (messageId: string, attachmentId: string) =>
+    `/api/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
 
   // mailboxes
   mailboxes: (accountId: string) =>

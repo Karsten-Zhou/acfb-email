@@ -36,6 +36,18 @@ export const AttachmentMetaSchema = z.object({
   size: z.number().int().nonnegative(),
   isInline: z.boolean(),
   contentId: z.string().nullable(),
+  /** RFC2183 disposition: "attachment" | "inline" (nullable). */
+  disposition: z.string().nullable(),
+});
+
+/** A provider-side attachment handle, used to fetch binary content on demand. */
+export const AttachmentDownloadSchema = z.object({
+  /** The message's provider id (IMAP UID / Gmail id / Graph id). */
+  providerMessageId: z.string(),
+  /** The attachment's identifier within the provider (part number, Gmail attachmentId, Graph id). */
+  providerAttachmentId: z.string().nullable(),
+  /** Raw MIME part identifier for IMAP (e.g. "1.2") or null for REST providers. */
+  partNumber: z.string().nullable(),
 });
 
 export const MessageSchema = z.object({
@@ -75,6 +87,8 @@ export const AccountSummarySchema = z.object({
   stateMessage: z.string().nullable(),
   createdAt: z.string(),
   lastSyncedAt: z.string().nullable(),
+  /** User-controlled position in the account list (lower = earlier). */
+  sortOrder: z.number().int().nonnegative(),
 });
 
 export const AccountDetailSchema = AccountSummarySchema.extend({
@@ -120,6 +134,14 @@ export const AddAccountInputSchema = z.object({
 
 export const TestConnectionInputSchema = AddAccountInputSchema;
 
+export const SendAttachmentSchema = z.object({
+  name: z.string().min(1).max(255),
+  mimeType: z.string().max(255).optional().default("application/octet-stream"),
+  /** Base64-encoded file content (assembled client-side; small files only). */
+  base64: z.string().min(1).max(10_000_000),
+  size: z.number().int().nonnegative().optional().default(0),
+});
+
 export const SendMessageInputSchema = z.object({
   accountId: z.string().min(1),
   to: z.array(z.string().email()).min(1).max(50),
@@ -131,6 +153,8 @@ export const SendMessageInputSchema = z.object({
   inReplyTo: z.string().nullable().optional().default(null),
   references: z.array(z.string()).optional().default([]),
   attachments: z.array(z.string()).optional().default([]), // attachment ids
+  /** New files to attach to the outgoing message (client-assembled). */
+  newAttachments: z.array(SendAttachmentSchema).optional().default([]),
 });
 
 export const UpdateFlagsInputSchema = z.object({

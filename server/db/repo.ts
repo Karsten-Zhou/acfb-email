@@ -1,4 +1,5 @@
 // Repository layer: all D1 access for email entities, scoped by user ownership.
+import { randomUUID } from "crypto";
 import type { Env } from "../env";
 
 export interface MailboxRow {
@@ -216,14 +217,78 @@ export const repo = {
       size: number;
       is_inline: number;
       content_id: string | null;
+      disposition: string | null;
+      part_number: string | null;
     }[]
   > {
     const rows = await env.DB.prepare(
-      `SELECT id, filename, mime_type, size, is_inline, content_id FROM attachments WHERE message_id = ?`,
+      `SELECT id, filename, mime_type, size, is_inline, content_id, disposition, part_number FROM attachments WHERE message_id = ? ORDER BY rowid ASC`,
     )
       .bind(messageId)
       .all();
     return rows.results as never;
+  },
+
+  /**
+   * Replace the attachment metadata rows for a message (used when a body is
+   * fetched/re-fetched). Keeps the set in sync with the provider parse.
+   */
+  async replaceAttachments(
+    env: Env,
+    messageId: string,
+    attachments: {
+      filename: string | null;
+      mime_type: string;
+      size: number;
+      is_inline: number;
+      content_id: string | null;
+      disposition: string | null;
+      part_number: string | null;
+    }[],
+  ): Promise<void> {
+    if (attachments.length === 0) return;
+    await env.DB.prepare(`DELETE FROM attachments WHERE message_id = ?`).bind(messageId).run();
+    for (const a of attachments) {
+      await env.DB.prepare(
+        `INSERT INTO attachments (id, message_id, filename, mime_type, size, is_inline, content_id, disposition, part_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          randomUUID(),
+          messageId,
+          a.filename,
+          a.mime_type,
+          a.size,
+          a.is_inline,
+          a.content_id,
+          a.disposition,
+          a.part_number,
+        )
+        .run();
+    }
+  },
+
+  /** A message's attachment row by id (ownership already scoped by message). */
+  async attachmentById(
+    env: Env,
+    attachmentId: string,
+  ): Promise<{
+    id: string;
+    message_id: string;
+    filename: string | null;
+    mime_type: string;
+    size: number;
+    is_inline: number;
+    content_id: string | null;
+    disposition: string | null;
+    part_number: string | null;
+  } | null> {
+    return env.DB.prepare(
+      `SELECT id, message_id, filename, mime_type, size, is_inline, content_id, disposition, part_number
+       FROM attachments WHERE id = ?`,
+    )
+      .bind(attachmentId)
+      .first();
   },
 
   async markBodyFetched(

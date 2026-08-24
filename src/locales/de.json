@@ -82,5 +82,12 @@
   "imapGroup": "IMAP",
   "smtpGroup": "SMTP",
   "showPassword": "Passwort anzeigen",
-  "hidePassword": "Passwort verbergen"
+  "hidePassword": "Passwort verbergen",
+  "attach": "Dateien anhängen",
+  "removeAttachment": "Anhang entfernen",
+  "download": "Herunterladen",
+  "editAccount": "Konto bearbeiten",
+  "moveUp": "Nach oben",
+  "moveDown": "Nach unten",
+  "save": "Speichern"
 }
