@@ -238,9 +238,7 @@ accountRoutes.put("/order", async (c) => {
   const ids = Array.isArray(body.orderedIds) ? body.orderedIds.slice(0, 50) : [];
   if (ids.length === 0) return c.json({ ok: true });
   // Scope: only allow ids the user owns.
-  const owned = await c.env.DB.prepare(
-    `SELECT id FROM accounts WHERE user_id = ?`,
-  )
+  const owned = await c.env.DB.prepare(`SELECT id FROM accounts WHERE user_id = ?`)
     .bind(user.id)
     .all<{ id: string }>();
   const ownedSet = new Set(owned.results.map((r) => r.id));

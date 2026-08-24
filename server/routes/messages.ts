@@ -198,12 +198,15 @@ messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
     const part = await provider.fetchAttachment(row.provider_path, providerId, att.part_number);
     const filename = (att.filename || "attachment").replace(/[\r\n"]/g, "_");
     const ascii = filename.replace(/[^\x20-\x7E]/g, "_");
-    const encoded = encodeURIComponent(ascii).replace(/['()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-    c.header("Content-Type", `${att.mime_type || part.mimeType || "application/octet-stream"}; charset=binary`);
-    c.header(
-      "Content-Disposition",
-      `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`,
+    const encoded = encodeURIComponent(ascii).replace(
+      /['()*]/g,
+      (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`,
     );
+    c.header(
+      "Content-Type",
+      `${att.mime_type || part.mimeType || "application/octet-stream"}; charset=binary`,
+    );
+    c.header("Content-Disposition", `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`);
     c.header("Content-Length", String(part.data.byteLength));
     c.header("Cache-Control", "private, no-store");
     // TS's BodyInit needs a view over ArrayBuffer (Uint8Array<ArrayBuffer>).

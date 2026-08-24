@@ -116,10 +116,7 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async fetchOlder(
-    mailboxPath: string,
-    options: ProviderSyncOptions,
-  ): Promise<ProviderPageResult> {
+  async fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult> {
     const imap = this.connectImap();
     try {
       await imap.connect();
@@ -252,11 +249,7 @@ export class ImapProvider implements IEmailProvider {
     }
   }
 
-  async move(
-    mailboxPath: string,
-    providerIds: string[],
-    targetMailboxPath: string,
-  ): Promise<void> {
+  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
     const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
     if (uids.length === 0) return;
     const imap = this.connectImap();

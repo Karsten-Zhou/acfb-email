@@ -108,7 +108,12 @@ export const api = {
   deleteAccount: (id: string) => request<{ ok: boolean }>(`/accounts/${id}`, { method: "DELETE" }),
   updateAccount: (
     id: string,
-    patch: { name?: string; displayName?: string | null; syncEnabled?: boolean; sortOrder?: number },
+    patch: {
+      name?: string;
+      displayName?: string | null;
+      syncEnabled?: boolean;
+      sortOrder?: number;
+    },
   ) =>
     request<{ ok: boolean }>(`/accounts/${id}`, {
       method: "PATCH",

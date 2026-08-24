@@ -309,13 +309,7 @@ function discard() {
 
         <!-- Attachments -->
         <div class="flex items-center gap-2">
-          <input
-            ref="fileInput"
-            type="file"
-            multiple
-            class="hidden"
-            @change="onFilesChosen"
-          />
+          <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
           <Button variant="outline" size="sm" :disabled="addingFiles" @click="pickFiles">
             <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
             <Paperclip v-else class="h-4 w-4" /> {{ t("attach") }}
