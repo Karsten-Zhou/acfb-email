@@ -103,6 +103,23 @@ const roleIcon: Record<string, typeof Inbox> = {
         <span class="flex-grow text-left">{{ t("unifiedInbox") }}</span>
       </button>
 
+      <!-- Empty state: guide the user to add an account in Settings. -->
+      <div
+        v-if="accountsState.accounts.length === 0"
+        class="mt-6 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
+      >
+        <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
+        <p class="text-xs leading-relaxed text-muted-foreground">{{ t("noAccountsHint") }}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          class="w-full"
+          @click="router.push({ name: 'settings' })"
+        >
+          <Settings class="h-4 w-4" /> {{ t("settings") }}
+        </Button>
+      </div>
+
       <template v-for="acct in accountsState.accounts" :key="acct.id">
         <div
           class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"

@@ -10,6 +10,8 @@
   "syncing": "同步中…",
   "settings": "设置",
   "noMessages": "这里还没有邮件。",
+  "noAccountsTitle": "还没有账户",
+  "noAccountsHint": "添加你的第一个邮箱账户，即可在此看到邮件文件夹。你可以连接 Gmail 或 Outlook，也可以添加任意 IMAP/SMTP 账户。",
   "selectToRead": "选择一封邮件来阅读",
   "markRead": "标记已读",
   "delete": "删除",

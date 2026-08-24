@@ -19,7 +19,6 @@ const cc = ref("");
 const bcc = ref("");
 const subject = ref("");
 const body = ref("");
-const mode = ref<"html" | "text">("text");
 const sending = ref(false);
 const savingDraft = ref(false);
 const draftId = ref<string | null>(null);
@@ -28,6 +27,27 @@ const fileInput = ref<HTMLInputElement | null>(null);
 /** Files to attach to the outgoing message (read client-side). */
 const attachments = ref<{ name: string; mimeType: string; size: number; base64: string }[]>([]);
 const addingFiles = ref(false);
+
+/**
+ * The compose editor is plain text (like most modern clients): typing is
+ * always plain text, and on send we ship BOTH a text/plain part (verbatim)
+ * and a minimal text/html part so rich clients render paragraph breaks.
+ * This mirrors Gmail/Outlook behavior — no visible "plain vs HTML" switch.
+ */
+function plainTextToHtml(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((para) => `<div>${escapeHtml(para.replace(/\n/g, "<br>"))}</div>`)
+    .join("");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 function pickFiles() {
   fileInput.value?.click();
@@ -123,8 +143,8 @@ async function send() {
       cc: ccList,
       bcc: bccList,
       subject: subject.value,
-      html: mode.value === "html" ? body.value : "",
-      text: mode.value === "text" ? body.value : "",
+      html: plainTextToHtml(body.value),
+      text: body.value,
       inReplyTo: null,
       references: [],
       attachments: [],
@@ -161,8 +181,8 @@ async function saveDraft() {
       cc: ccList,
       bcc: bccList,
       subject: subject.value,
-      html: mode.value === "html" ? body.value : "",
-      text: mode.value === "text" ? body.value : "",
+      html: plainTextToHtml(body.value),
+      text: body.value,
     });
     draftId.value = res.id;
   } catch (err) {
@@ -276,35 +296,10 @@ function discard() {
           />
         </div>
 
-        <div class="flex items-center gap-1">
-          <button
-            class="rounded-md px-2.5 py-1 text-xs font-medium"
-            :class="
-              mode === 'text'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent'
-            "
-            @click="mode = 'text'"
-          >
-            {{ t("plainText") }}
-          </button>
-          <button
-            class="rounded-md px-2.5 py-1 text-xs font-medium"
-            :class="
-              mode === 'html'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent'
-            "
-            @click="mode = 'html'"
-          >
-            {{ t("html") }}
-          </button>
-        </div>
-
         <textarea
           v-model="body"
           class="min-h-[280px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm placeholder:text-muted-foreground"
-          :placeholder="mode === 'html' ? '<p>…</p>' : t('content')"
+          :placeholder="t('content')"
         />
 
         <!-- Attachments -->

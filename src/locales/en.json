@@ -10,6 +10,8 @@
   "syncing": "Syncing…",
   "settings": "Settings",
   "noMessages": "No messages here yet.",
+  "noAccountsTitle": "No accounts yet",
+  "noAccountsHint": "Add your first email account to see your mailboxes here. You can connect Gmail or Outlook, or add any IMAP/SMTP account.",
   "selectToRead": "Select a message to read it",
   "markRead": "Mark read",
   "delete": "Delete",
