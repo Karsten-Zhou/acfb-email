@@ -54,11 +54,25 @@ export function buildRawMessage(input: ComposeInput): Uint8Array {
     msg.addAttachment({
       filename: a.filename,
       contentType: a.contentType,
-      data: a.base64,
+      data: foldBase64(a.base64),
       encoding: "base64",
     });
   }
 
   const raw = msg.asRaw();
-  return new TextEncoder().encode(raw);
+  // mimetext's node entry uses `os.EOL`, which is bare LF on Linux/Workerd.
+  // RFC 5322/SMTP require CRLF line endings, and mimetext does not fold base64
+  // itself — a large attachment would otherwise be one giant line that exceeds
+  // the 998-octet SMTP limit (RFC 5321) and get rejected with "Line too long".
+  // Normalize every line ending to CRLF so headers, body and the folded base64
+  // attachment are transmitted consistently.
+  return new TextEncoder().encode(raw.replace(/\r?\n/g, "\r\n"));
+}
+
+/** Wrap base64 into RFC 2045 76-char lines (required for MIME attachments). */
+function foldBase64(base64: string): string {
+  const clean = base64.replace(/\s+/g, "");
+  const lines: string[] = [];
+  for (let i = 0; i < clean.length; i += 76) lines.push(clean.slice(i, i + 76));
+  return lines.join("\n");
 }
