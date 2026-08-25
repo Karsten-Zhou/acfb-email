@@ -14,19 +14,34 @@ import {
   loadUnified,
   loadMessages,
   deleteMessages,
+  moveMessages,
   updateFlags,
   openMessage,
   mailState,
 } from "../stores/mail";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
-import { toastError } from "../stores/toast";
+import { toastError, toastSuccess } from "../stores/toast";
 import Button from "../components/UiButton.vue";
 import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
 import MessageListPane from "./parts/MessageListPane.vue";
 import MessageReaderPane from "./parts/MessageReaderPane.vue";
-import { RefreshCw, Plus, Settings, Loader2, Menu, MailOpen } from "lucide-vue-next";
+import {
+  RefreshCw,
+  Plus,
+  Settings,
+  Loader2,
+  Menu,
+  MailOpen,
+  Inbox,
+  Send,
+  FileText,
+  Archive,
+  AlertTriangle,
+  Trash2,
+  Mail as MailIcon,
+} from "lucide-vue-next";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
@@ -51,6 +66,12 @@ const togglingRead = ref(false);
 const refreshing = ref(false);
 /** If set, the confirm dialog targets a single message (from the reading pane). */
 const pendingDeleteId = ref<string | null>(null);
+/** Move-to-folder dialog: open state + the ids to move when a folder is picked. */
+const confirmMove = ref(false);
+const moving = ref(false);
+const pendingMoveIds = ref<string[]>([]);
+/** The account whose mailboxes the move dialog lists (moves stay in-account). */
+const moveAccountId = ref<string | null>(null);
 
 const roleLabel: Record<string, string> = {
   inbox: "Inbox",
@@ -60,6 +81,16 @@ const roleLabel: Record<string, string> = {
   archive: "Archive",
   spam: "Spam",
   trash: "Trash",
+};
+
+const roleIcon: Record<string, typeof Inbox> = {
+  inbox: Inbox,
+  all: MailIcon,
+  sent: Send,
+  drafts: FileText,
+  archive: Archive,
+  spam: AlertTriangle,
+  trash: Trash2,
 };
 
 const mailboxTree = ref<
@@ -233,6 +264,59 @@ async function doDeleteSelected() {
   }
 }
 
+/** Mailboxes the move dialog offers (same account, minus the pending messages' own folders). */
+const moveExcludedMailboxIds = computed(() => {
+  const ids = new Set<string>();
+  for (const m of mailState.messages) {
+    if (pendingMoveIds.value.includes(m.id)) ids.add(m.mailboxId);
+  }
+  if (mailState.selected && pendingMoveIds.value.includes(mailState.selected.id)) {
+    ids.add(mailState.selected.mailboxId);
+  }
+  return ids;
+});
+
+const moveTargetMailboxes = computed(() =>
+  mailboxTree.value.filter(
+    (item) =>
+      item.accountId === moveAccountId.value && !moveExcludedMailboxIds.value.has(item.mailbox.id),
+  ),
+);
+
+/** Open the move dialog for the bulk selection (all messages must share one account). */
+function openMoveSelected() {
+  const ids = [...mailState.selectedIds];
+  const msgs = mailState.messages.filter((m) => ids.includes(m.id));
+  const accounts = new Set(msgs.map((m) => m.accountId));
+  if (accounts.size !== 1) {
+    toastError(t("moveMixedAccounts"));
+    return;
+  }
+  pendingMoveIds.value = ids;
+  moveAccountId.value = [...accounts][0];
+  confirmMove.value = true;
+}
+
+/** Move the pending messages into the picked mailbox. */
+async function doMove(targetMailboxId: string) {
+  if (moving.value || pendingMoveIds.value.length === 0) return;
+  moving.value = true;
+  try {
+    await moveMessages(pendingMoveIds.value, targetMailboxId);
+    toastSuccess(t("movedMessages"));
+    // If the open reading message was moved, close the reader.
+    if (mailState.selected && pendingMoveIds.value.includes(mailState.selected.id)) {
+      mailState.selected = null;
+      reading.value = false;
+      if (route.params.id) await router.replace("/mail");
+    }
+    mailState.selectedIds = new Set();
+    confirmMove.value = false;
+  } finally {
+    moving.value = false;
+  }
+}
+
 /** Messages after applying the "only unread" filter. */
 const visibleMessages = computed(() => {
   if (!onlyUnread.value) return mailState.messages;
@@ -387,6 +471,7 @@ const listTitle = computed(() => {
       :selected-count="selectedCount"
       @toggle-unread="onlyUnread = !onlyUnread"
       @mark-read="markSelectedRead"
+      @move-selected="openMoveSelected"
       @confirm-delete="confirmDeleteSelected"
       @open="openMessageRow"
       @toggle-select="toggleSelect"
@@ -473,6 +558,37 @@ const listTitle = computed(() => {
         <Button variant="destructive" size="sm" :disabled="deleting" @click="doDeleteSelected">
           <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
         </Button>
+      </template>
+    </UiDialog>
+
+    <!-- Modal: move to folder -->
+    <UiDialog
+      :open="confirmMove"
+      :title="t('moveTo')"
+      :busy="moving"
+      max-width-class="max-w-md"
+      @close="confirmMove = false"
+    >
+      <p class="mb-2 text-sm text-muted-foreground">{{ t("moveToHint") }}</p>
+      <div class="max-h-64 space-y-0.5 overflow-y-auto">
+        <button
+          v-for="item in moveTargetMailboxes"
+          :key="item.mailbox.id"
+          class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+          :disabled="moving"
+          @click="doMove(item.mailbox.id)"
+        >
+          <component
+            :is="roleIcon[item.mailbox.role] || Inbox"
+            class="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+          <span class="min-w-0 flex-1 truncate">{{ item.mailbox.name }}</span>
+        </button>
+      </div>
+      <template #footer>
+        <Button variant="ghost" size="sm" :disabled="moving" @click="confirmMove = false">{{
+          t("cancelAction")
+        }}</Button>
       </template>
     </UiDialog>
   </div>

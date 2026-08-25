@@ -16,6 +16,7 @@ import {
   Star,
   Loader2,
   Paperclip,
+  FolderInput,
 } from "lucide-vue-next";
 import type { Message } from "@shared/types";
 
@@ -37,6 +38,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleUnread: [];
   "mark-read": [];
+  "move-selected": [];
   "confirm-delete": [];
   open: [m: Message];
   toggleSelect: [id: string];
@@ -111,6 +113,11 @@ function onTouchEnd() {
         <AppTooltip v-if="actionsVisible" :label="t('markRead')">
           <Button variant="ghost" size="sm" @click="emit('mark-read')">
             {{ t("markRead") }}
+          </Button>
+        </AppTooltip>
+        <AppTooltip v-if="actionsVisible" :label="t('moveTo')">
+          <Button variant="ghost" size="sm" @click="emit('move-selected')">
+            <FolderInput class="h-4 w-4" /> {{ t("move") }}
           </Button>
         </AppTooltip>
         <AppTooltip v-if="actionsVisible" :label="t('delete')">
