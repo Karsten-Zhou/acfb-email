@@ -151,7 +151,12 @@ const emit = defineEmits<{
       <div class="flex-1 overflow-y-auto px-5 py-5">
         <div
           class="email-body text-[15px]"
-          v-html="sanitizeHtml(mailState.selected.html || mailState.selected.text || '')"
+          v-html="
+            sanitizeHtml(mailState.selected.html || mailState.selected.text || '', {
+              messageId: mailState.selected.id,
+              attachments: mailState.selected.attachments,
+            })
+          "
         />
       </div>
     </template>

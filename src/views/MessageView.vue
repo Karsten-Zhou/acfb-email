@@ -143,7 +143,12 @@ function reply() {
 
         <div
           class="email-body mt-5 text-[15px]"
-          v-html="sanitizeHtml(msg.html || msg.text || '')"
+          v-html="
+            sanitizeHtml(msg.html || msg.text || '', {
+              messageId: msg.id,
+              attachments: msg.attachments,
+            })
+          "
         />
       </template>
     </main>
