@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // MessageReaderPane — the rightmost reading column: header actions
 // (back/reply/star/read/delete), meta rows, and the sanitized body.
+import { computed } from "vue";
 import { mailState } from "../../stores/mail";
 import { sanitizeHtml } from "../../lib/sanitize";
 import { t, formatDateTime } from "../../lib/i18n";
@@ -34,9 +35,10 @@ const emit = defineEmits<{
   "confirm-delete": [];
 }>();
 
-// `sanitizeHtml` is the imported helper from lib/sanitize; it's used directly
-// in the template's v-html binding (safe: our DOMPurify config preserves email
-// centering attributes like td[align=center]).
+/** Attachments the user can download (inline images stay embedded in the body). */
+const downloadableAttachments = computed(() =>
+  (mailState.selected?.attachments ?? []).filter((a) => !a.isInline),
+);
 </script>
 
 <template>
@@ -130,11 +132,11 @@ const emit = defineEmits<{
         >
       </div>
       <div
-        v-if="mailState.selected.attachments?.length"
+        v-if="downloadableAttachments.length"
         class="flex flex-wrap gap-2 border-b border-border px-5 py-2"
       >
         <a
-          v-for="a in mailState.selected.attachments.filter((x) => !x.isInline)"
+          v-for="a in downloadableAttachments"
           :key="a.id"
           :href="api.attachmentUrl(mailState.selected.id, a.id)"
           :download="a.filename || 'attachment'"
