@@ -300,6 +300,15 @@ function openMoveSelected() {
   confirmMove.value = true;
 }
 
+/** Open the move dialog for a single message (from the reading pane). */
+function openMoveMessage(id: string) {
+  const m = mailState.selected;
+  if (!m) return;
+  pendingMoveIds.value = [id];
+  moveAccountId.value = m.accountId;
+  confirmMove.value = true;
+}
+
 /** Move the pending messages into the picked mailbox. */
 async function doMove(targetMailboxId: string) {
   if (moving.value || pendingMoveIds.value.length === 0) return;
@@ -505,6 +514,7 @@ const listTitle = computed(() => {
         updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })
       "
       @toggle-read="toggleReadFromReader"
+      @move-message="openMoveMessage(mailState.selected!.id)"
       @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
     />
 

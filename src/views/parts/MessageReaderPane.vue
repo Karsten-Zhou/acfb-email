@@ -1,7 +1,10 @@
 <script setup lang="ts">
 // MessageReaderPane — the rightmost reading column: header actions
-// (back/reply/star/read/delete), meta rows, and the sanitized body.
-import { computed } from "vue";
+// (back/reply/star/read/move/delete), meta rows, and the sanitized body.
+// When the pane itself is narrow the icon actions collapse behind a "…" menu
+// (decided by the pane's measured width, not the viewport, since the sidebar
+// + list can squeeze it on any screen size); a roomy pane shows them inline.
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { mailState } from "../../stores/mail";
 import { sanitizeHtml } from "../../lib/sanitize";
 import { t, formatDateTime } from "../../lib/i18n";
@@ -18,6 +21,8 @@ import {
   RefreshCw,
   Trash2,
   Loader2,
+  FolderInput,
+  MoreHorizontal,
 } from "lucide-vue-next";
 
 defineProps<{
@@ -32,8 +37,116 @@ const emit = defineEmits<{
   reply: [];
   "toggle-star": [];
   "toggle-read": [];
+  "move-message": [];
   "confirm-delete": [];
 }>();
+
+/** Actions reachable from the mobile "…" menu (map 1:1 to emits). */
+type ReaderAction = "reply" | "toggle-star" | "toggle-read" | "move-message" | "confirm-delete";
+
+// ---- mobile "…" action menu ----
+const moreOpen = ref(false);
+const moreBtnEl = ref<HTMLElement | null>(null);
+const moreMenuEl = ref<HTMLElement | null>(null);
+const morePos = ref<{ left: number; top: number } | null>(null);
+
+// ---- header layout: inline buttons vs "…" menu ----
+// The pane's own width decides which header renders (ResizeObserver on the
+// pane, not a viewport breakpoint — the sidebar + list can squeeze the pane
+// on any screen size). Starts wide so a roomy header never flashes collapsed.
+const paneEl = ref<HTMLElement | null>(null);
+const paneWidth = ref(Number.POSITIVE_INFINITY);
+/** Below this pane width the action buttons collapse behind the "…" menu. */
+const COMPACT_HEADER_PX = 420;
+const compactHeader = computed(() => paneWidth.value < COMPACT_HEADER_PX);
+let resizeObserver: ResizeObserver | null = null;
+
+// If the pane widens past the threshold while the "…" menu is open, close it.
+watch(compactHeader, (compact) => {
+  if (!compact) closeMore();
+});
+
+async function toggleMore() {
+  if (moreOpen.value) {
+    closeMore();
+    return;
+  }
+  moreOpen.value = true;
+  await nextTick();
+  placeMore();
+}
+
+function closeMore() {
+  moreOpen.value = false;
+  morePos.value = null;
+}
+
+/** Pin the menu below the trigger, right-aligned so it stays on-screen. */
+function placeMore() {
+  const btn = moreBtnEl.value;
+  const menu = moreMenuEl.value;
+  if (!btn || !menu) return;
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth;
+  const mh = menu.offsetHeight;
+  const dropUp = window.innerHeight - r.bottom < mh && r.top > mh;
+  const top = dropUp ? r.top - mh - 4 : r.bottom + 4;
+  const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+  morePos.value = { left, top };
+}
+
+function onDocMouseDown(e: MouseEvent) {
+  if (!moreOpen.value) return;
+  const target = e.target as Node;
+  if (moreBtnEl.value?.contains(target) || moreMenuEl.value?.contains(target)) return;
+  closeMore();
+}
+
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === "Escape") closeMore();
+}
+
+onMounted(() => {
+  document.addEventListener("mousedown", onDocMouseDown);
+  window.addEventListener("keydown", onDocKey);
+  window.addEventListener("resize", closeMore);
+  window.addEventListener("scroll", closeMore, { capture: true, passive: true });
+  resizeObserver = new ResizeObserver((entries) => {
+    const w = entries[0]?.contentRect.width;
+    if (typeof w === "number") paneWidth.value = w;
+  });
+  if (paneEl.value) resizeObserver.observe(paneEl.value);
+});
+onUnmounted(() => {
+  document.removeEventListener("mousedown", onDocMouseDown);
+  window.removeEventListener("keydown", onDocKey);
+  window.removeEventListener("resize", closeMore);
+  window.removeEventListener("scroll", closeMore, { capture: true });
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+/** Run a mobile-menu action (closes the menu, then forwards the emit). */
+function runAction(action: ReaderAction) {
+  closeMore();
+  switch (action) {
+    case "reply":
+      emit("reply");
+      break;
+    case "toggle-star":
+      emit("toggle-star");
+      break;
+    case "toggle-read":
+      emit("toggle-read");
+      break;
+    case "move-message":
+      emit("move-message");
+      break;
+    case "confirm-delete":
+      emit("confirm-delete");
+      break;
+  }
+}
 
 /** Attachments the user can download (inline images stay embedded in the body). */
 const downloadableAttachments = computed(() =>
@@ -43,6 +156,7 @@ const downloadableAttachments = computed(() =>
 
 <template>
   <section
+    ref="paneEl"
     class="min-w-0 flex-1 flex-col bg-background"
     :class="mailState.selected || loading ? 'flex md:flex' : 'hidden md:flex'"
   >
@@ -82,7 +196,8 @@ const downloadableAttachments = computed(() =>
             <span class="text-xs">{{ formatDateTime(mailState.selected.receivedAt) }}</span>
           </div>
         </div>
-        <div class="flex items-center gap-1">
+        <!-- Roomier pane: actions inline. -->
+        <div v-if="!compactHeader" class="flex items-center gap-1">
           <AppTooltip :label="t('reply')">
             <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('reply')">
               <Reply class="h-4 w-4" />
@@ -108,6 +223,11 @@ const downloadableAttachments = computed(() =>
               <MailIcon v-else class="h-4 w-4" />
             </Button>
           </AppTooltip>
+          <AppTooltip :label="t('moveTo')">
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('move-message')">
+              <FolderInput class="h-4 w-4" />
+            </Button>
+          </AppTooltip>
           <AppTooltip :label="t('delete')">
             <Button
               variant="ghost"
@@ -118,6 +238,85 @@ const downloadableAttachments = computed(() =>
               <Trash2 class="h-4 w-4" />
             </Button>
           </AppTooltip>
+        </div>
+
+        <!-- Narrow pane: collapse the icon group behind a "…" menu so the
+             header doesn't crowd. -->
+        <div v-if="compactHeader" ref="moreBtnEl" class="relative">
+          <AppTooltip :label="t('moreActions')">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              aria-haspopup="true"
+              :aria-expanded="moreOpen"
+              @click="toggleMore"
+            >
+              <MoreHorizontal class="h-4 w-4" />
+            </Button>
+          </AppTooltip>
+          <Teleport to="body">
+            <Transition
+              enter-active-class="transition-opacity duration-75"
+              leave-active-class="transition-opacity duration-75"
+              enter-from-class="opacity-0"
+              leave-to-class="opacity-0"
+            >
+              <div
+                v-if="moreOpen"
+                ref="moreMenuEl"
+                role="menu"
+                class="fixed z-[100] w-48 rounded-md border border-border bg-popover p-1 shadow-md"
+                :style="
+                  morePos ? { left: `${morePos.left}px`, top: `${morePos.top}px` } : undefined
+                "
+              >
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  @click="runAction('reply')"
+                >
+                  <Reply class="h-4 w-4" /> {{ t("reply") }}
+                </button>
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  @click="runAction('toggle-star')"
+                >
+                  <Star
+                    class="h-4 w-4"
+                    :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
+                  />
+                  {{ mailState.selected.isStarred ? t("unstar") : t("star") }}
+                </button>
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  :disabled="togglingRead"
+                  @click="runAction('toggle-read')"
+                >
+                  <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
+                  <MailIcon v-else class="h-4 w-4" />
+                  {{ mailState.selected.isRead ? t("markUnread") : t("markRead") }}
+                </button>
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  @click="runAction('move-message')"
+                >
+                  <FolderInput class="h-4 w-4" /> {{ t("moveTo") }}
+                </button>
+                <div class="my-1 h-px bg-border" />
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive hover:text-white"
+                  @click="runAction('confirm-delete')"
+                >
+                  <Trash2 class="h-4 w-4" /> {{ t("delete") }}
+                </button>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
       </header>
 
