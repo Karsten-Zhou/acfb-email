@@ -8,6 +8,7 @@
         "@formatjs/intl-localematcher": "^0.8.13",
         "@tailwindcss/vite": "^4.3.3",
         "@tiptap/extension-placeholder": "^3.30.3",
+        "@tiptap/extension-text-style": "^3.30.3",
         "@tiptap/pm": "^3.30.3",
         "@tiptap/starter-kit": "^3.30.3",
         "@tiptap/vue-3": "^3.30.3",
@@ -374,6 +375,8 @@
     "@tiptap/extension-strike": ["@tiptap/extension-strike@3.30.3", "https://registry.npmmirror.com/@tiptap/extension-strike/-/extension-strike-3.30.3.tgz", { "peerDependencies": { "@tiptap/core": "3.30.3" } }, "sha512-e9BI8Hzei23GjmYysXxL+CHq3fIgOm29BbSUMbYXxT2cJ+TkkgJp7EvHf74gSABNME0gUN+mG0pRR5wTFoOCcg=="],
 
     "@tiptap/extension-text": ["@tiptap/extension-text@3.30.3", "https://registry.npmmirror.com/@tiptap/extension-text/-/extension-text-3.30.3.tgz", { "peerDependencies": { "@tiptap/core": "3.30.3" } }, "sha512-Jh8ZyI0HLOJOIPZl5a5XRJbTs4pAUakYIWCZ3Hv3lF9ouXW/C0bY67XQU7bv6Rvu8AHzDszhKklnOZ6z1NQPXQ=="],
+
+    "@tiptap/extension-text-style": ["@tiptap/extension-text-style@3.30.3", "https://registry.npmmirror.com/@tiptap/extension-text-style/-/extension-text-style-3.30.3.tgz", { "peerDependencies": { "@tiptap/core": "3.30.3" } }, "sha512-aMacIkBwvcSABIXIOK0iCmGfNLICuuIWGiozycFwIJfwv87xwO6xAXfc6Q4/m3RE9Oj1DPqWohXMtc8tOp002w=="],
 
     "@tiptap/extension-underline": ["@tiptap/extension-underline@3.30.3", "https://registry.npmmirror.com/@tiptap/extension-underline/-/extension-underline-3.30.3.tgz", { "peerDependencies": { "@tiptap/core": "3.30.3" } }, "sha512-TiZ+b524Ee4PNlW+HNmkg3x4btR1K6btJy9pEjMuDf0Rx01UaTBvHpHmABR/DbbcC1CuZiQ3ylJwLL+90PaEoA=="],
 

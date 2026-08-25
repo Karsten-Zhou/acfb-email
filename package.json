@@ -21,6 +21,7 @@
     "@formatjs/intl-localematcher": "^0.8.13",
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-placeholder": "^3.30.3",
+    "@tiptap/extension-text-style": "^3.30.3",
     "@tiptap/pm": "^3.30.3",
     "@tiptap/starter-kit": "^3.30.3",
     "@tiptap/vue-3": "^3.30.3",
