@@ -1,6 +1,12 @@
 # Lefthook git hooks configuration.
 # Formatting and static checks run automatically before each commit.
 # Docs: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+#
+# Note: `bun run test` (vitest + the Cloudflare workerd pool) is intentionally
+# NOT a pre-commit hook — spawning workerd subprocesses from a git hook on
+# Windows can leave orphaned processes that hold .git/index.lock and block all
+# subsequent commits ("commit looks stuck"). Tests run on demand (`bun run
+# test`) and in CI.
 
 pre-commit:
   parallel: true
@@ -14,8 +20,6 @@ pre-commit:
       run: bun run lint
     typecheck:
       run: bun run typecheck
-    test:
-      run: bun run test
 #
 #     - script: "hello.go"
 #       runner: go run
