@@ -152,7 +152,6 @@ export const SendMessageInputSchema = z.object({
   text: z.string().max(2_000_000).optional().default(""),
   inReplyTo: z.string().nullable().optional().default(null),
   references: z.array(z.string()).optional().default([]),
-  attachments: z.array(z.string()).optional().default([]), // attachment ids
   /** New files to attach to the outgoing message (client-assembled). */
   newAttachments: z.array(SendAttachmentSchema).optional().default([]),
 });

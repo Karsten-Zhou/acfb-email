@@ -24,8 +24,6 @@ sendRoutes.post("/send", async (c) => {
   const cred = await repo.credential(c.env, account.id);
   const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
 
-  // v1: attachments require re-fetching binary content from the provider, which
-  // is not yet wired. Sending is text/html only for now (documented limitation).
   const raw = buildRawMessage({
     from: { name: account.display_name, address: account.email },
     to: input.to,

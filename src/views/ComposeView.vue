@@ -12,6 +12,7 @@ import { cn } from "../lib/cn";
 import Button from "../components/UiButton.vue";
 import AppTooltip from "../components/UiToolTip.vue";
 import RichTextEditor from "../components/RichTextEditor.vue";
+import UiSelect from "../components/UiSelect.vue";
 import { ChevronLeft, Send, Trash2, FilePlus2, Loader2, Paperclip, X } from "lucide-vue-next";
 
 const route = useRoute();
@@ -111,6 +112,11 @@ onMounted(async () => {
 
 const canSend = computed(() => to.value.trim().length > 0 && accountId.value.length > 0);
 
+/** Accounts as { value, label } options for the From dropdown. */
+const accountOptions = computed(() =>
+  accountsState.accounts.map((a) => ({ value: a.id, label: `${a.name} <${a.email}>` })),
+);
+
 /** Split a comma-separated recipient string into trimmed, non-empty entries. */
 function recipients(value: string): string[] {
   return value
@@ -134,7 +140,6 @@ async function send() {
       text: editorRef.value?.getText() ?? "",
       inReplyTo: null,
       references: [],
-      attachments: [],
       newAttachments: attachments.value,
     });
     if (draftId.value) await api.deleteDraft(draftId.value);
@@ -175,46 +180,45 @@ function discard() {
 
 <template>
   <div class="flex h-full flex-col bg-background">
-    <header class="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
-      <AppTooltip :label="t('back')">
-        <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
-          <ChevronLeft class="h-4 w-4" />
-        </Button>
-      </AppTooltip>
+    <header class="border-b border-border bg-card">
+      <div class="flex items-center px-2 py-1">
+        <AppTooltip :label="t('back')">
+          <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
+            <ChevronLeft class="h-4 w-4" />
+          </Button>
+        </AppTooltip>
+      </div>
+      <div class="flex items-center gap-2 px-3 pb-2">
+        <AppTooltip :label="sending ? t('sending') : t('send')">
+          <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
+            <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
+            <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
+          </Button>
+        </AppTooltip>
 
-      <AppTooltip :label="sending ? t('sending') : t('send')">
-        <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
-          <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
-          <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
-        </Button>
-      </AppTooltip>
+        <UiSelect
+          v-model="accountId"
+          :options="accountOptions"
+          :prefix="t('fromLabel')"
+          :aria-label="t('from')"
+        />
 
-      <select
-        id="compose-from"
-        v-model="accountId"
-        class="h-8 min-w-0 max-w-[260px] rounded-md border border-input bg-background px-2 text-sm"
-        :aria-label="t('from')"
-      >
-        <option v-for="a in accountsState.accounts" :key="a.id" :value="a.id">
-          {{ a.name }} &lt;{{ a.email }}&gt;
-        </option>
-      </select>
+        <div class="flex-1" />
 
-      <div class="flex-1" />
+        <AppTooltip :label="t('saveDraft')">
+          <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
+            <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
+            <FilePlus2 v-else class="h-4 w-4" />
+            <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
+          </Button>
+        </AppTooltip>
 
-      <AppTooltip :label="t('saveDraft')">
-        <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
-          <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
-          <FilePlus2 v-else class="h-4 w-4" />
-          <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
-        </Button>
-      </AppTooltip>
-
-      <AppTooltip :label="t('discard')">
-        <Button variant="ghost-destructive" size="icon" class="h-8 w-8" @click="discard">
-          <Trash2 class="h-4 w-4" />
-        </Button>
-      </AppTooltip>
+        <AppTooltip :label="t('discard')">
+          <Button variant="ghost-destructive" size="icon" class="h-8 w-8" @click="discard">
+            <Trash2 class="h-4 w-4" />
+          </Button>
+        </AppTooltip>
+      </div>
     </header>
 
     <div class="flex-1 overflow-y-auto p-4">
