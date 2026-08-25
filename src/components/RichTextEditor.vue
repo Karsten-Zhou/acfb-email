@@ -76,7 +76,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="rounded-md border border-input bg-background">
+  <div class="rich-editor rounded-md border border-input bg-background">
     <div class="flex flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-border px-2 py-1">
       <slot name="toolbar" />
       <span class="mx-1 h-4 w-px shrink-0 bg-border" />
@@ -212,5 +212,12 @@ defineExpose({
 }
 .tiptap li > p {
   margin: 0;
+}
+
+/* The app-wide :focus-visible outline is redundant in the editor: toolbar
+   buttons already draw their own ring and the rounded container would be
+   doubled by it. Keep keyboard focus via the buttons' ring instead. */
+.rich-editor :focus-visible {
+  outline: none;
 }
 </style>

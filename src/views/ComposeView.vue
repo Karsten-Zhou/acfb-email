@@ -181,12 +181,13 @@ function discard() {
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="border-b border-border bg-card">
-      <div class="flex items-center px-2 py-1">
+      <div class="flex items-center gap-2 px-3 py-1.5">
         <AppTooltip :label="t('back')">
           <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
             <ChevronLeft class="h-4 w-4" />
           </Button>
         </AppTooltip>
+        <h1 class="text-sm font-semibold">{{ t("newMessage") }}</h1>
       </div>
       <div class="flex items-center gap-2 px-3 pb-2">
         <AppTooltip :label="sending ? t('sending') : t('send')">
