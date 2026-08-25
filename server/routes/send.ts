@@ -50,6 +50,10 @@ sendRoutes.post("/send", async (c) => {
       bcc: input.bcc,
       subject: input.subject,
       rawMessage: raw,
+      // REST providers (Graph/Gmail) build their own body from html/text;
+      // without these the body goes out empty even though the raw MIME is built.
+      html: input.html || undefined,
+      text: input.text || undefined,
       inReplyTo: input.inReplyTo,
       references: input.references,
     });
