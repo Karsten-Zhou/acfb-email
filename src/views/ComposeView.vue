@@ -1,13 +1,17 @@
 <script setup lang="ts">
 // Compose view: send email, save drafts, reply prefill via query params.
+// The body is a rich-text (HTML) editor; the From selector and CC/BCC toggles
+// sit in the header/to-row to match the rest of the app's density.
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { accountsState, loadAccounts } from "../stores/accounts";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { formatAttachmentSize } from "../lib/utils";
+import { cn } from "../lib/cn";
 import Button from "../components/UiButton.vue";
 import AppTooltip from "../components/UiToolTip.vue";
+import RichTextEditor from "../components/RichTextEditor.vue";
 import { ChevronLeft, Send, Trash2, FilePlus2, Loader2, Paperclip, X } from "lucide-vue-next";
 
 const route = useRoute();
@@ -18,7 +22,11 @@ const to = ref("");
 const cc = ref("");
 const bcc = ref("");
 const subject = ref("");
+/** Body is the rich editor's HTML; the text/plain part is derived on send. */
 const body = ref("");
+/** Whether the CC / BCC lines are expanded (toggled from the To row). */
+const showCc = ref(false);
+const showBcc = ref(false);
 const sending = ref(false);
 const savingDraft = ref(false);
 const draftId = ref<string | null>(null);
@@ -27,27 +35,8 @@ const fileInput = ref<HTMLInputElement | null>(null);
 /** Files to attach to the outgoing message (read client-side). */
 const attachments = ref<{ name: string; mimeType: string; size: number; base64: string }[]>([]);
 const addingFiles = ref(false);
-
-/**
- * The compose editor is plain text (like most modern clients): typing is
- * always plain text, and on send we ship BOTH a text/plain part (verbatim)
- * and a minimal text/html part so rich clients render paragraph breaks.
- * This mirrors Gmail/Outlook behavior — no visible "plain vs HTML" switch.
- */
-function plainTextToHtml(text: string): string {
-  return text
-    .split(/\n{2,}/)
-    .map((para) => `<div>${escapeHtml(para.replace(/\n/g, "<br>"))}</div>`)
-    .join("");
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+/** The editor, exposing getText() for the text/plain MIME part. */
+const editorRef = ref<{ getText: () => string } | null>(null);
 
 function pickFiles() {
   fileInput.value?.click();
@@ -112,39 +101,37 @@ onMounted(async () => {
       to.value = d.to.join(", ");
       cc.value = d.cc.join(", ");
       bcc.value = d.bcc.join(", ");
+      showCc.value = d.cc.length > 0;
+      showBcc.value = d.bcc.length > 0;
       subject.value = d.subject ?? "";
-      body.value = d.text ?? d.html ?? "";
+      body.value = d.html ?? "";
     }
   }
 });
 
 const canSend = computed(() => to.value.trim().length > 0 && accountId.value.length > 0);
 
+/** Split a comma-separated recipient string into trimmed, non-empty entries. */
+function recipients(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 async function send() {
   if (!canSend.value) return;
   sending.value = true;
   error.value = null;
   try {
-    const toList = to.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const ccList = cc.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const bccList = bcc.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
     await api.send({
       accountId: accountId.value,
-      to: toList,
-      cc: ccList,
-      bcc: bccList,
+      to: recipients(to.value),
+      cc: recipients(cc.value),
+      bcc: recipients(bcc.value),
       subject: subject.value,
-      html: plainTextToHtml(body.value),
-      text: body.value,
+      html: body.value,
+      text: editorRef.value?.getText() ?? "",
       inReplyTo: null,
       references: [],
       attachments: [],
@@ -162,27 +149,15 @@ async function send() {
 async function saveDraft() {
   savingDraft.value = true;
   try {
-    const toList = to.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const ccList = cc.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const bccList = bcc.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
     const res = await api.saveDraft({
       id: draftId.value ?? undefined,
       accountId: accountId.value || null,
-      to: toList,
-      cc: ccList,
-      bcc: bccList,
+      to: recipients(to.value),
+      cc: recipients(cc.value),
+      bcc: recipients(bcc.value),
       subject: subject.value,
-      html: plainTextToHtml(body.value),
-      text: body.value,
+      html: body.value,
+      text: editorRef.value?.getText() ?? "",
     });
     draftId.value = res.id;
   } catch (err) {
@@ -206,27 +181,37 @@ function discard() {
           <ChevronLeft class="h-4 w-4" />
         </Button>
       </AppTooltip>
-      <h1 class="text-sm font-semibold">{{ t("newMessage") }}</h1>
-      <div class="flex-1" />
-      <AppTooltip :label="t('saveDraft')">
-        <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
-          <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
-          <FilePlus2 v-else class="h-4 w-4" /> {{ t("saveDraft") }}
-        </Button>
-      </AppTooltip>
+
       <AppTooltip :label="sending ? t('sending') : t('send')">
         <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
           <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
           <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
         </Button>
       </AppTooltip>
+
+      <select
+        id="compose-from"
+        v-model="accountId"
+        class="h-8 min-w-0 max-w-[260px] rounded-md border border-input bg-background px-2 text-sm"
+        :aria-label="t('from')"
+      >
+        <option v-for="a in accountsState.accounts" :key="a.id" :value="a.id">
+          {{ a.name }} &lt;{{ a.email }}&gt;
+        </option>
+      </select>
+
+      <div class="flex-1" />
+
+      <AppTooltip :label="t('saveDraft')">
+        <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
+          <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
+          <FilePlus2 v-else class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
+        </Button>
+      </AppTooltip>
+
       <AppTooltip :label="t('discard')">
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
-          @click="discard"
-        >
+        <Button variant="ghost-destructive" size="icon" class="h-8 w-8" @click="discard">
           <Trash2 class="h-4 w-4" />
         </Button>
       </AppTooltip>
@@ -242,20 +227,6 @@ function discard() {
 
       <div class="space-y-3">
         <div class="flex items-center gap-2 text-sm">
-          <label for="compose-from" class="w-14 shrink-0 text-muted-foreground">{{
-            t("from")
-          }}</label>
-          <select
-            id="compose-from"
-            v-model="accountId"
-            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm"
-          >
-            <option v-for="a in accountsState.accounts" :key="a.id" :value="a.id">
-              {{ a.name }} &lt;{{ a.email }}&gt;
-            </option>
-          </select>
-        </div>
-        <div class="flex items-center gap-2 text-sm">
           <label for="compose-to" class="w-14 shrink-0 text-muted-foreground">{{ t("to") }}</label>
           <input
             id="compose-to"
@@ -263,8 +234,25 @@ function discard() {
             class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
             :placeholder="'recipient@example.com'"
           />
+          <Button
+            variant="ghost"
+            size="sm"
+            :class="cn(showCc && 'bg-accent text-accent-foreground')"
+            @click="showCc = !showCc"
+          >
+            {{ t("cc") }}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            :class="cn(showBcc && 'bg-accent text-accent-foreground')"
+            @click="showBcc = !showBcc"
+          >
+            {{ t("bcc") }}
+          </Button>
         </div>
-        <div class="flex items-center gap-2 text-sm">
+
+        <div v-if="showCc" class="flex items-center gap-2 text-sm">
           <label for="compose-cc" class="w-14 shrink-0 text-muted-foreground">{{ t("cc") }}</label>
           <input
             id="compose-cc"
@@ -273,7 +261,8 @@ function discard() {
             :placeholder="'cc@example.com'"
           />
         </div>
-        <div class="flex items-center gap-2 text-sm">
+
+        <div v-if="showBcc" class="flex items-center gap-2 text-sm">
           <label for="compose-bcc" class="w-14 shrink-0 text-muted-foreground">{{
             t("bcc")
           }}</label>
@@ -284,6 +273,7 @@ function discard() {
             :placeholder="'bcc@example.com'"
           />
         </div>
+
         <div class="flex items-center gap-2 text-sm">
           <label for="compose-subject" class="w-14 shrink-0 text-muted-foreground">{{
             t("subject")
@@ -296,20 +286,25 @@ function discard() {
           />
         </div>
 
-        <textarea
-          v-model="body"
-          class="min-h-[280px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm placeholder:text-muted-foreground"
-          :placeholder="t('content')"
-        />
+        <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
 
-        <!-- Attachments -->
-        <div class="flex items-center gap-2">
-          <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
-          <Button variant="outline" size="sm" :disabled="addingFiles" @click="pickFiles">
-            <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
-            <Paperclip v-else class="h-4 w-4" /> {{ t("attach") }}
-          </Button>
-        </div>
+        <RichTextEditor ref="editorRef" v-model="body" :placeholder="t('content')">
+          <template #toolbar>
+            <AppTooltip :label="t('attach')">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :disabled="addingFiles"
+                @click="pickFiles"
+              >
+                <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
+                <Paperclip v-else class="h-4 w-4" />
+              </Button>
+            </AppTooltip>
+          </template>
+        </RichTextEditor>
+
         <div v-if="attachments.length" class="flex flex-wrap gap-2">
           <div
             v-for="(a, i) in attachments"
