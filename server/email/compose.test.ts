@@ -54,7 +54,9 @@ describe("MIME message building (mimetext)", () => {
       to: ["bob@example.com"],
       subject: "Big attachment",
       text: "body",
-      attachments: [{ filename: "big.bin", contentType: "application/octet-stream", base64: bigB64 }],
+      attachments: [
+        { filename: "big.bin", contentType: "application/octet-stream", base64: bigB64 },
+      ],
     });
     const s = new TextDecoder().decode(raw);
     const maxOctets = Math.max(...s.split("\r\n").map((l) => l.length));
