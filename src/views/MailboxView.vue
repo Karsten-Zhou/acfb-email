@@ -46,7 +46,10 @@ import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();
 const router = useRouter();
-const activeMailboxId = ref<string | null>("unified");
+/** Initial mailbox from the URL (?mailbox=…) — e.g. after composing, land the
+ *  user on the account's Sent folder to see the just-sent mail. */
+const initialMailbox = typeof route.query.mailbox === "string" ? route.query.mailbox : "";
+const activeMailboxId = ref<string | null>(initialMailbox || "unified");
 /** Mobile drawer: whether the folder sidebar is open (only below md). */
 const sidebarOpen = ref(false);
 const syncing = ref(false);
@@ -431,6 +434,19 @@ watch(
 
 onMounted(refresh);
 watch(activeMailboxId, () => loadInto());
+// Support ?mailbox=<id> deep links (e.g. land on the Sent folder after send).
+watch(
+  () => route.query.mailbox,
+  (q) => {
+    const id = typeof q === "string" ? q : "";
+    if (id && id !== activeMailboxId.value) {
+      activeMailboxId.value = id;
+      mailState.selectedIds = new Set();
+      hasOlder.value = true;
+      void loadInto();
+    }
+  },
+);
 
 const listTitle = computed(() => {
   if (activeMailboxId.value === "unified") return t("unifiedInbox");

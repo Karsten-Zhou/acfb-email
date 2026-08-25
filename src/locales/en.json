@@ -19,6 +19,7 @@
   "saveDraft": "Save draft",
   "send": "Send",
   "sending": "Sending…",
+  "sendSuccess": "Message sent successfully",
   "discard": "Discard",
   "from": "From",
   "fromLabel": "From:",

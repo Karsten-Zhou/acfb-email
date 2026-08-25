@@ -19,6 +19,7 @@
   "saveDraft": "保存草稿",
   "send": "发送",
   "sending": "发送中…",
+  "sendSuccess": "邮件发送成功",
   "discard": "丢弃",
   "from": "发件人",
   "fromLabel": "发件人：",

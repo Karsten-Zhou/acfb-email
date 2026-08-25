@@ -4,9 +4,15 @@
 // sit in the header/to-row to match the rest of the app's density.
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { accountsState, loadAccounts } from "../stores/accounts";
+import {
+  accountsState,
+  loadAccounts,
+  markAccountSyncing,
+  clearAccountSyncing,
+} from "../stores/accounts";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
+import { toastSuccess } from "../stores/toast";
 import { formatAttachmentSize } from "../lib/utils";
 import { cn } from "../lib/cn";
 import Button from "../components/UiButton.vue";
@@ -125,6 +131,16 @@ function recipients(value: string): string[] {
     .filter(Boolean);
 }
 
+/** The account's Sent mailbox id (if it has one), to land on after sending. */
+async function findSentMailbox(accountId: string): Promise<string | null> {
+  try {
+    const { mailboxes } = await api.mailboxes(accountId);
+    return mailboxes.find((m) => m.role === "sent")?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function send() {
   if (!canSend.value) return;
   sending.value = true;
@@ -143,7 +159,17 @@ async function send() {
       newAttachments: attachments.value,
     });
     if (draftId.value) await api.deleteDraft(draftId.value);
-    router.push({ name: "mailbox" });
+    toastSuccess(t("sendSuccess"));
+    // Auto-sync the account so the just-sent mail is pulled into its Sent
+    // folder. The sync runs server-side and is not awaited — the account
+    // state poller shows progress — so we land on the Sent folder to see it.
+    markAccountSyncing(accountId.value);
+    void api
+      .syncAccount(accountId.value)
+      .catch(() => undefined)
+      .finally(() => clearAccountSyncing());
+    const sentId = await findSentMailbox(accountId.value);
+    await router.push({ name: "mailbox", query: sentId ? { mailbox: sentId } : {} });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to send";
   } finally {
