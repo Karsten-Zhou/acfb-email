@@ -12,7 +12,7 @@ function kindIcon(kind: "success" | "error"): typeof CheckCircle2 {
   <div
     aria-live="polite"
     aria-atomic="false"
-    class="pointer-events-none fixed right-4 bottom-4 z-[100] flex w-[min(100vw-2rem,24rem)] flex-col gap-2"
+    class="pointer-events-none fixed right-4 bottom-4 z-100 flex w-[min(100vw-2rem,24rem)] flex-col gap-2"
   >
     <TransitionGroup
       enter-active-class="transition duration-200 ease-out"

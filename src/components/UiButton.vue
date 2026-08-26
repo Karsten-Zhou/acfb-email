@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // UiButton — flat button component (plain <button>, no reka Primitive).
-// Referenced from the RSS reader's UiButton.vue; kept without Primitive to
-// avoid the reka render-slot crash seen earlier in this project.
+// Kept without Primitive to avoid the reka render-slot crash seen earlier in this project.
 import { computed, type HTMLAttributes } from "vue";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";

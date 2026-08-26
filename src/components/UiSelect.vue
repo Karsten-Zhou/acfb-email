@@ -93,7 +93,7 @@ onUnmounted(() => {
   <button
     ref="triggerEl"
     type="button"
-    class="inline-flex h-8 min-w-0 max-w-[160px] items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[260px]"
+    class="inline-flex h-8 min-w-0 max-w-40 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring sm:max-w-65"
     :aria-label="ariaLabel"
     aria-haspopup="true"
     :aria-expanded="open"
@@ -114,7 +114,7 @@ onUnmounted(() => {
       <ul
         v-if="open"
         ref="menuEl"
-        class="fixed z-[100] max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
+        class="fixed z-100 max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
         :style="
           pos ? { left: `${pos.left}px`, top: `${pos.top}px`, width: `${pos.width}px` } : undefined
         "

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 // UiSwitch — toggle switch (v-model:modelValue boolean).
-// Copied from the RSS reader's UiSwitch.vue.
 import { cn } from "../lib/cn";
 
 const modelValue = defineModel<boolean>({ default: false });

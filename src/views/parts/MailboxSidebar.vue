@@ -61,11 +61,9 @@ const roleIcon: Record<string, typeof Inbox> = {
   </Transition>
   <!-- Mobile drawer: always rendered as a fixed overlay that slides in from
        the left when `open` (translate + visibility so the slide-out animates
-       too); on md+ it becomes the static column of the pane layout.
-       Note: Tailwind v4's translate-* utilities drive the CSS `translate`
-       property (not transform), so the transition must list `translate`. -->
+       too); on md+ it becomes the static column of the pane layout. -->
   <aside
-    class="flex w-64 flex-shrink-0 flex-col border-r border-border bg-card fixed inset-y-0 left-0 z-40 shadow-2xl transition-[translate,visibility] duration-300 ease-out md:static md:flex md:translate-x-0 md:visible md:shadow-none"
+    class="flex w-64 shrink-0 flex-col border-r border-border bg-card fixed inset-y-0 left-0 z-40 shadow-2xl transition-[translate,visibility] duration-300 ease-out md:static md:flex md:translate-x-0 md:visible md:shadow-none"
     :class="open ? 'translate-x-0 visible' : '-translate-x-full invisible'"
   >
     <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
@@ -108,7 +106,7 @@ const roleIcon: Record<string, typeof Inbox> = {
         @click="emit('select', 'unified')"
       >
         <MailIcon class="h-4 w-4 shrink-0" />
-        <span class="flex-grow text-left">{{ t("unifiedInbox") }}</span>
+        <span class="grow text-left">{{ t("unifiedInbox") }}</span>
       </button>
 
       <!-- Empty state: guide the user to add an account in Settings. -->
@@ -152,7 +150,7 @@ const roleIcon: Record<string, typeof Inbox> = {
           @click="emit('select', item.mailbox.id)"
         >
           <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4 shrink-0" />
-          <span class="flex-grow truncate text-left">{{ item.mailbox.name }}</span>
+          <span class="grow truncate text-left">{{ item.mailbox.name }}</span>
           <span
             v-if="unread(item)"
             class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground"

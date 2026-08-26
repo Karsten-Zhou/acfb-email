@@ -160,7 +160,7 @@ onUnmounted(() => {
           role="tooltip"
           :class="
             cn(
-              'pointer-events-none fixed z-[100] whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm',
+              'pointer-events-none fixed z-100 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm',
               props.class,
             )
           "

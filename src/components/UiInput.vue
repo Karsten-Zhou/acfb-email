@@ -1,6 +1,5 @@
 <script setup lang="ts">
 // UiInput — flat input component (v-model:modelValue).
-// Referenced from the RSS reader's UiInput.vue.
 import { computed, type HTMLAttributes } from "vue";
 import { cn } from "../lib/cn";
 

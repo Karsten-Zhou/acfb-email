@@ -557,9 +557,7 @@ const listTitle = computed(() => {
       </div>
     </div>
 
-    <!-- Mobile compose FAB (replaces the redundant bottom nav — Mail/Settings
-         are reachable via the top bar + hamburger, Compose is the one action
-         that deserves a dedicated thumb-reachable button). -->
+    <!-- Mobile compose FAB -->
     <button
       v-if="!reading"
       class="fixed bottom-4 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 md:hidden"

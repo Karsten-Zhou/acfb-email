@@ -266,7 +266,7 @@ const downloadableAttachments = computed(() =>
                 v-if="moreOpen"
                 ref="moreMenuEl"
                 role="menu"
-                class="fixed z-[100] w-48 rounded-md border border-border bg-popover p-1 shadow-md"
+                class="fixed z-100 w-48 rounded-md border border-border bg-popover p-1 shadow-md"
                 :style="
                   morePos ? { left: `${morePos.left}px`, top: `${morePos.top}px` } : undefined
                 "
@@ -342,14 +342,14 @@ const downloadableAttachments = computed(() =>
           class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs transition-colors hover:bg-accent"
         >
           <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-          <span class="max-w-[200px] truncate">{{ a.filename || "attachment" }}</span>
+          <span class="max-w-50 truncate">{{ a.filename || "attachment" }}</span>
           <span v-if="a.size > 0" class="text-muted-foreground"
             >({{ formatAttachmentSize(a.size) }})</span
           >
         </a>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-5 py-5">
+      <div class="flex-1 overflow-y-auto p-5">
         <div
           class="email-body text-[15px]"
           v-html="

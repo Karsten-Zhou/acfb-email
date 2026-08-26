@@ -343,7 +343,7 @@ function discard() {
             class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
           >
             <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-            <span class="max-w-[220px] truncate">{{ a.name }}</span>
+            <span class="max-w-55 truncate">{{ a.name }}</span>
             <span v-if="a.size > 0" class="text-muted-foreground">
               ({{ formatAttachmentSize(a.size) }})
             </span>
