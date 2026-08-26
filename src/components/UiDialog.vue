@@ -1,8 +1,6 @@
 <script setup lang="ts">
 // UiDialog — accessible modal dialog (teleported to body with a backdrop),
-// built on reka-ui's Dialog. reka owns the focus trap, Escape handling, body
-// scroll lock, and ARIA wiring. Emits `close` when the backdrop, Escape, or the
-// (optional) close button is used.
+// built on reka-ui's Dialog.
 import {
   DialogContent,
   DialogDescription,

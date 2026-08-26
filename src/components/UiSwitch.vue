@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// UiSwitch — toggle switch (v-model:modelValue boolean) built on reka-ui's
-// Switch. reka owns the switch button semantics, ARIA, and keyboard handling.
+// UiSwitch — toggle switch (v-model:modelValue boolean) built on reka-ui's Switch.
 import { SwitchRoot, SwitchThumb } from "reka-ui";
 import { cn } from "../lib/cn";
 

@@ -15,10 +15,6 @@ const APP_REPO_URL = "https://github.com/XiaoSong-CPE/a-cloudflare-based-email-c
     </h2>
     <dl class="space-y-1.5 text-sm">
       <div class="flex justify-between">
-        <dt class="text-muted-foreground">{{ t("appName") }}</dt>
-        <dd class="font-medium">Cloudflare Email Client</dd>
-      </div>
-      <div class="flex justify-between">
         <dt class="text-muted-foreground">{{ t("version") }}</dt>
         <dd class="font-medium">{{ appVersion }}</dd>
       </div>

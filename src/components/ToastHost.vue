@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// ToastHost — fixed-bottom toast stack built on reka-ui's Toast. reka drives
-// the auto-dismiss timer, swipe-to-dismiss, and enter/exit animation; this host
-// just maps the store's items to ToastRoots (which teleport into the viewport).
+// ToastHost — fixed-bottom toast stack built on reka-ui's Toast.
 import { toastState, dismissToast, type ToastItem } from "../stores/toast";
 import {
   ToastClose,

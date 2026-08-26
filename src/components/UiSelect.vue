@@ -1,8 +1,6 @@
 <script setup lang="ts">
 // UiSelect — dropdown for choosing one of a small set of options, built on
-// reka-ui's Select. reka owns positioning (popper), keyboard navigation,
-// ARIA, and typeahead; SelectPortal teleports the menu to <body> so it can
-// never be clipped by an overflow ancestor.
+// reka-ui's Select.
 import { computed } from "vue";
 import {
   SelectContent,
@@ -55,14 +53,14 @@ function onValueChange(value: unknown) {
       <SelectContent
         position="popper"
         :side-offset="4"
-        class="z-100 min-w-[200px] w-[var(--reka-select-trigger-width)] max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
+        class="z-100 min-w-50 w-(--reka-select-trigger-width) max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
       >
         <SelectViewport>
           <SelectItem
             v-for="o in options"
             :key="o.value"
             :value="o.value"
-            class="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            class="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
           >
             <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
             <SelectItemIndicator>
