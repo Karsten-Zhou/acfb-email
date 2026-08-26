@@ -60,7 +60,7 @@ function onValueChange(value: unknown) {
             v-for="o in options"
             :key="o.value"
             :value="o.value"
-            class="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+            class="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none! data-highlighted:bg-accent data-highlighted:text-accent-foreground"
           >
             <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
             <SelectItemIndicator>
