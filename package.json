@@ -1,5 +1,5 @@
 {
-  "name": "cloudflare-email-client",
+  "name": "a-cloudflare-based-email-client",
   "private": true,
   "version": "0.1.0",
   "type": "module",
