@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // PreferencesPanel — language dropdown (Intl-named) + theme switcher.
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed } from "vue";
 import { t, setLocale, localeState, supportedLocales, type LocaleSetting } from "../../lib/i18n";
 import { themeState, setTheme, type ThemeSetting } from "../../lib/theme";
 import UiToolTip from "../../components/UiToolTip.vue";
-import { Languages, ChevronDown, Check, Monitor, Sun, Moon } from "lucide-vue-next";
+import UiSelect from "../../components/UiSelect.vue";
+import { Languages, Monitor, Sun, Moon } from "lucide-vue-next";
 
 const localeValue = computed({
   get: () => localeState.value.setting,
@@ -25,24 +26,11 @@ function languageLabel(lang: LocaleSetting): string {
       navigator.language,
   });
 }
-const languageMenuOpen = ref(false);
-const languageMenuRef = ref<HTMLElement | null>(null);
 
-function toggleLanguageMenu() {
-  languageMenuOpen.value = !languageMenuOpen.value;
-}
-function pickLanguage(v: LocaleSetting) {
-  setLocale(v);
-  languageMenuOpen.value = false;
-}
-/* Close the language dropdown on outside click. */
-function onDocClick(e: MouseEvent) {
-  if (languageMenuRef.value && !languageMenuRef.value.contains(e.target as Node)) {
-    languageMenuOpen.value = false;
-  }
-}
-onMounted(() => document.addEventListener("click", onDocClick));
-onUnmounted(() => document.removeEventListener("click", onDocClick));
+const localeOptions = computed(() => [
+  { value: "auto" as LocaleSetting, label: languageLabel("auto") },
+  ...supportedLocales.map((l) => ({ value: l, label: languageLabel(l) })),
+]);
 </script>
 
 <template>
@@ -53,47 +41,7 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
         <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Languages class="h-3.5 w-3.5" /> {{ t("language") }}
         </label>
-        <!-- Nice language dropdown (Intl-named options) -->
-        <div ref="languageMenuRef" class="relative">
-          <button
-            type="button"
-            class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-2.5 text-sm"
-            @click.stop="toggleLanguageMenu"
-          >
-            <span>{{ languageLabel(localeValue) }}</span>
-            <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-          <Transition
-            enter-active-class="transition-opacity duration-100"
-            leave-active-class="transition-opacity duration-75"
-            enter-from-class="opacity-0"
-            leave-to-class="opacity-0"
-          >
-            <div
-              v-if="languageMenuOpen"
-              class="absolute top-full left-0 z-10 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md"
-            >
-              <button
-                class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                :class="localeValue === 'auto' ? 'bg-accent text-accent-foreground' : ''"
-                @click="pickLanguage('auto')"
-              >
-                <span>{{ languageLabel("auto") }}</span>
-                <Check v-if="localeValue === 'auto'" class="h-4 w-4 text-primary" />
-              </button>
-              <button
-                v-for="l in supportedLocales"
-                :key="l"
-                class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                :class="localeValue === l ? 'bg-accent text-accent-foreground' : ''"
-                @click="pickLanguage(l)"
-              >
-                <span>{{ languageLabel(l) }}</span>
-                <Check v-if="localeValue === l" class="h-4 w-4 text-primary" />
-              </button>
-            </div>
-          </Transition>
-        </div>
+        <UiSelect v-model="localeValue" :options="localeOptions" :aria-label="t('language')" />
       </div>
       <div class="space-y-2">
         <label class="text-xs font-medium text-muted-foreground">{{ t("theme") }}</label>
