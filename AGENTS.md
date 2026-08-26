@@ -97,8 +97,6 @@ Some tooling details that matter:
 
 - Email HTML is sanitized client-side with DOMPurify before `v-html`. The shared
   entry is `sanitizeHtml()` in `src/lib/sanitize.ts`:
-  - Re-allows the legacy presentational `align` attribute on table elements
-    (ubiquitous in email HTML; safe, no URL surface).
   - Rewrites `cid:` inline-image references to the app's attachment endpoint.
     It lets DOMPurify parse & sanitize first (`RETURN_DOM`), then walks the
     already-clean output tree with DOM APIs — never regexes raw email HTML.
