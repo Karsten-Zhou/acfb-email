@@ -1,6 +1,8 @@
-// Toast store: minimal reactive toast notifications (no external dep).
+// Toast store: minimal reactive toast notifications.
 // Surfaces non-blocking feedback for async actions that would otherwise fail
-// silently (message load, flags, sync, send, account ops...). Auto-dismisses.
+// silently (message load, flags, sync, send, account ops...). reka's Toast
+// drives the auto-dismiss timer and exit animation; this store just holds the
+// list and a controlled `open` flag per item.
 import { reactive } from "vue";
 
 export type ToastKind = "success" | "error";
@@ -10,9 +12,10 @@ export interface ToastItem {
   kind: ToastKind;
   message: string;
   description?: string;
+  /** Controlled open state, managed by ToastHost so reka can animate the exit. */
+  open: boolean;
 }
 
-const AUTO_DISMISS_MS = 5000;
 let nextId = 0;
 
 export const toastState = reactive<{
@@ -21,20 +24,13 @@ export const toastState = reactive<{
   items: [],
 });
 
-const timers = new Map<number, ReturnType<typeof setTimeout>>();
-
 export function dismissToast(id: number): void {
-  const timer = timers.get(id);
-  if (timer) clearTimeout(timer);
-  timers.delete(id);
   toastState.items = toastState.items.filter((item) => item.id !== id);
 }
 
 export function pushToast(kind: ToastKind, message: string, description?: string): number {
   const id = ++nextId;
-  toastState.items.push({ id, kind, message, description });
-  const timer = setTimeout(() => dismissToast(id), AUTO_DISMISS_MS);
-  timers.set(id, timer);
+  toastState.items.push({ id, kind, message, description, open: true });
   return id;
 }
 
