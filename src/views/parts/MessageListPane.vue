@@ -91,11 +91,13 @@ function onTouchEnd() {
 </script>
 
 <template>
-  <!-- Desktop: cap the list width so the reading pane gets comfortable room
-       (max-w-xl ≈ 36rem; more than that doesn't add row readability). -->
+  <!-- Desktop (lg+): cap the list width so the reading pane gets comfortable
+       room (max-w-xl ≈ 36rem; more than that doesn't add row readability).
+       Below lg the list and reader swap (only one shows beside the sidebar),
+       so the list fills the remaining width without a cap. -->
   <section
-    class="flex min-w-0 flex-1 flex-col border-r border-border bg-background md:max-w-xl"
-    :class="reading ? 'hidden md:flex' : 'flex'"
+    class="flex min-w-0 flex-1 flex-col border-r border-border bg-background lg:max-w-xl"
+    :class="reading ? 'hidden lg:flex' : 'flex'"
   >
     <header
       class="hidden flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 md:flex"

@@ -158,7 +158,7 @@ const downloadableAttachments = computed(() =>
   <section
     ref="paneEl"
     class="min-w-0 flex-1 flex-col bg-background"
-    :class="mailState.selected || loading ? 'flex md:flex' : 'hidden md:flex'"
+    :class="mailState.selected || loading ? 'flex' : 'hidden lg:flex'"
   >
     <!-- Loading takes priority: on the first click the route triggers and
          `selected` isn't set yet, so the spinner must show immediately
@@ -178,7 +178,7 @@ const downloadableAttachments = computed(() =>
     <template v-else>
       <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
         <AppTooltip :label="t('content')" side="bottom">
-          <Button variant="ghost" size="icon" class="h-8 w-8 md:hidden" @click="emit('back')">
+          <Button variant="ghost" size="icon" class="h-8 w-8 lg:hidden" @click="emit('back')">
             <ChevronLeft class="h-4 w-4" />
           </Button>
         </AppTooltip>

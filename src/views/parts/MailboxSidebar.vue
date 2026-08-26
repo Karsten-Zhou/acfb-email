@@ -50,14 +50,23 @@ const roleIcon: Record<string, typeof Inbox> = {
 </script>
 
 <template>
-  <!-- Mobile backdrop (below md) -->
-  <div v-if="open" class="fixed inset-0 z-30 bg-black/50 md:hidden" @click="emit('close')" />
-  <!-- Mobile drawer: fixed overlay when open; desktop: static column. -->
+  <!-- Mobile backdrop (below md) — fades in with the drawer. -->
+  <Transition
+    enter-active-class="transition-opacity duration-300 ease-out"
+    leave-active-class="transition-opacity duration-200 ease-in"
+    enter-from-class="opacity-0"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="open" class="fixed inset-0 z-30 bg-black/50 md:hidden" @click="emit('close')" />
+  </Transition>
+  <!-- Mobile drawer: always rendered as a fixed overlay that slides in from
+       the left when `open` (translate + visibility so the slide-out animates
+       too); on md+ it becomes the static column of the pane layout.
+       Note: Tailwind v4's translate-* utilities drive the CSS `translate`
+       property (not transform), so the transition must list `translate`. -->
   <aside
-    class="w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex"
-    :class="
-      open ? 'fixed inset-y-0 left-0 z-40 flex shadow-2xl md:static md:flex' : 'hidden md:flex'
-    "
+    class="flex w-64 flex-shrink-0 flex-col border-r border-border bg-card fixed inset-y-0 left-0 z-40 shadow-2xl transition-[translate,visibility] duration-300 ease-out md:static md:flex md:translate-x-0 md:visible md:shadow-none"
+    :class="open ? 'translate-x-0 visible' : '-translate-x-full invisible'"
   >
     <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
       <span class="text-sm font-semibold tracking-tight">Mail</span>
