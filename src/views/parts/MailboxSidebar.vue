@@ -94,8 +94,8 @@ const roleIcon: Record<string, typeof Inbox> = {
     </div>
 
     <div class="px-3 py-2">
-      <Button class="w-full" variant="default" size="sm" @click="router.push({ name: 'compose' })">
-        <Plus class="h-4 w-4" /> Compose
+      <Button class="w-full" variant="default" size="sm" as-child>
+        <RouterLink to="/compose"> <Plus class="h-4 w-4" /> Compose </RouterLink>
       </Button>
     </div>
 

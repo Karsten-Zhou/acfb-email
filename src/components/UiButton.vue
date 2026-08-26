@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// UiButton — flat button component (plain <button>, no reka Primitive).
-// Kept without Primitive to avoid the reka render-slot crash seen earlier in this project.
+// UiButton — flat button component built on reka-ui's Primitive, so it can
+// render as any element/component (`as`) or merge onto a child (`asChild`).
 import { computed, type HTMLAttributes } from "vue";
+import { Primitive, type PrimitiveProps } from "reka-ui";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
 
@@ -42,9 +43,18 @@ const props = withDefaults(
     variant?: ButtonVariants["variant"];
     size?: ButtonVariants["size"];
     type?: "button" | "submit" | "reset";
+    as?: PrimitiveProps["as"];
+    asChild?: PrimitiveProps["asChild"];
     class?: HTMLAttributes["class"];
   }>(),
-  { variant: "default", size: "default", type: "button", class: undefined },
+  {
+    variant: "default",
+    size: "default",
+    type: "button",
+    as: "button",
+    asChild: false,
+    class: undefined,
+  },
 );
 
 const computedClass = computed(() =>
@@ -53,7 +63,7 @@ const computedClass = computed(() =>
 </script>
 
 <template>
-  <button :type="type" :class="computedClass" :data-slot="'button'">
+  <Primitive :as="as" :as-child="asChild" :type="type" :class="computedClass" :data-slot="'button'">
     <slot />
-  </button>
+  </Primitive>
 </template>
