@@ -92,7 +92,7 @@ app.onError((err, c) => {
 // 15 minutes of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox
 // IMAP sync needs. syncAccount persists the account state; errors are acked
 // (no infinite retries) and surfaced through the account's state_message.
-export async function queue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
+async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     const { accountId } = msg.body;
     try {
@@ -103,4 +103,10 @@ export async function queue(batch: MessageBatch<SyncMessage>, env: Env): Promise
   }
 }
 
-export default app;
+// The Cloudflare Vite plugin only registers queue consumers exposed on the
+// default export object (alongside `fetch`); a standalone named `queue` export
+// is not detected as a queue handler and the consumer attach fails.
+export default {
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  queue: handleQueue,
+};
