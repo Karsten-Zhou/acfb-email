@@ -112,26 +112,23 @@ function onTouchEnd() {
         >
           <MailOpen class="h-3.5 w-3.5" /> {{ t("showOnlyUnread") }}
         </button>
-        <AppTooltip v-if="actionsVisible" :label="t('markRead')">
-          <Button variant="ghost" size="sm" @click="emit('mark-read')">
-            {{ t("markRead") }}
-          </Button>
-        </AppTooltip>
+        <Button v-if="actionsVisible" variant="ghost" size="sm" @click="emit('mark-read')">
+          {{ t("markRead") }}
+        </Button>
         <AppTooltip v-if="actionsVisible" :label="t('moveTo')">
           <Button variant="ghost" size="sm" @click="emit('move-selected')">
             <FolderInput class="h-4 w-4" /> {{ t("move") }}
           </Button>
         </AppTooltip>
-        <AppTooltip v-if="actionsVisible" :label="t('delete')">
-          <Button
-            variant="ghost"
-            size="sm"
-            class="text-destructive"
-            @click="emit('confirm-delete')"
-          >
-            <Trash2 class="h-4 w-4" /> {{ t("delete") }} ({{ selectedCount }})
-          </Button>
-        </AppTooltip>
+        <Button
+          v-if="actionsVisible"
+          variant="ghost"
+          size="sm"
+          class="text-destructive"
+          @click="emit('confirm-delete')"
+        >
+          <Trash2 class="h-4 w-4" /> {{ t("delete") }} ({{ selectedCount }})
+        </Button>
       </div>
     </header>
 

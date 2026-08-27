@@ -3,7 +3,6 @@
 import { computed } from "vue";
 import { t, setLocale, localeState, supportedLocales, type LocaleSetting } from "../../lib/i18n";
 import { themeState, setTheme, type ThemeSetting } from "../../lib/theme";
-import UiToolTip from "../../components/UiToolTip.vue";
 import UiSelect from "../../components/UiSelect.vue";
 import { Languages, Monitor, Sun, Moon } from "lucide-vue-next";
 
@@ -46,45 +45,39 @@ const localeOptions = computed(() => [
       <div class="space-y-2">
         <label class="text-xs font-medium text-muted-foreground">{{ t("theme") }}</label>
         <div class="flex gap-1.5">
-          <UiToolTip :label="t('themeAuto')">
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="
-                themeValue === 'auto'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-accent'
-              "
-              @click="themeValue = 'auto'"
-            >
-              <Monitor class="h-3.5 w-3.5" /> {{ t("themeAuto") }}
-            </button>
-          </UiToolTip>
-          <UiToolTip :label="t('themeLight')">
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="
-                themeValue === 'light'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-accent'
-              "
-              @click="themeValue = 'light'"
-            >
-              <Sun class="h-3.5 w-3.5" /> {{ t("themeLight") }}
-            </button>
-          </UiToolTip>
-          <UiToolTip :label="t('themeDark')">
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
-              :class="
-                themeValue === 'dark'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-accent'
-              "
-              @click="themeValue = 'dark'"
-            >
-              <Moon class="h-3.5 w-3.5" /> {{ t("themeDark") }}
-            </button>
-          </UiToolTip>
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
+            :class="
+              themeValue === 'auto'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'hover:bg-accent'
+            "
+            @click="themeValue = 'auto'"
+          >
+            <Monitor class="h-3.5 w-3.5" /> {{ t("themeAuto") }}
+          </button>
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
+            :class="
+              themeValue === 'light'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'hover:bg-accent'
+            "
+            @click="themeValue = 'light'"
+          >
+            <Sun class="h-3.5 w-3.5" /> {{ t("themeLight") }}
+          </button>
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
+            :class="
+              themeValue === 'dark'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'hover:bg-accent'
+            "
+            @click="themeValue = 'dark'"
+          >
+            <Moon class="h-3.5 w-3.5" /> {{ t("themeDark") }}
+          </button>
         </div>
       </div>
     </div>

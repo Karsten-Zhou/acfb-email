@@ -224,12 +224,10 @@ function discard() {
         <h1 class="text-sm font-semibold">{{ t("newMessage") }}</h1>
       </div>
       <div class="flex items-center gap-2 px-3 pb-2">
-        <AppTooltip :label="sending ? t('sending') : t('send')">
-          <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
-            <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
-            <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
-          </Button>
-        </AppTooltip>
+        <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
+          <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
+          <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
+        </Button>
 
         <UiSelect
           v-model="accountId"
@@ -240,13 +238,11 @@ function discard() {
 
         <div class="flex-1" />
 
-        <AppTooltip :label="t('saveDraft')">
-          <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
-            <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
-            <FilePlus2 v-else class="h-4 w-4" />
-            <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
-          </Button>
-        </AppTooltip>
+        <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
+          <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
+          <FilePlus2 v-else class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
+        </Button>
 
         <AppTooltip :label="t('discard')">
           <Button variant="ghost-destructive" size="icon" class="h-8 w-8" @click="discard">
