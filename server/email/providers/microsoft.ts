@@ -21,6 +21,7 @@ import {
   b64urlToBytes,
 } from "./oauth-util";
 import type { OAuthToken } from "../../oauth/client";
+import type { MailboxRole } from "@shared/constants";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
@@ -81,14 +82,47 @@ export class MicrosoftProvider implements IEmailProvider {
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
+    // Resolve the locale-independent well-known folder ids once so each folder
+    // can be tagged with its canonical role regardless of its display name.
+    const roleById = await this.wellKnownFolderRoles();
     const { status, json, errorText } = await providerGet(
       `${GRAPH}/me/mailFolders?$select=id,displayName,parentFolderId`,
       this.token.access_token,
     );
     if (status !== 200) throw new Error(`Failed to list Outlook folders (${errorText ?? status})`);
     const folders = (json as { value?: { id: string; displayName: string }[] }).value ?? [];
-    // Include standard well-known folders plus favorites; use displayName as path.
-    return folders.map((f) => ({ name: f.displayName, delimiter: "/", flags: [] }));
+    return folders.map((f) => ({
+      name: f.displayName,
+      delimiter: "/",
+      flags: [],
+      role: roleById.get(f.id),
+    }));
+  }
+
+  /** Map Graph well-known folder ids (locale-independent) to canonical roles. */
+  private async wellKnownFolderRoles(): Promise<Map<string, MailboxRole>> {
+    const wellKnown: Record<string, MailboxRole> = {
+      inbox: "inbox",
+      sentitems: "sent",
+      drafts: "drafts",
+      archive: "archive",
+      junkemail: "spam",
+      deleteditems: "trash",
+    };
+    const results = await Promise.all(
+      Object.entries(wellKnown).map(async ([name, role]) => {
+        const { status, json } = await providerGet(
+          `${GRAPH}/me/mailFolders/${name}?$select=id`,
+          this.token.access_token,
+        );
+        return { role, id: status === 200 ? (json as { id?: string }).id : undefined };
+      }),
+    );
+    const map = new Map<string, MailboxRole>();
+    for (const r of results) {
+      if (r.id) map.set(r.id, r.role);
+    }
+    return map;
   }
 
   async syncMailbox(

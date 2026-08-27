@@ -2,12 +2,16 @@
 // ever talks to this interface, so adding Gmail/Microsoft/POP3 later is a
 // matter of implementing this interface.
 
-import type { ProviderType } from "@shared/constants";
+import type { MailboxRole, ProviderType } from "@shared/constants";
 
 export interface ProviderMailbox {
   name: string; // display/path name
   delimiter: string | null;
   flags: string[];
+  /** Canonical role when the provider can identify it reliably (IMAP
+   *  SPECIAL-USE flags, Gmail system label, Graph well-known folder name) —
+   *  independent of the folder's display name/locale. */
+  role?: MailboxRole;
 }
 
 export interface ProviderAddress {

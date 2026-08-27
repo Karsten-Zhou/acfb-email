@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 import { buildProvider } from "../email/providers";
 import { roleFromImapName, roleSortOrder } from "../email/providers/role-map";
 import { decodeModifiedUtf7 } from "../email/imap/modified-utf7";
-import type { ProviderMessage } from "../email/providers/types";
+import type { ProviderMailbox, ProviderMessage } from "../email/providers/types";
 import type { Env } from "../env";
 
 interface AcctRow {
@@ -67,7 +67,7 @@ export async function syncAccount(
       let messagesSeen = 0;
 
       for (const mb of mailboxes) {
-        const result = await syncOneMailbox(env, provider, account, mb.name);
+        const result = await syncOneMailbox(env, provider, account, mb);
         mailboxesSynced += result.synced ? 1 : 0;
         messagesSeen += result.seen;
       }
@@ -111,10 +111,10 @@ async function syncOneMailbox(
   env: Env,
   provider: Awaited<ReturnType<typeof buildProvider>>,
   account: AcctRow,
-  mailboxPath: string,
+  mb: ProviderMailbox,
 ): Promise<{ synced: boolean; seen: number }> {
   // Find/create the mailbox row.
-  const mailbox = await upsertMailbox(env, account.id, mailboxPath);
+  const mailbox = await upsertMailbox(env, account.id, mb);
 
   // Load sync cursors (per-mailbox: UIDs are mailbox-scoped in IMAP).
   const syncRow = await getSyncState(env, account.id, mailbox.id);
@@ -122,7 +122,7 @@ async function syncOneMailbox(
   const uidValidity = syncRow?.uid_validity ?? null;
 
   const fetchLimit = parseInt(env.SYNC_FETCH_LIMIT ?? "200", 10) || 200;
-  const result = await provider.syncMailbox(mailboxPath, {
+  const result = await provider.syncMailbox(mb.name, {
     sinceUid,
     fetchLimit,
   });
@@ -278,26 +278,44 @@ async function upsertMessage(
   }
 }
 
-async function upsertMailbox(env: Env, accountId: string, path: string): Promise<{ id: string }> {
+async function upsertMailbox(
+  env: Env,
+  accountId: string,
+  mb: ProviderMailbox,
+): Promise<{ id: string }> {
   const existing = await env.DB.prepare(
-    `SELECT id, provider_path FROM mailboxes WHERE account_id = ? AND provider_path = ?`,
+    `SELECT id, role, provider_path FROM mailboxes WHERE account_id = ? AND provider_path = ?`,
   )
-    .bind(accountId, path)
-    .first<{ id: string }>();
+    .bind(accountId, mb.name)
+    .first<{ id: string; role: string }>();
 
-  if (existing) return existing;
+  if (existing) {
+    // Re-derive the role so improvements to role detection (SPECIAL-USE flags,
+    // well-known folders) apply to already-synced mailboxes too — e.g. a
+    // non-English provider whose name heuristic earlier fell back to "other".
+    const role = mb.role ?? roleFromImapName(decodeModifiedUtf7(mb.name), mb.flags);
+    if (existing.role !== role) {
+      await env.DB.prepare(`UPDATE mailboxes SET role = ?, sort_order = ? WHERE id = ?`)
+        .bind(role, roleSortOrder(role), existing.id)
+        .run();
+    }
+    return existing;
+  }
 
   const id = randomUUID();
   // Decode IMAP modified-UTF-7 folder names (non-ASCII) for display; the raw
   // provider_path is kept for IMAP commands.
-  const displayName = decodeModifiedUtf7(path);
-  const role = roleFromImapName(displayName, []);
+  const displayName = decodeModifiedUtf7(mb.name);
+  // Prefer the provider's detected role (SPECIAL-USE flags / well-known
+  // folder) so it's correct even when the folder name is localized; fall back
+  // to name heuristics.
+  const role = mb.role ?? roleFromImapName(displayName, mb.flags);
   const sortOrder = roleSortOrder(role);
   await env.DB.prepare(
     `INSERT INTO mailboxes (id, account_id, name, role, provider_path, sort_order)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(id, accountId, displayName, role, path, sortOrder)
+    .bind(id, accountId, displayName, role, mb.name, sortOrder)
     .run();
   return { id };
 }
@@ -367,7 +385,13 @@ export async function importOlderPage(
     beforeDate,
     fetchLimit: limit,
   });
-  const mailbox = await upsertMailbox(env, account.id, mailboxPath);
+  // The mailbox already exists (created during the initial sync, where its
+  // role was resolved); this just looks it up by provider path.
+  const mailbox = await upsertMailbox(env, account.id, {
+    name: mailboxPath,
+    delimiter: null,
+    flags: [],
+  });
   for (const msg of result.messages) {
     await upsertMessage(env, fullAccount, mailbox, null, msg);
   }

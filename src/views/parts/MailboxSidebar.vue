@@ -5,6 +5,7 @@
 import { useRouter } from "vue-router";
 import { accountsState } from "../../stores/accounts";
 import { t } from "../../lib/i18n";
+import { roleLabel } from "../../lib/roles";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
 import {
@@ -151,7 +152,9 @@ const roleIcon: Record<string, typeof Inbox> = {
           @click="emit('select', item.mailbox.id)"
         >
           <component :is="roleIcon[item.mailbox.role] || Inbox" class="h-4 w-4 shrink-0" />
-          <span class="grow truncate text-left">{{ item.mailbox.name }}</span>
+          <span class="grow truncate text-left">{{
+            roleLabel(item.mailbox.role) ?? item.mailbox.name
+          }}</span>
           <span
             v-if="unread(item)"
             class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground"

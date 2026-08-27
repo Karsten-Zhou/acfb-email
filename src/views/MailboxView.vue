@@ -21,6 +21,7 @@ import {
 } from "../stores/mail";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
+import { roleLabel } from "../lib/roles";
 import { toastError, toastSuccess } from "../stores/toast";
 import Button from "../components/UiButton.vue";
 import UiDialog from "../components/UiDialog.vue";
@@ -78,16 +79,6 @@ const moving = ref(false);
 const pendingMoveIds = ref<string[]>([]);
 /** The account whose mailboxes the move dialog lists (moves stay in-account). */
 const moveAccountId = ref<string | null>(null);
-
-const roleLabel: Record<string, string> = {
-  inbox: "Inbox",
-  all: "All Mail",
-  sent: "Sent",
-  drafts: "Drafts",
-  archive: "Archive",
-  spam: "Spam",
-  trash: "Trash",
-};
 
 const roleIcon: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -483,7 +474,7 @@ watch(
 const listTitle = computed(() => {
   if (activeMailboxId.value === "unified") return t("unifiedInbox");
   const item = mailboxTree.value.find((t) => t.mailbox.id === activeMailboxId.value);
-  return roleLabel[item?.mailbox.role ?? "inbox"] ?? item?.mailbox.name ?? "Mailbox";
+  return roleLabel(item?.mailbox.role) ?? item?.mailbox.name ?? "Mailbox";
 });
 </script>
 
@@ -631,7 +622,9 @@ const listTitle = computed(() => {
             :is="roleIcon[item.mailbox.role] || Inbox"
             class="h-4 w-4 shrink-0 text-muted-foreground"
           />
-          <span class="min-w-0 flex-1 truncate">{{ item.mailbox.name }}</span>
+          <span class="min-w-0 flex-1 truncate">{{
+            roleLabel(item.mailbox.role) ?? item.mailbox.name
+          }}</span>
         </button>
       </div>
       <template #footer>

@@ -67,7 +67,15 @@ export class ImapProvider implements IEmailProvider {
     try {
       await imap.connect();
       const boxes = await imap.listMailboxes();
-      return boxes.map((b) => ({ name: b.name, delimiter: b.delimiter, flags: b.flags }));
+      return boxes.map((b) => ({
+        name: b.name,
+        delimiter: b.delimiter,
+        flags: b.flags,
+        // Use the server's SPECIAL-USE flags (e.g. \Sent, \Drafts, \Trash,
+        // \Junk, \Archive) which are locale-independent, falling back to the
+        // display name.
+        role: roleFromImapName(b.name, b.flags),
+      }));
     } finally {
       await imap.close().catch(() => {});
     }

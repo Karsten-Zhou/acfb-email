@@ -22,6 +22,7 @@ import {
   providerJsonPatch,
 } from "./oauth-util";
 import type { OAuthToken } from "../../oauth/client";
+import { roleFromImapName } from "./role-map";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -63,7 +64,14 @@ export class GmailProvider implements IEmailProvider {
     const { status, json, errorText } = await providerGet(`${API}/labels`, this.token.access_token);
     if (status !== 200) throw new Error(`Failed to list Gmail labels (${errorText ?? status})`);
     const labels = (json as { labels?: { id: string; name: string }[] }).labels ?? [];
-    return labels.map((l) => ({ name: l.name, delimiter: "/", flags: [] }));
+    // Gmail system labels have fixed English names regardless of mailbox
+    // locale, so the name-based role mapping is reliable here.
+    return labels.map((l) => ({
+      name: l.name,
+      delimiter: "/",
+      flags: [],
+      role: roleFromImapName(l.name, []),
+    }));
   }
 
   async syncMailbox(
