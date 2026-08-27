@@ -163,7 +163,7 @@ async function syncOneMailbox(
 async function upsertMessage(
   env: Env,
   account: AcctRow,
-  mailbox: { id: string },
+  mailbox: { id: string; role: string },
   uidValidity: number | null,
   msg: ProviderMessage,
 ): Promise<void> {
@@ -197,16 +197,23 @@ async function upsertMessage(
     .bind(mailbox.id, providerKey)
     .first<{ id: string }>();
 
-  // Outlook (Microsoft Graph) assigns a fresh message id whenever a message is
-  // moved between folders, so the per-mailbox provider-id key above cannot
-  // recognize the same physical message re-entering a folder — it would insert
-  // a duplicate row. The Message-ID header is stable across moves, so collapse
-  // any same-message rows (keeping the row we're about to update, if any) to
-  // leave a single canonical entry. Safe for Outlook because each message
-  // lives in exactly one folder.
-  if (account.provider === "microsoft" && msg.messageId) {
+  // Moving a message between folders changes its provider id (IMAP UID on a
+  // move, Microsoft Graph id on a move), so the per-mailbox provider-id key
+  // above cannot recognize the same physical message re-entering a folder — it
+  // would insert a duplicate row. The Message-ID header is stable across
+  // moves, so collapse any same-message rows (keeping the row we're about to
+  // update, if any). Safe for IMAP/Microsoft where a message lives in one
+  // folder; rows in "all"-role mailboxes (e.g. Gmail IMAP All Mail) are
+  // excluded because they legitimately mirror other folders.
+  if (
+    (account.provider === "microsoft" || account.provider === "imap") &&
+    msg.messageId &&
+    mailbox.role !== "all"
+  ) {
     await env.DB.prepare(
-      `DELETE FROM messages WHERE account_id = ? AND maybe_thread_id = ? AND id != ?`,
+      `DELETE FROM messages
+         WHERE account_id = ? AND maybe_thread_id = ? AND id != ?
+           AND mailbox_id NOT IN (SELECT id FROM mailboxes WHERE role = 'all')`,
     )
       .bind(account.id, msg.messageId, existing?.id ?? "")
       .run();
@@ -282,7 +289,7 @@ async function upsertMailbox(
   env: Env,
   accountId: string,
   mb: ProviderMailbox,
-): Promise<{ id: string }> {
+): Promise<{ id: string; role: string }> {
   const existing = await env.DB.prepare(
     `SELECT id, role, provider_path FROM mailboxes WHERE account_id = ? AND provider_path = ?`,
   )
@@ -317,7 +324,7 @@ async function upsertMailbox(
   )
     .bind(id, accountId, displayName, role, mb.name, sortOrder)
     .run();
-  return { id };
+  return { id, role };
 }
 
 async function getAccount(env: Env, accountId: string): Promise<AcctRow | null> {
