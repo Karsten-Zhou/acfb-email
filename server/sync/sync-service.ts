@@ -197,6 +197,21 @@ async function upsertMessage(
     .bind(mailbox.id, providerKey)
     .first<{ id: string }>();
 
+  // Outlook (Microsoft Graph) assigns a fresh message id whenever a message is
+  // moved between folders, so the per-mailbox provider-id key above cannot
+  // recognize the same physical message re-entering a folder — it would insert
+  // a duplicate row. The Message-ID header is stable across moves, so collapse
+  // any same-message rows (keeping the row we're about to update, if any) to
+  // leave a single canonical entry. Safe for Outlook because each message
+  // lives in exactly one folder.
+  if (account.provider === "microsoft" && msg.messageId) {
+    await env.DB.prepare(
+      `DELETE FROM messages WHERE account_id = ? AND maybe_thread_id = ? AND id != ?`,
+    )
+      .bind(account.id, msg.messageId, existing?.id ?? "")
+      .run();
+  }
+
   if (existing) {
     // Update flags/read state if changed.
     await env.DB.prepare(
