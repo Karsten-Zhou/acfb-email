@@ -10,7 +10,7 @@ import {
   markAccountSyncing,
   clearAccountSyncing,
 } from "../stores/accounts";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { t } from "../lib/i18n";
 import { toastSuccess } from "../stores/toast";
 import { formatAttachmentSize } from "../lib/utils";
@@ -103,15 +103,24 @@ onMounted(async () => {
   const draftParam = route.params.draftId as string | undefined;
   if (draftParam) {
     draftId.value = draftParam;
-    const { message } = await api.message(draftParam);
-    if (message.accountId) accountId.value = message.accountId;
-    to.value = message.to.map((a) => a.address).join(", ");
-    cc.value = message.cc.map((a) => a.address).join(", ");
-    bcc.value = message.bcc.map((a) => a.address).join(", ");
-    showCc.value = message.cc.length > 0;
-    showBcc.value = message.bcc.length > 0;
-    subject.value = message.subject ?? "";
-    body.value = message.html ?? message.text ?? "";
+    try {
+      const { message } = await api.message(draftParam);
+      if (message.accountId) accountId.value = message.accountId;
+      to.value = message.to.map((a) => a.address).join(", ");
+      cc.value = message.cc.map((a) => a.address).join(", ");
+      bcc.value = message.bcc.map((a) => a.address).join(", ");
+      showCc.value = message.cc.length > 0;
+      showBcc.value = message.bcc.length > 0;
+      subject.value = message.subject ?? "";
+      body.value = message.html ?? message.text ?? "";
+    } catch (err) {
+      // The draft is gone upstream — the api layer already toasted the reason
+      // and the backend pruned the stale row, so leave compose. Any other
+      // error leaves us here with the (empty) form and its own toast.
+      if (err instanceof ApiError && err.code === "message_gone") {
+        await router.replace({ name: "mailbox" });
+      }
+    }
   }
 });
 

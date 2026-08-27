@@ -17,6 +17,7 @@ import {
 } from "@shared/schemas";
 import type { Message, MessageDetail } from "@shared/types";
 import type { MessageRow } from "../db/repo";
+import type { ProviderBody } from "../email/providers/types";
 
 export const messageRoutes = new Hono<{ Bindings: Env }>();
 messageRoutes.use("*", requireAuth);
@@ -150,7 +151,19 @@ messageRoutes.get("/:id", async (c) => {
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
     const providerId = providerIdFor(account.provider, row);
-    const body = await provider.fetchBody(row.provider_path, providerId);
+    let body: ProviderBody;
+    try {
+      body = await provider.fetchBody(row.provider_path, providerId);
+    } catch (err) {
+      // The provider no longer has this message (e.g. a draft deleted
+      // upstream). Prune the stale row so it drops out of the list, and tell
+      // the client it's gone instead of surfacing a 500.
+      if (isMessageGone(err)) {
+        await repo.deleteMessage(c.env, row.id);
+        throw new HttpError(410, "This message is no longer available", "message_gone");
+      }
+      throw err;
+    }
     html = body.html;
     text = body.text;
     await repo.markBodyFetched(c.env, row.id, html, text);
@@ -302,7 +315,13 @@ messageRoutes.post("/delete", async (c) => {
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
     const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
-    await provider.delete(box.provider_path, pids);
+    try {
+      await provider.delete(box.provider_path, pids);
+    } catch (err) {
+      // The object is already gone upstream — still prune the local rows so
+      // a stale entry doesn't linger and 404 later.
+      if (!isMessageGone(err)) throw err;
+    }
     for (const m of msgs) await repo.deleteMessage(c.env, m.id);
     await repo.refreshUnseen(c.env, mailboxId);
   }
@@ -403,4 +422,9 @@ function providerIdFor(
     return String(row.remote_uid ?? "");
   }
   return row.remote_message_id ?? "";
+}
+/** True when a provider error means the message no longer exists upstream. */
+function isMessageGone(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b404\b/.test(msg) || /not found/i.test(msg) || /does not exist/i.test(msg);
 }
