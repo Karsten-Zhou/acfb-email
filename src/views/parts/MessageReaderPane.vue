@@ -25,11 +25,14 @@ import {
   MoreHorizontal,
 } from "lucide-vue-next";
 
-defineProps<{
+const props = defineProps<{
   loading: boolean;
   /** True while the mark-read/mark-unread toggle request is in flight — shows
    *  a spinner inside the toggle button instead of blanking the whole pane. */
   togglingRead: boolean;
+  /** True while the star toggle request is in flight — shows a spinner in the
+   *  star button and the compact "…" menu item. */
+  togglingStar: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -126,9 +129,17 @@ onUnmounted(() => {
   resizeObserver = null;
 });
 
-/** Run a mobile-menu action (closes the menu, then forwards the emit). */
+/** Run a mobile-menu action. Star/read leave the menu open so their in-flight
+ *  spinner is visible; the watcher below closes it once the request settles.
+ *  Everything else dismisses immediately. */
 function runAction(action: ReaderAction) {
-  closeMore();
+  switch (action) {
+    case "toggle-star":
+    case "toggle-read":
+      break;
+    default:
+      closeMore();
+  }
   switch (action) {
     case "reply":
       emit("reply");
@@ -147,6 +158,15 @@ function runAction(action: ReaderAction) {
       break;
   }
 }
+
+// When a star/read request started from the menu settles, close the menu that
+// was kept open to show its spinner.
+watch(
+  [() => props.togglingStar, () => props.togglingRead],
+  ([star, read], [prevStar, prevRead]) => {
+    if ((prevStar && !star) || (prevRead && !read)) closeMore();
+  },
+);
 
 /** Attachments the user can download (inline images stay embedded in the body). */
 const downloadableAttachments = computed(() =>
@@ -204,8 +224,16 @@ const downloadableAttachments = computed(() =>
             </Button>
           </AppTooltip>
           <AppTooltip :label="t('star')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggle-star')">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :disabled="togglingStar"
+              @click="emit('toggle-star')"
+            >
+              <Loader2 v-if="togglingStar" class="h-4 w-4 animate-spin" />
               <Star
+                v-else
                 class="h-4 w-4"
                 :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
               />
@@ -280,10 +308,13 @@ const downloadableAttachments = computed(() =>
                 </button>
                 <button
                   role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  :disabled="togglingStar"
                   @click="runAction('toggle-star')"
                 >
+                  <Loader2 v-if="togglingStar" class="h-4 w-4 animate-spin" />
                   <Star
+                    v-else
                     class="h-4 w-4"
                     :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
                   />

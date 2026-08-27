@@ -65,6 +65,9 @@ const deleting = ref(false);
 const loadingMessage = ref(false);
 /** Read-toggle in flight: spinner shows on the reader's mark-read button. */
 const togglingRead = ref(false);
+/** Star-toggle in flight: spinner shows on the reader's star button (and in
+ *  the compact "…" menu when the pane is narrow). */
+const togglingStar = ref(false);
 /** Pull-to-refresh in flight (mobile touch drag). */
 const refreshing = ref(false);
 /** If set, the confirm dialog targets a single message (from the reading pane). */
@@ -217,8 +220,15 @@ function selectMailbox(id: string) {
   void loadInto();
 }
 
-/** Open a message: desktop reads it in the rightmost pane via the route. */
+/** Open a message: desktop reads it in the rightmost pane via the route.
+ *  Drafts in the Drafts folder open in the Compose editor instead, so the
+ *  user can continue editing them. */
 function openMessageRow(m: Message) {
+  const box = mailboxTree.value.find((t) => t.mailbox.id === m.mailboxId);
+  if (box?.mailbox.role === "drafts") {
+    router.push({ name: "compose-draft", params: { draftId: m.id } });
+    return;
+  }
   router.push({ name: "message", params: { id: m.id } });
   reading.value = true; // mobile: show the compact reader
 }
@@ -418,6 +428,19 @@ async function toggleReadFromReader() {
   }
 }
 
+/** Toggle star/unstar on the open reading message. Shows a spinner on the
+ *  reader's star button (and in the compact "…" menu) while in flight. */
+async function toggleStar() {
+  const m = mailState.selected;
+  if (!m) return;
+  togglingStar.value = true;
+  try {
+    await updateFlags([m.id], { starred: !m.isStarred });
+  } finally {
+    togglingStar.value = false;
+  }
+}
+
 // ---- route-driven reading pane ----
 watch(
   () => route.params.id,
@@ -508,11 +531,10 @@ const listTitle = computed(() => {
     <MessageReaderPane
       :loading="loadingMessage"
       :toggling-read="togglingRead"
+      :toggling-star="togglingStar"
       @back="router.replace('/mail')"
       @reply="replyTo"
-      @toggle-star="
-        updateFlags([mailState.selected!.id], { starred: !mailState.selected!.isStarred })
-      "
+      @toggle-star="toggleStar"
       @toggle-read="toggleReadFromReader"
       @move-message="openMoveMessage(mailState.selected!.id)"
       @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
@@ -594,6 +616,9 @@ const listTitle = computed(() => {
       @close="confirmMove = false"
     >
       <p class="mb-2 text-sm text-muted-foreground">{{ t("moveToHint") }}</p>
+      <div v-if="moving" class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 class="h-4 w-4 animate-spin" /> {{ t("moving") }}
+      </div>
       <div class="max-h-64 space-y-0.5 overflow-y-auto">
         <button
           v-for="item in moveTargetMailboxes"

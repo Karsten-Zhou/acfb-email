@@ -275,11 +275,9 @@ async function syncOne(id: string) {
   <div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-sm font-semibold">{{ t("emailAccounts") }}</h2>
-      <UiToolTip :label="t('addAccount')">
-        <UiButton variant="default" size="sm" @click="showAdd = !showAdd">
-          <Plus class="h-4 w-4" /> {{ t("addAccount") }}
-        </UiButton>
-      </UiToolTip>
+      <UiButton variant="default" size="sm" @click="showAdd = !showAdd">
+        <Plus class="h-4 w-4" /> {{ t("addAccount") }}
+      </UiButton>
     </div>
 
     <div

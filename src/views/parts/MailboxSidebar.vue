@@ -109,9 +109,10 @@ const roleIcon: Record<string, typeof Inbox> = {
         <span class="grow text-left">{{ t("unifiedInbox") }}</span>
       </button>
 
-      <!-- Empty state: guide the user to add an account in Settings. -->
+      <!-- Empty state: guide the user to add an account in Settings. Only show
+           after the accounts request settles (never flash while it loads). -->
       <div
-        v-if="accountsState.accounts.length === 0"
+        v-if="!accountsState.loading && accountsState.accounts.length === 0"
         class="mt-6 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
       >
         <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
