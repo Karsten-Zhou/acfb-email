@@ -2,7 +2,7 @@
 // work from the provider interface so Gmail/Microsoft can be added without
 // touching sync logic.
 
-import { ImapFlow, AuthenticationFailure } from "imapflow";
+import { ImapFlow } from "imapflow";
 import { smtpSend } from "../smtp/client";
 import { roleFromImapName } from "./role-map";
 import type {
@@ -344,9 +344,17 @@ function toIsoString(d: Date | string | undefined): string | null {
 }
 
 function toTestError(err: unknown): Error {
-  if (err instanceof AuthenticationFailure) {
-    const e = err as AuthenticationFailure & { responseText?: string; response?: string };
-    const detail = e.responseText || e.response || err.message;
+  const e = err as {
+    authenticationFailed?: boolean;
+    responseText?: string;
+    response?: string;
+    message?: string;
+  };
+  // imapflow marks auth failures with `authenticationFailed`; surface the
+  // server's rejection reason (e.g. "Basic authentication is disabled",
+  // app-password required) to the test-connection UI.
+  if (e.authenticationFailed === true) {
+    const detail = e.responseText || e.response || e.message || String(err);
     return new Error(detail);
   }
   return err instanceof Error ? err : new Error(String(err));
