@@ -81,7 +81,10 @@ app.onError((err, c) => {
   }
   // Log the real error (safe: no credentials should reach here).
   console.error("[error]", c.req.method, c.req.path, err);
-  return c.json({ error: "Internal server error" }, 500);
+  // The app is behind a GitHub login, so surface the underlying error detail
+  // to help debugging instead of a generic 500 (no credentials reach here).
+  const message = err instanceof Error ? err.message : "Internal server error";
+  return c.json({ error: message }, 500);
 });
 
 export default app;
