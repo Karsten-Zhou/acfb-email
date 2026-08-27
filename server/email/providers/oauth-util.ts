@@ -7,9 +7,14 @@ export type { OAuthToken };
 export async function providerGet(
   url: string,
   accessToken: string,
+  extraHeaders?: Record<string, string>,
 ): Promise<{ status: number; json: unknown; errorText?: string }> {
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+      ...extraHeaders,
+    },
   });
   const json = await res.json().catch(() => null);
   let errorText: string | undefined;
@@ -35,10 +40,15 @@ export async function providerJson(
   accessToken: string,
   body: unknown,
   method: "POST" | "PATCH" | "DELETE" = "POST",
+  extraHeaders?: Record<string, string>,
 ): Promise<{ status: number; json: unknown; errorText?: string }> {
   const res = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...extraHeaders,
+    },
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => null);
@@ -63,8 +73,9 @@ export async function providerJsonPatch(
   url: string,
   accessToken: string,
   body: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<{ status: number; json: unknown }> {
-  return providerJson(url, accessToken, body, "PATCH");
+  return providerJson(url, accessToken, body, "PATCH", extraHeaders);
 }
 
 /** Encode bytes to base64url. */

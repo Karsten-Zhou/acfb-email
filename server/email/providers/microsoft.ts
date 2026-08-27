@@ -24,6 +24,11 @@ import type { OAuthToken } from "../../oauth/client";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
+// Request immutable Graph message ids (stable across folder moves) so the
+// per-mailbox (mailbox_id, remote_message_id) dedup key survives a move. The
+// Prefer header must be sent on every message request so ids stay consistent.
+const IMMUTABLE_ID_HEADER = { Prefer: 'IdType="ImmutableId"' };
+
 interface GraphAddress {
   name?: string;
   address?: string;
@@ -142,7 +147,11 @@ export class MicrosoftProvider implements IEmailProvider {
       const sinceDate = new Date(Math.max(options.sinceUid, 0)).toISOString();
       url += `&$filter=sentDateTime gt ${sinceDate}`;
     }
-    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    const { status, json, errorText } = await providerGet(
+      url,
+      this.token.access_token,
+      IMMUTABLE_ID_HEADER,
+    );
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
     const msgs = (json as { value?: GraphMessage[] }).value ?? [];
     const out: ProviderMessage[] = msgs.map(mapGraphMessage);
@@ -164,7 +173,11 @@ export class MicrosoftProvider implements IEmailProvider {
     } else if (options.beforeUid) {
       url += `&$filter=receivedDateTime lt ${new Date(options.beforeUid).toISOString()}`;
     }
-    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    const { status, json, errorText } = await providerGet(
+      url,
+      this.token.access_token,
+      IMMUTABLE_ID_HEADER,
+    );
     if (status !== 200) throw new Error(`Failed to list Outlook messages (${errorText ?? status})`);
     const msgs = (json as { value?: GraphMessage[] }).value ?? [];
     // Graph returns @odata.nextLink when more pages exist.
@@ -175,7 +188,11 @@ export class MicrosoftProvider implements IEmailProvider {
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
     const url = `${GRAPH}/me/messages/${encodeURIComponent(providerId)}?$select=id,body,hasAttachments`;
-    const { status, json, errorText } = await providerGet(url, this.token.access_token);
+    const { status, json, errorText } = await providerGet(
+      url,
+      this.token.access_token,
+      IMMUTABLE_ID_HEADER,
+    );
     if (status !== 200) throw new Error(`Failed to fetch Outlook message (${errorText ?? status})`);
     const m = json as GraphMessage;
     const bodyHtml = m.body?.contentType === "html" ? (m.body.content ?? null) : null;
@@ -185,6 +202,7 @@ export class MicrosoftProvider implements IEmailProvider {
     const attList = await providerGet(
       `${GRAPH}/me/messages/${encodeURIComponent(providerId)}/attachments`,
       this.token.access_token,
+      IMMUTABLE_ID_HEADER,
     );
     let atts: GraphAttachment[] = [];
     if (attList.status === 200) {
@@ -214,6 +232,7 @@ export class MicrosoftProvider implements IEmailProvider {
     const { status, json, errorText } = await providerGet(
       `${GRAPH}/me/messages/${encodeURIComponent(providerId)}/attachments/${encodeURIComponent(partNumber)}`,
       this.token.access_token,
+      IMMUTABLE_ID_HEADER,
     );
     if (status !== 200)
       throw new Error(`Failed to fetch Outlook attachment (${errorText ?? status})`);
@@ -241,6 +260,7 @@ export class MicrosoftProvider implements IEmailProvider {
         `${GRAPH}/me/messages/${encodeURIComponent(id)}`,
         this.token.access_token,
         patch,
+        IMMUTABLE_ID_HEADER,
       );
     }
   }
@@ -255,6 +275,8 @@ export class MicrosoftProvider implements IEmailProvider {
         {
           destinationId: targetId,
         },
+        "POST",
+        IMMUTABLE_ID_HEADER,
       );
     }
   }
@@ -266,6 +288,7 @@ export class MicrosoftProvider implements IEmailProvider {
         this.token.access_token,
         {},
         "DELETE",
+        IMMUTABLE_ID_HEADER,
       );
     }
   }
@@ -298,6 +321,7 @@ export class MicrosoftProvider implements IEmailProvider {
       this.token.access_token,
       { message },
       "POST",
+      IMMUTABLE_ID_HEADER,
     );
     if (status !== 202 && status !== 201)
       throw new Error(`Outlook send failed (${errorText ?? status})`);
@@ -323,6 +347,7 @@ export class MicrosoftProvider implements IEmailProvider {
       this.token.access_token,
       message,
       "POST",
+      IMMUTABLE_ID_HEADER,
     );
     if (status !== 201 && status !== 200)
       throw new Error(`Outlook draft save failed (${errorText ?? status})`);
