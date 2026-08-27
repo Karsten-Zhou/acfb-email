@@ -46,7 +46,7 @@
     "@cloudflare/workers-types": "^5.20260821.1",
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.4.0",
-    "@vitejs/plugin-vue": "~5.2.0",
+    "@vitejs/plugin-vue": "~5.2.4",
     "@vue/tsconfig": "^0.9.1",
     "eslint": "^10.9.0",
     "eslint-config-prettier": "^10.1.8",
@@ -59,7 +59,7 @@
     "vite": "~8.2.0",
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.127.0"
   },
   "patchedDependencies": {
     "imapflow@1.7.6": "patches/imapflow@1.7.6.patch"
