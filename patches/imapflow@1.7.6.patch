@@ -1,0 +1,37 @@
+diff --git a/lib/imap-flow.js b/lib/imap-flow.js
+index db6f380..faf0f89 100644
+--- a/lib/imap-flow.js
++++ b/lib/imap-flow.js
+@@ -1373,15 +1373,25 @@ class ImapFlow extends EventEmitter {
+         // The `this.reading` flag acts as a concurrency guard: if reader()
+         // is already running, new 'readable' events are ignored. The reader
+         // loop will keep draining data until the stream returns null.
++        //
++        // Workerd fires 'readable' earlier than Node (while a previous reader()
++        // is still awaiting handleResponse), so a plain guard drops the event and
++        // stalls. Remember the missed event and re-run after the guard clears.
+         this.socketReadable = () => {
+-            if (!this.reading) {
+-                this.reading = true;
+-                this.reader()
+-                    .catch(err => this.log.error({ err, cid: this.id }))
+-                    .finally(() => {
+-                        this.reading = false;
+-                    });
++            if (this.reading) {
++                this._readPending = true;
++                return;
+             }
++            this.reading = true;
++            this.reader()
++                .catch(err => this.log.error({ err, cid: this.id }))
++                .finally(() => {
++                    this.reading = false;
++                    if (this._readPending) {
++                        this._readPending = false;
++                        this.socketReadable();
++                    }
++                });
+         };
+ 
+         this.streamer.on('readable', this.socketReadable);

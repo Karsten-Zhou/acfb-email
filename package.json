@@ -29,6 +29,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.14",
     "hono": "^4.13.3",
+    "imapflow": "^1.7.6",
     "lucide-vue-next": "^1.0.0",
     "mimetext": "^3.0.28",
     "postal-mime": "^3.0.0",
@@ -59,5 +60,8 @@
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11",
     "wrangler": "^4.125.0"
+  },
+  "patchedDependencies": {
+    "imapflow@1.7.6": "patches/imapflow@1.7.6.patch"
   }
 }

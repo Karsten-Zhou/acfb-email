@@ -3,25 +3,25 @@
   "name": "cloudflare-email-client",
   "main": "server/index.ts",
   "compatibility_date": "2026-08-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_v2"],
   "assets": {
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*"],
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "cloudflare-email-client",
-      "database_id": "00000000-0000-0000-0000-000000000000"
-    }
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
   ],
   "vars": {
     "APP_URL": "http://localhost:5173",
     "SESSION_DAYS": "7",
     "SYNC_FETCH_LIMIT": "100",
-    "SYNC_TIMEOUT_MS": "45000"
-  }
+    "SYNC_TIMEOUT_MS": "45000",
+  },
 }

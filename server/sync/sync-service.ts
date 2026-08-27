@@ -8,7 +8,6 @@
 import { randomUUID } from "crypto";
 import { buildProvider } from "../email/providers";
 import { roleFromImapName, roleSortOrder } from "../email/providers/role-map";
-import { decodeModifiedUtf7 } from "../email/imap/modified-utf7";
 import type { ProviderMailbox, ProviderMessage } from "../email/providers/types";
 import type { Env } from "../env";
 
@@ -300,7 +299,7 @@ async function upsertMailbox(
     // Re-derive the role so improvements to role detection (SPECIAL-USE flags,
     // well-known folders) apply to already-synced mailboxes too — e.g. a
     // non-English provider whose name heuristic earlier fell back to "other".
-    const role = mb.role ?? roleFromImapName(decodeModifiedUtf7(mb.name), mb.flags);
+    const role = mb.role ?? roleFromImapName(mb.name, mb.flags);
     if (existing.role !== role) {
       await env.DB.prepare(`UPDATE mailboxes SET role = ?, sort_order = ? WHERE id = ?`)
         .bind(role, roleSortOrder(role), existing.id)
@@ -310,9 +309,8 @@ async function upsertMailbox(
   }
 
   const id = randomUUID();
-  // Decode IMAP modified-UTF-7 folder names (non-ASCII) for display; the raw
-  // provider_path is kept for IMAP commands.
-  const displayName = decodeModifiedUtf7(mb.name);
+  // Provider paths are already Unicode (imapflow decodes modified UTF-7).
+  const displayName = mb.name;
   // Prefer the provider's detected role (SPECIAL-USE flags / well-known
   // folder) so it's correct even when the folder name is localized; fall back
   // to name heuristics.

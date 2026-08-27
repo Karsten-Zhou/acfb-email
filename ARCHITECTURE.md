@@ -46,7 +46,7 @@ Cloudflare Worker
 | Vue SPA | `src/` | views, reactive stores, router (hash-based so deep links work without server rewrites), DOMPurify sanitization |
 | Hono router | `server/index.ts` | mounts `/api`, error handling, CSRF + logging middleware |
 | Auth | `server/auth/` | GitHub OAuth callback, session creation/validation, allowlist check, CSRF constant-time compare |
-| IMAP client | `server/email/imap/client.ts` | minimal IMAP4rev1 over `cloudflare:sockets` (no Node `net`/`tls`) |
+| IMAP client | `imapflow` (patched) | IMAP4rev1 over workerd `node:net`/`node:tls`/`node:stream` |
 | SMTP client | `server/email/smtp/client.ts` | submission via ports 587/465 (Workers forbid port 25) |
 | MIME parse | `postal-mime` | RFC5322/MIME parsing of received messages (verified Workers-compatible) |
 | MIME build | `mimetext` | builds outgoing RFC5322 messages |
@@ -184,14 +184,20 @@ deliberate:
 `ImapProvider` (imap.ts) implements it. Adding Gmail or Outlook later means adding
 a new class + a `buildProvider` case — sync, routes, and UI do not change.
 
-### IMAP client (custom, justified)
+### IMAP via imapflow (patched)
 
-There is **no mature IMAP library that runs on Cloudflare Workers** (imapflow and
-friends require Node `net`/`tls`). The spec's decision rule (prefer libraries;
-prefer simple custom code over complex infrastructure) lands here on a compact,
-focused IMAP4rev1 client over `cloudflare:sockets` (~400 lines) covering: LIST,
-SELECT, SEARCH, FETCH (envelopes + raw literals), STORE flags, COPY, MOVE, DELETE,
-and STARTTLS/implicit TLS. This is the one place we could not use a library.
+`imapflow` is the IMAP engine, running on workerd's `node:net`/`node:tls`/
+`node:stream` support. It needs one small patch (kept in
+`patches/imapflow@1.7.6.patch`): workerd fires the stream `'readable'` event
+earlier than Node — while imapflow's reader reentrancy guard is still held — so
+a tagged response is dropped and the command never settles. The patch makes
+`socketReadable` remember the missed event and re-run the reader (verified live
+against QQ Mail, 2026-08-27); keep it in sync when bumping imapflow. imapflow
+covers LIST, SELECT, SEARCH, FETCH, STORE flags, COPY, MOVE, DELETE, APPEND,
+STARTTLS/implicit TLS, plus SPECIAL-USE folder detection and modified UTF-7
+mailbox-name decoding. `COMPRESS=DEFLATE` is disabled in the provider
+(`disableCompression: true`) because workerd's compressed stream chain drops
+large responses (verified live against QQ Mail, 2026-08-27).
 
 ---
 
@@ -207,7 +213,7 @@ and STARTTLS/implicit TLS. This is the one place we could not use a library.
 | Workers | ✅ | Serves SPA + API (free-tier 100k req/day is far above personal use) |
 | D1 | ✅ | Relational data (accounts, mailboxes, messages, sessions) |
 | Workers Assets | ✅ | Serves the Vue SPA from edge (free) |
-| `cloudflare:sockets` | ✅ | Outbound IMAP/SMTP TCP |
+| `cloudflare:sockets` | ✅ | Outbound SMTP TCP (IMAP runs via workerd `node:net`/`node:tls`) |
 | KV | ❌ | No need in v1; possible later for short-lived caches |
 | R2 | ❌ | Deferred — attachments are metadata-only in v1 (documented) |
 | Queues / Cron | ❌ | Deferred by product decision; seam exists in `syncAccount` |

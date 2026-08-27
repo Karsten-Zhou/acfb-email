@@ -1,12 +1,13 @@
-// Generic IMAP/SMTP provider adapter. Uses the ImapClient and an SMTP send.
-// Decouples protocol work from the provider interface so Gmail/Microsoft can
-// be added without touching sync logic.
+// Generic IMAP/SMTP provider adapter built on `imapflow`. Decouples protocol
+// work from the provider interface so Gmail/Microsoft can be added without
+// touching sync logic.
 
-import { ImapClient, ImapError } from "../imap/client";
+import { ImapFlow, AuthenticationFailure } from "imapflow";
 import { smtpSend } from "../smtp/client";
 import { roleFromImapName } from "./role-map";
 import type {
   IEmailProvider,
+  ProviderAddress,
   ProviderAttachment,
   ProviderBody,
   ProviderFetchResult,
@@ -41,141 +42,124 @@ export class ImapProvider implements IEmailProvider {
     private fromAddress: string,
   ) {}
 
-  private connectImap(): ImapClient {
-    return new ImapClient({
+  private createClient(): ImapFlow {
+    return new ImapFlow({
       host: this.transport.imapHost,
       port: this.transport.imapPort,
       secure: this.transport.imapSecure,
-      username: this.creds.username,
-      password: this.creds.password,
+      servername: this.transport.imapHost,
+      auth: { user: this.creds.username, pass: this.creds.password },
+      // Workerd's compressed stream chain drops large responses (e.g. UID
+      // SEARCH), so COMPRESS=DEFLATE stays off.
+      disableCompression: true,
+      logger: false,
     });
   }
 
-  async testConnection(): Promise<{ ok: true }> {
-    const imap = this.connectImap();
+  /** Open a fresh connection, run `fn`, then log out. */
+  private async withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T> {
+    const client = this.createClient();
     try {
-      await imap.connect();
-      await imap.logout();
-      return { ok: true };
+      await client.connect();
+      return await fn(client);
     } finally {
-      await imap.close().catch(() => {});
+      await client.logout().catch(() => client.close());
+    }
+  }
+
+  async testConnection(): Promise<{ ok: true }> {
+    const client = this.createClient();
+    try {
+      await client.connect();
+      await client.logout();
+      return { ok: true };
+    } catch (err) {
+      // Surface the server's rejection reason (e.g. "Basic authentication is
+      // disabled", app-password required) to the test-connection UI.
+      throw toTestError(err);
+    } finally {
+      client.close();
     }
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      const boxes = await imap.listMailboxes();
-      return boxes.map((b) => ({
-        name: b.name,
-        delimiter: b.delimiter,
-        flags: b.flags,
-        // Use the server's SPECIAL-USE flags (e.g. \Sent, \Drafts, \Trash,
-        // \Junk, \Archive) which are locale-independent, falling back to the
-        // display name.
-        role: roleFromImapName(b.name, b.flags),
+    return this.withClient(async (client) => {
+      const boxes = await client.list();
+      return boxes.map((box) => ({
+        name: box.path,
+        delimiter: box.delimiter ?? null,
+        flags: [...box.flags],
+        role: roleFromImapName(box.path, [...box.flags]),
       }));
-    } finally {
-      await imap.close().catch(() => {});
-    }
+    });
   }
 
   async syncMailbox(
     mailboxPath: string,
     options: ProviderSyncOptions,
   ): Promise<ProviderFetchResult> {
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      const sel = await imap.select(mailboxPath);
-
-      let uids: number[];
-      if (options.sinceUid && options.sinceUid > 0) {
-        uids = await imap.searchUidsSince(options.sinceUid);
-      } else {
-        const all = await imap.searchAllUids();
-        const limit = options.fetchLimit ?? 200;
-        uids = all.slice(-limit); // newest `limit`
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        let uids: number[];
+        if (options.sinceUid && options.sinceUid > 0) {
+          uids = (await client.search({ uid: `${options.sinceUid + 1}:*` }, { uid: true })) || [];
+        } else {
+          const all = (await client.search({ uid: "1:*" }, { uid: true })) || [];
+          const limit = options.fetchLimit ?? 200;
+          uids = all.slice(-limit); // newest `limit`
+        }
+        const messages = await this.fetchEnvelopes(client, uids);
+        const mailbox = client.mailbox;
+        return {
+          messages,
+          highestUid: uids.length ? Math.max(...uids) : 0,
+          uidValidity:
+            mailbox && typeof mailbox.uidValidity === "bigint" ? Number(mailbox.uidValidity) : null,
+          total: mailbox ? mailbox.exists : null,
+        };
+      } finally {
+        lock.release();
       }
-
-      const envelopes = await imap.fetchHeadersByUid(uids);
-      const messages: ProviderMessage[] = envelopes.map((e) => ({
-        providerId: String(e.uid),
-        remoteUid: e.uid,
-        messageId: e.messageId,
-        subject: e.subject,
-        from: e.from,
-        to: e.to,
-        cc: e.cc,
-        date: e.date,
-        internalDate: e.internalDate,
-        flags: e.flags,
-        size: e.size,
-      }));
-      const highestUid = uids.length ? Math.max(...uids) : 0;
-      const result: ProviderFetchResult = {
-        messages,
-        highestUid,
-        uidValidity: sel.uidValidity,
-        total: sel.total,
-      };
-      return result;
-    } finally {
-      await imap.close().catch(() => {});
-    }
+    });
   }
 
   async fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult> {
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-
-      if (!options.beforeUid || options.beforeUid <= 1) {
-        return { messages: [], hasMore: false };
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        if (!options.beforeUid || options.beforeUid <= 1) {
+          return { messages: [], hasMore: false };
+        }
+        const all =
+          (await client.search({ uid: `1:${options.beforeUid - 1}` }, { uid: true })) || [];
+        const limit = options.fetchLimit ?? 50;
+        const uids = all.slice(-limit); // the `limit` most recent of those older than the cursor
+        if (uids.length === 0) return { messages: [], hasMore: false };
+        const messages = await this.fetchEnvelopes(client, uids);
+        return {
+          messages,
+          // If we got a full page, there are (likely) more even older messages.
+          hasMore: uids.length === limit && all.length > limit,
+        };
+      } finally {
+        lock.release();
       }
-      const all = await imap.searchUidsBefore(options.beforeUid);
-      const limit = options.fetchLimit ?? 50;
-      const uids = all.slice(-limit); // the `limit` most recent of those older than the cursor
-      if (uids.length === 0) return { messages: [], hasMore: false };
-
-      const envelopes = await imap.fetchHeadersByUid(uids);
-      const messages: ProviderMessage[] = envelopes.map((e) => ({
-        providerId: String(e.uid),
-        remoteUid: e.uid,
-        messageId: e.messageId,
-        subject: e.subject,
-        from: e.from,
-        to: e.to,
-        cc: e.cc,
-        date: e.date,
-        internalDate: e.internalDate,
-        flags: e.flags,
-        size: e.size,
-      }));
-      return {
-        messages,
-        // If we got a full page, there are (likely) more even older messages.
-        hasMore: uids.length === limit && all.length > limit,
-      };
-    } finally {
-      await imap.close().catch(() => {});
-    }
+    });
   }
 
   async fetchBody(mailboxPath: string, providerId: string): Promise<ProviderBody> {
     const uid = parseInt(providerId, 10);
     if (Number.isNaN(uid)) throw new Error("Invalid IMAP message id");
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-      const raw = await imap.fetchRawByUid(uid);
-      return await this.parseBody(raw);
-    } finally {
-      await imap.close().catch(() => {});
-    }
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        const raw = await this.fetchSource(client, uid);
+        return await this.parseBody(raw);
+      } finally {
+        lock.release();
+      }
+    });
   }
 
   async fetchAttachment(
@@ -190,32 +174,138 @@ export class ImapProvider implements IEmailProvider {
     // message on demand and re-parse it — nothing is stored in our infra.
     const idx = parseInt(partNumber ?? "", 10);
     if (Number.isNaN(idx) || idx < 0) throw new Error("Missing attachment part number");
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-      const raw = await imap.fetchRawByUid(uid);
-      const { default: PostalMime } = await import("postal-mime");
-      const email = await PostalMime.parse(raw);
-      const a = (email.attachments ?? [])[idx];
-      if (!a || !a.content) throw new Error("Attachment not found in message");
-      const data =
-        a.content instanceof Uint8Array
-          ? a.content
-          : new Uint8Array(a.content instanceof ArrayBuffer ? a.content : asciiBytes(a.content));
-      return {
-        filename: a.filename ?? null,
-        mimeType: a.mimeType ?? "application/octet-stream",
-        data,
-      };
-    } finally {
-      await imap.close().catch(() => {});
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        const raw = await this.fetchSource(client, uid);
+        const { default: PostalMime } = await import("postal-mime");
+        const email = await PostalMime.parse(raw);
+        const a = (email.attachments ?? [])[idx];
+        if (!a || !a.content) throw new Error("Attachment not found in message");
+        const data =
+          a.content instanceof Uint8Array
+            ? a.content
+            : new Uint8Array(a.content instanceof ArrayBuffer ? a.content : asciiBytes(a.content));
+        return {
+          filename: a.filename ?? null,
+          mimeType: a.mimeType ?? "application/octet-stream",
+          data,
+        };
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async setFlags(
+    mailboxPath: string,
+    providerIds: string[],
+    flags: { read?: boolean; starred?: boolean },
+  ): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
+    await this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        if (flags.read !== undefined) {
+          if (flags.read) await client.messageFlagsAdd(uids, ["\\Seen"], { uid: true });
+          else await client.messageFlagsRemove(uids, ["\\Seen"], { uid: true });
+        }
+        if (flags.starred !== undefined) {
+          if (flags.starred) await client.messageFlagsAdd(uids, ["\\Flagged"], { uid: true });
+          else await client.messageFlagsRemove(uids, ["\\Flagged"], { uid: true });
+        }
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
+    await this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        await client.messageMove(uids, targetMailboxPath, { uid: true });
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async delete(mailboxPath: string, providerIds: string[]): Promise<void> {
+    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+    if (uids.length === 0) return;
+    await this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        await client.messageDelete(uids, { uid: true });
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async send(opts: SendOptions): Promise<void> {
+    const recipients = [...opts.to, ...(opts.cc ?? []), ...(opts.bcc ?? [])];
+    await smtpSend(
+      {
+        host: this.transport.smtpHost,
+        port: this.transport.smtpPort,
+        secure: this.transport.smtpSecure,
+        username: this.creds.username,
+        password: this.creds.password,
+        from: opts.from,
+      },
+      opts.rawMessage,
+      recipients,
+    );
+  }
+
+  /** Append the draft MIME into the provider's Drafts folder. */
+  async saveDraft(opts: SaveDraftOptions): Promise<void> {
+    await this.withClient(async (client) => {
+      const boxes = await client.list();
+      const drafts =
+        boxes.find((b) => roleFromImapName(b.path, [...b.flags]) === "drafts") ??
+        boxes.find((b) => b.path.toUpperCase() === "DRAFTS");
+      await client.append(drafts?.path ?? "Drafts", opts.rawMessage, ["\\Drafts"]);
+    });
+  }
+
+  private async fetchEnvelopes(client: ImapFlow, uids: number[]): Promise<ProviderMessage[]> {
+    if (uids.length === 0) return [];
+    const messages: ProviderMessage[] = [];
+    for await (const msg of client.fetch(
+      uids,
+      { uid: true, envelope: true, flags: true, size: true, internalDate: true },
+      { uid: true },
+    )) {
+      messages.push({
+        providerId: String(msg.uid),
+        remoteUid: msg.uid,
+        messageId: msg.envelope?.messageId ?? null,
+        subject: msg.envelope?.subject ?? null,
+        from: toProviderAddress(msg.envelope?.from?.[0]),
+        to: (msg.envelope?.to ?? []).map(toProviderAddress),
+        cc: (msg.envelope?.cc ?? []).map(toProviderAddress),
+        date: msg.envelope?.date ? toIsoString(msg.envelope.date) : null,
+        internalDate: toIsoString(msg.internalDate),
+        flags: [...(msg.flags ?? [])],
+        size: msg.size ?? null,
+      });
     }
+    return messages;
+  }
+
+  private async fetchSource(client: ImapFlow, uid: number): Promise<Uint8Array> {
+    const msg = await client.fetchOne(uid, { source: true }, { uid: true });
+    if (!msg) throw new Error("Message not found");
+    return toUint8Array(msg.source);
   }
 
   private async parseBody(raw: Uint8Array): Promise<ProviderBody> {
-    // MIME parsing happens in the sync/parse layer to keep this adapter slim;
-    // but we need the structured body here. Import PostalMime lazily.
     const { default: PostalMime } = await import("postal-mime");
     const email = await PostalMime.parse(raw);
     // Map attachments to their MIME part numbers (IMAP BODY[part] addresses):
@@ -241,90 +331,25 @@ export class ImapProvider implements IEmailProvider {
       attachments,
     };
   }
+}
 
-  async setFlags(
-    mailboxPath: string,
-    providerIds: string[],
-    flags: { read?: boolean; starred?: boolean },
-  ): Promise<void> {
-    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
-    if (uids.length === 0) return;
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-      await imap.setFlags(uids, flags);
-    } finally {
-      await imap.close().catch(() => {});
-    }
-  }
+function toProviderAddress(a?: { name?: string; address?: string }): ProviderAddress {
+  return { name: a?.name ?? null, address: a?.address ?? null };
+}
 
-  async move(mailboxPath: string, providerIds: string[], targetMailboxPath: string): Promise<void> {
-    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
-    if (uids.length === 0) return;
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-      try {
-        await imap.move(uids, targetMailboxPath);
-      } catch (err) {
-        // MOVE unsupported: copy then delete.
-        if (err instanceof ImapError) {
-          await imap.copy(uids, targetMailboxPath);
-          await imap.delete(uids);
-          return;
-        }
-        throw err;
-      }
-    } finally {
-      await imap.close().catch(() => {});
-    }
-  }
+function toIsoString(d: Date | string | undefined): string | null {
+  if (!d) return null;
+  const t = d instanceof Date ? d : new Date(d);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+}
 
-  async delete(mailboxPath: string, providerIds: string[]): Promise<void> {
-    const uids = providerIds.map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
-    if (uids.length === 0) return;
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      await imap.select(mailboxPath);
-      await imap.delete(uids);
-    } finally {
-      await imap.close().catch(() => {});
-    }
+function toTestError(err: unknown): Error {
+  if (err instanceof AuthenticationFailure) {
+    const e = err as AuthenticationFailure & { responseText?: string; response?: string };
+    const detail = e.responseText || e.response || err.message;
+    return new Error(detail);
   }
-
-  async send(opts: SendOptions): Promise<void> {
-    const recipients = [...opts.to, ...(opts.cc ?? []), ...(opts.bcc ?? [])];
-    await smtpSend(
-      {
-        host: this.transport.smtpHost,
-        port: this.transport.smtpPort,
-        secure: this.transport.smtpSecure,
-        username: this.creds.username,
-        password: this.creds.password,
-        from: opts.from,
-      },
-      opts.rawMessage,
-      recipients,
-    );
-  }
-
-  /** Append the draft MIME into the provider's Drafts folder. */
-  async saveDraft(opts: SaveDraftOptions): Promise<void> {
-    const imap = this.connectImap();
-    try {
-      await imap.connect();
-      const boxes = await imap.listMailboxes();
-      const drafts =
-        boxes.find((b) => roleFromImapName(b.name, b.flags) === "drafts") ??
-        boxes.find((b) => b.name.toUpperCase() === "DRAFTS");
-      await imap.append(drafts?.name ?? "Drafts", ["\\Drafts"], opts.rawMessage);
-    } finally {
-      await imap.close().catch(() => {});
-    }
-  }
+  return err instanceof Error ? err : new Error(String(err));
 }
 
 function toBase64(content: Uint8Array | ArrayBuffer | string): string {
@@ -347,4 +372,9 @@ function asciiBytes(s: string): Uint8Array {
 function byteLength(content: Uint8Array | ArrayBuffer | string): number {
   if (typeof content === "string") return content.length;
   return content.byteLength;
+}
+
+function toUint8Array(buf: Uint8Array | undefined): Uint8Array {
+  if (!buf) throw new Error("Message not found");
+  return buf;
 }

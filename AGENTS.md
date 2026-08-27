@@ -60,12 +60,18 @@ Some tooling details that matter:
   fallback handles deep links. `/mail/message/:id` maps to `MailboxView`, which
   reads the route param and renders it in the rightmost reading pane on wide
   screens.
-- **IMAP client is custom** — there is no Workers-compatible IMAP library, so
-  `server/email/imap/client.ts` talks raw IMAP over Workers TCP sockets
-  (`cloudflare:sockets`). Correspondingly, SMTP is implemented over sockets in
+- **IMAP via `imapflow`** (patched — `patches/imapflow@1.7.6.patch`). Workerd
+  supports `node:net`/`node:tls`/`node:stream`, but fires the stream
+  `'readable'` event earlier than Node — while imapflow's reader reentrancy
+  guard is still held — so a tagged response is dropped and commands hang. The
+  patch makes `socketReadable` remember the missed event and re-run the reader.
+  Keep it in sync when bumping imapflow. SMTP is implemented over sockets in
   `server/email/smtp/client.ts`.
-  - `connect()` requires `allowHalfOpen` in SocketOptions; sockets support
-    `secureTransport: on|off|starttls`.
+  - Don't pass `tls.rejectUnauthorized` to imapflow (workerd throws
+    `ERR_OPTION_NOT_IMPLEMENTED`); pass an explicit `servername`.
+  - **`COMPRESS=DEFLATE` must stay disabled** (`disableCompression: true` in
+    `ImapProvider`): workerd's compressed stream chain drops large responses
+    (e.g. a big `UID SEARCH` result), hanging the command. Verified live 2026-08-27.
   - Workers blocks outbound port 25 (SMTP); use 465/587.
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has
   `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its
@@ -126,8 +132,7 @@ Some tooling details that matter:
 - Sync-state polling uses adaptive cadence (fast while any account is
   `running`, slow otherwise). Race conditions in this loop have bitten us — see
   the fast-poll/`clearAccountSyncing`/`runInFlight` guard notes in repo memory.
-- The custom IMAP `WireReader` keeps raw byte counts for literals (decoded
-  string length !== raw bytes for non-ASCII); splitting at the IMAP top level
-  must track quotes so a space inside a quoted "name" doesn't mis-split.
+- imapflow decodes modified UTF-7 mailbox names to Unicode; provider mailbox
+  `name`/`path` are already decoded, so no manual UTF-7 handling is needed.
 - Test-connection flow returns `{ ok, message }` so the UI can surface the real
   IMAP server rejection reason (e.g. "Basic authentication is disabled").
