@@ -146,12 +146,14 @@ drafts(id, user_id FK, account_id FK, to/cc/bcc JSON, subject, html, text, updat
 
 ## 5. Synchronization design
 
-**v1 keeps it simple and correct**: sync runs on login and on an explicit "Sync
-now" button. There is no Cron/Queue yet (per product decision), but the seam is
-deliberate:
+**Sync is enqueued, not inline**: account add / OAuth connect push a job to the
+`email-sync` Queue (`wrangler.jsonc` producer binding `SYNC_QUEUE`); the
+`queue()` consumer in `server/index.ts` calls `syncAccount(env, accountId)`.
+A queue consumer gets 15 minutes of wall-time (vs `waitUntil`'s 30 s), which a
+slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls
+`POST /api/accounts/:id/sync` synchronously.
 
-- `syncAccount(env, accountId)` is the single entry point; a future Cron trigger
-  or Queue consumer calls exactly this.
+- `syncAccount(env, accountId)` is the single entry point.
 - Cursors are incremental (UID-based), so repeated syncs are cheap and never
   re-download the whole mailbox.
 - `SYNC_FETCH_LIMIT` bounds the number of messages processed per account per run
@@ -216,7 +218,8 @@ large responses (verified live against QQ Mail, 2026-08-27).
 | `cloudflare:sockets` | ✅ | Outbound SMTP TCP (IMAP runs via workerd `node:net`/`node:tls`) |
 | KV | ❌ | No need in v1; possible later for short-lived caches |
 | R2 | ❌ | Deferred — attachments are metadata-only in v1 (documented) |
-| Queues / Cron | ❌ | Deferred by product decision; seam exists in `syncAccount` |
+| Queues | ✅ | Background account syncs (`email-sync` consumer) — 15-min wall-time |
+| Cron | ❌ | Not needed; sync is enqueued on add/connect + manual trigger |
 | WebSockets/SSE | ❌ | Not needed for v1 (refresh + periodic sync model) |
 | Browser Push | ⏳ | Table reserved; Service Worker + push to be wired in a later phase |
 
@@ -241,8 +244,10 @@ large responses (verified live against QQ Mail, 2026-08-27).
    DOMPurify requires a DOM, which the Worker doesn't have. The Worker still
    only returns small text/html previews, and the client always runs DOMPurify
    before rendering. This is standard practice for email clients.
-2. **Cron/Queues deferred** (your decision): v1 syncs on login + manual refresh.
-   `syncAccount` is the single entry point so adding Cron later is ~20 lines.
+2. **Cron deferred; sync via Queue**: sync is enqueued on account add / OAuth
+   connect and consumed by the `email-sync` Queue consumer (15-min wall-time,
+   vs waitUntil's 30 s cap). `syncAccount` is the single entry point so a Cron
+   trigger could be added later.
 3. **Attachments are metadata-only in v1**: the `attachments` table tracks
    filename/type/size; binary content is not re-fetched for forwarding yet.
 4. **POP3 is not implemented**: POP3 has materially weaker semantics than IMAP and

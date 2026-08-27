@@ -11,7 +11,6 @@ import { HttpError } from "../http-error";
 import { requireAuth, randomToken, safeEqual } from "../auth";
 import { currentUser } from "../auth/session";
 import { decryptCredential, encryptCredential } from "../security/crypto";
-import { syncAccount } from "../sync/sync-service";
 import {
   buildAuthorizeUrl,
   exchangeCode,
@@ -107,10 +106,15 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     .bind(accountId, encrypted)
     .run();
 
-  // Kick off the first sync (new accounts) / refresh (reconnects). waitUntil
-  // keeps it alive beyond the redirect so the Worker doesn't cancel it; the
-  // sync itself is time-bounded.
-  c.executionCtx.waitUntil(syncAccount(c.env, accountId).catch(() => {}));
+  // Enqueue the first sync (new accounts) / refresh (reconnects). The queue
+  // consumer runs it with a 15-minute wall-time budget (vs waitUntil's 30 s),
+  // so a slow multi-mailbox IMAP sync has room to finish. A failed enqueue
+  // must not break the OAuth redirect flow.
+  try {
+    await c.env.SYNC_QUEUE.send({ accountId });
+  } catch (err) {
+    console.error("[sync-queue] enqueue failed for account", accountId, err);
+  }
 
   // Back to Settings with a query flag so the page shows a success notice.
   return c.redirect(`${c.env.APP_URL}/settings?connected=${provider}`);

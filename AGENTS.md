@@ -80,9 +80,11 @@ Some tooling details that matter:
   `MicrosoftProvider`, and an IMAP provider behind a common interface. Provider
   ids for a message are resolved via `providerIdFor()` in `server/routes/messages.ts`
   (IMAP uses `remote_uid`; Gmail/Graph use `remote_message_id`).
-- **Syncing**: sync runs on login + manual trigger (Cron/Queues deferred; the
-  seam is `syncAccount`). `server/sync/sync-service.ts` orchestrates
-  mailbox/message fetching and upsert.
+- **Syncing**: account add / OAuth connect enqueue a sync job to the
+  `email-sync` Queue; the `queue()` consumer in `server/index.ts` runs it
+  (15-min wall-time budget vs waitUntil's 30 s). A manual `POST
+  /api/accounts/:id/sync` trigger also exists. `server/sync/sync-service.ts`
+  orchestrates mailbox/message fetching and upsert.
 - **Attachments are metadata-only on Cloudflare** — binary content is never
   stored in Worker infra. The download route re-fetches the part live from the
   provider on demand (`GET /api/messages/:id/attachments/:attachId`).

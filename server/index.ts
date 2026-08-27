@@ -3,7 +3,8 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./env";
+import type { Env, SyncMessage } from "./env";
+import { syncAccount } from "./sync/sync-service";
 import { HttpError } from "./http-error";
 import { csrfGuard } from "./auth";
 import { authRoutes } from "./routes/auth";
@@ -86,5 +87,20 @@ app.onError((err, c) => {
   const message = err instanceof Error ? err.message : "Internal server error";
   return c.json({ error: message }, 500);
 });
+
+// Queue consumer: runs full account syncs in the background. A queue batch gets
+// 15 minutes of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox
+// IMAP sync needs. syncAccount persists the account state; errors are acked
+// (no infinite retries) and surfaced through the account's state_message.
+export async function queue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
+  for (const msg of batch.messages) {
+    const { accountId } = msg.body;
+    try {
+      await syncAccount(env, accountId);
+    } catch (err) {
+      console.error("[queue] sync failed for account", accountId, err);
+    }
+  }
+}
 
 export default app;

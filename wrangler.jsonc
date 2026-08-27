@@ -2,8 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "cloudflare-email-client",
   "main": "server/index.ts",
-  "compatibility_date": "2026-08-01",
-  "compatibility_flags": ["nodejs_compat", "nodejs_compat_v2"],
+  "compatibility_date": "2026-08-27",
   "assets": {
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"],
@@ -14,14 +13,30 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "cloudflare-email-client",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "acfb-email",
+      "database_id": "d3de4ec6-59f4-48e4-807f-0f280a407bf7",
     },
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SYNC_QUEUE",
+        "queue": "email-sync",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "email-sync",
+        "max_batch_size": 1,
+        "max_retries": 1,
+        "retry_delay": 60,
+      },
+    ],
+  },
   "vars": {
-    "APP_URL": "http://localhost:5173",
+    "APP_URL": "https://email.24218079.xyz",
     "SESSION_DAYS": "7",
     "SYNC_FETCH_LIMIT": "100",
-    "SYNC_TIMEOUT_MS": "45000",
+    "SYNC_TIMEOUT_MS": "480000",
   },
 }

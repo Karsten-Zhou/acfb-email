@@ -217,12 +217,18 @@ For local development use `http://localhost:5173/api/oauth/<provider>/callback`
   no backdoor — export/rotate credentials first if you ever change the key.
 - **Sessions**: users can simply log in again (sessions expire).
 
+## In use: Queue (sync jobs)
+
+Background account syncs run via the `email-sync` Queue (producer binding
+`SYNC_QUEUE`, consumer `queue()` in `server/index.ts`). The queue was created
+with `bunx wrangler queues create email-sync`. A queue consumer has 15 minutes
+of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox IMAP sync needs.
+
 ## Optional resources (deferred)
 
 | Resource | When you'd add it | How |
 | --- | --- | --- |
 | Cron trigger | Background sync without manual refresh | add `triggers.crons` + `scheduled()` handler calling `syncAccount` |
-| Queue | Batch sync jobs / retries | `wrangler queues create` + `queue()` consumer |
 | R2 | Storing attachment bytes / bodies | add binding, move blob storage out of D1 |
 | KV | Short-lived cache | optional binding |
 

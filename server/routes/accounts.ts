@@ -59,7 +59,7 @@ accountRoutes.get("/", async (c) => {
 
 // GET /api/accounts/states — lightweight live status of each account. Polled
 // by the client so sidebar/settings reflect sync progress without a full page
-// reload (sync runs server-side in the background via waitUntil).
+// reload (sync runs server-side in the background via the sync queue).
 accountRoutes.get("/states", async (c) => {
   const user = currentUser(c);
   const rows = await c.env.DB.prepare(
@@ -174,9 +174,15 @@ accountRoutes.post("/", async (c) => {
     .bind(id, encrypted)
     .run();
 
-  // Fire-and-forget first sync (bounded). waitUntil keeps it alive beyond the
-  // response so the Worker doesn't cancel it mid-flight.
-  c.executionCtx.waitUntil(syncAccount(c.env, id).catch(() => {}));
+  // Enqueue the first sync. The queue consumer runs it with a 15-minute
+  // wall-time budget (vs waitUntil's 30 s), so a slow multi-mailbox IMAP sync
+  // has room to finish. A failed enqueue must not roll back the account row
+  // already created above.
+  try {
+    await c.env.SYNC_QUEUE.send({ accountId: id });
+  } catch (err) {
+    console.error("[sync-queue] enqueue failed for account", id, err);
+  }
 
   const summary = AccountSummarySchema.parse({
     id,
