@@ -172,8 +172,7 @@ export const DeleteMessagesInputSchema = z.object({
 });
 
 export const DraftInputSchema = z.object({
-  id: z.string().optional(),
-  accountId: z.string().nullable().optional(),
+  accountId: z.string().min(1),
   to: z.array(z.string()).optional().default([]),
   cc: z.array(z.string()).optional().default([]),
   bcc: z.array(z.string()).optional().default([]),

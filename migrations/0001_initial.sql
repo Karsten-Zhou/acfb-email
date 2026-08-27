@@ -180,23 +180,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
 
 -- ------------------------------------------------------------------
--- app_settings: per-user settings (JSON blob) + drafts
+-- app_settings: per-user settings (JSON blob)
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_settings (
   user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   data       TEXT NOT NULL DEFAULT '{}'
 );
-
-CREATE TABLE IF NOT EXISTS drafts (
-  id         TEXT PRIMARY KEY,               -- uuid
-  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
-  to_json    TEXT NOT NULL DEFAULT '[]',
-  cc_json    TEXT NOT NULL DEFAULT '[]',
-  bcc_json   TEXT NOT NULL DEFAULT '[]',
-  subject    TEXT,
-  html       TEXT,
-  text       TEXT,
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_drafts_user ON drafts(user_id);

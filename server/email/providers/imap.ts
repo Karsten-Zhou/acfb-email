@@ -4,6 +4,7 @@
 
 import { ImapClient, ImapError } from "../imap/client";
 import { smtpSend } from "../smtp/client";
+import { roleFromImapName } from "./role-map";
 import type {
   IEmailProvider,
   ProviderAttachment,
@@ -13,6 +14,7 @@ import type {
   ProviderMessage,
   ProviderPageResult,
   ProviderSyncOptions,
+  SaveDraftOptions,
   SendOptions,
 } from "./types";
 
@@ -299,6 +301,21 @@ export class ImapProvider implements IEmailProvider {
       opts.rawMessage,
       recipients,
     );
+  }
+
+  /** Append the draft MIME into the provider's Drafts folder. */
+  async saveDraft(opts: SaveDraftOptions): Promise<void> {
+    const imap = this.connectImap();
+    try {
+      await imap.connect();
+      const boxes = await imap.listMailboxes();
+      const drafts =
+        boxes.find((b) => roleFromImapName(b.name, b.flags) === "drafts") ??
+        boxes.find((b) => b.name.toUpperCase() === "DRAFTS");
+      await imap.append(drafts?.name ?? "Drafts", ["\\Drafts"], opts.rawMessage);
+    } finally {
+      await imap.close().catch(() => {});
+    }
   }
 }
 

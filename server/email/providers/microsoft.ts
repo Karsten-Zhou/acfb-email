@@ -10,6 +10,7 @@ import type {
   ProviderMessage,
   ProviderPageResult,
   ProviderSyncOptions,
+  SaveDraftOptions,
   SendOptions,
 } from "./types";
 import {
@@ -303,6 +304,28 @@ export class MicrosoftProvider implements IEmailProvider {
     void json;
     void base64url;
     void b64urlToBytes;
+  }
+
+  /** Create a draft message in the Drafts folder (Mail.ReadWrite scope). */
+  async saveDraft(opts: SaveDraftOptions): Promise<void> {
+    const message: Record<string, unknown> = {
+      subject: opts.subject,
+      body: {
+        contentType: opts.html ? "html" : "text",
+        content: opts.html || opts.text || "",
+      },
+      toRecipients: opts.to.map((a) => ({ emailAddress: { address: a } })),
+      ccRecipients: (opts.cc ?? []).map((a) => ({ emailAddress: { address: a } })),
+      bccRecipients: (opts.bcc ?? []).map((a) => ({ emailAddress: { address: a } })),
+    };
+    const { status, errorText } = await providerJson(
+      `${GRAPH}/me/mailFolders/drafts/messages`,
+      this.token.access_token,
+      message,
+      "POST",
+    );
+    if (status !== 201 && status !== 200)
+      throw new Error(`Outlook draft save failed (${errorText ?? status})`);
   }
 }
 

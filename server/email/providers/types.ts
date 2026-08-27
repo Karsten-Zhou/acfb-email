@@ -97,6 +97,18 @@ export interface SendOptions {
   references?: string[];
 }
 
+/** Draft content written to the provider's Drafts folder on save. */
+export interface SaveDraftOptions {
+  from: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  rawMessage: Uint8Array; // pre-built MIME
+  html?: string; // for REST providers (Gmail/Graph) that build their own body
+  text?: string;
+}
+
 export interface IEmailProvider {
   readonly type: ProviderType;
 
@@ -145,4 +157,7 @@ export interface IEmailProvider {
 
   /** Send a message. */
   send(opts: SendOptions): Promise<void>;
+
+  /** Save a draft into the provider's Drafts folder. */
+  saveDraft(opts: SaveDraftOptions): Promise<void>;
 }

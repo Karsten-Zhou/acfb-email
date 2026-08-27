@@ -11,6 +11,7 @@ import type {
   ProviderMessage,
   ProviderPageResult,
   ProviderSyncOptions,
+  SaveDraftOptions,
   SendOptions,
 } from "./types";
 import {
@@ -243,6 +244,18 @@ export class GmailProvider implements IEmailProvider {
     );
     if (status !== 200) throw new Error(`Gmail send failed (${status})`);
     void json;
+  }
+
+  /** Create a Gmail draft (DRAFT label) from the built MIME. */
+  async saveDraft(opts: SaveDraftOptions): Promise<void> {
+    const b64 = base64url(opts.rawMessage);
+    const { status, errorText } = await providerJson(
+      `${API}/drafts`,
+      this.token.access_token,
+      { message: { raw: b64 } },
+      "POST",
+    );
+    if (status !== 200) throw new Error(`Gmail draft save failed (${errorText ?? status})`);
   }
 }
 

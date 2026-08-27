@@ -507,6 +507,44 @@ export class ImapClient {
     await this.command("UID STORE", `${uids.join(",")} +FLAGS (\\Deleted)`);
     await this.command("EXPUNGE");
   }
+
+  /**
+   * Append a raw message to a mailbox (used to save drafts into the provider's
+   * Drafts folder). APPEND sends the message body as a literal, so unlike
+   * `command()` we must wait for the server's "+" continuation before writing
+   * the bytes, then read the tagged result.
+   */
+  async append(mailbox: string, flags: string[], raw: Uint8Array): Promise<void> {
+    if (!this.wire || !this.writer) throw new ImapError("Not connected");
+    const tag = `A${++this.tagCounter}`;
+    const flagStr = flags.length ? ` (${flags.join(" ")})` : "";
+    await this.write(`${tag} APPEND "${mailbox}"${flagStr} {${raw.byteLength}}`);
+
+    // Wait for the continuation line (starts with "+") before sending bytes.
+    while (true) {
+      const line = await this.wire.readLine();
+      if (line === null) throw new ImapError("Connection closed during APPEND");
+      if (line.startsWith("+")) break;
+    }
+
+    // Send the raw bytes followed by CRLF to complete the literal.
+    const buf = new Uint8Array(raw.byteLength + 2);
+    buf.set(raw, 0);
+    buf.set([13, 10], raw.byteLength);
+    await this.writer.write(buf);
+
+    // Read until the tagged completion line.
+    while (true) {
+      const line = await this.wire.readLine();
+      if (line === null) throw new ImapError("Connection closed during APPEND");
+      if (!line.startsWith(tag + " ")) continue;
+      const rest = line.slice(tag.length + 1);
+      if (!rest.startsWith("OK")) {
+        throw new ImapError(`IMAP APPEND refused: ${rest}`, rest.startsWith("NO") ? "no" : "bad");
+      }
+      return;
+    }
+  }
 }
 
 // ---------------------------------------------------------------

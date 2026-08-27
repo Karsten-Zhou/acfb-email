@@ -97,22 +97,21 @@ onMounted(async () => {
   if (route.query.to) to.value = route.query.to as string;
   if (route.query.subject) subject.value = route.query.subject as string;
 
-  // Load a draft if navigated via compose/:draftId
+  // Load a draft from the provider's Drafts folder (compose/:draftId where
+  // draftId is the message id). api.message() reads the body without marking
+  // the message read.
   const draftParam = route.params.draftId as string | undefined;
   if (draftParam) {
     draftId.value = draftParam;
-    const { drafts } = await api.drafts();
-    const d = drafts.find((x) => x.id === draftParam);
-    if (d) {
-      if (d.accountId) accountId.value = d.accountId;
-      to.value = d.to.join(", ");
-      cc.value = d.cc.join(", ");
-      bcc.value = d.bcc.join(", ");
-      showCc.value = d.cc.length > 0;
-      showBcc.value = d.bcc.length > 0;
-      subject.value = d.subject ?? "";
-      body.value = d.html ?? "";
-    }
+    const { message } = await api.message(draftParam);
+    if (message.accountId) accountId.value = message.accountId;
+    to.value = message.to.map((a) => a.address).join(", ");
+    cc.value = message.cc.map((a) => a.address).join(", ");
+    bcc.value = message.bcc.map((a) => a.address).join(", ");
+    showCc.value = message.cc.length > 0;
+    showBcc.value = message.bcc.length > 0;
+    subject.value = message.subject ?? "";
+    body.value = message.html ?? message.text ?? "";
   }
 });
 
@@ -158,7 +157,7 @@ async function send() {
       references: [],
       newAttachments: attachments.value,
     });
-    if (draftId.value) await api.deleteDraft(draftId.value);
+    if (draftId.value) await api.delete([draftId.value]);
     toastSuccess(t("sendSuccess"));
     // Auto-sync the account so the just-sent mail is pulled into its Sent
     // folder. The sync runs server-side and is not awaited — the account
@@ -179,10 +178,10 @@ async function send() {
 
 async function saveDraft() {
   savingDraft.value = true;
+  error.value = null;
   try {
-    const res = await api.saveDraft({
-      id: draftId.value ?? undefined,
-      accountId: accountId.value || null,
+    await api.saveDraft({
+      accountId: accountId.value,
       to: recipients(to.value),
       cc: recipients(cc.value),
       bcc: recipients(bcc.value),
@@ -190,7 +189,15 @@ async function saveDraft() {
       html: body.value,
       text: editorRef.value?.getText() ?? "",
     });
-    draftId.value = res.id;
+    toastSuccess(t("draftSaved"));
+    // The draft now lives in the provider's Drafts folder; sync the account so
+    // it appears there. Runs server-side in the background — the account-state
+    // poller shows progress.
+    markAccountSyncing(accountId.value);
+    void api
+      .syncAccount(accountId.value)
+      .catch(() => undefined)
+      .finally(() => clearAccountSyncing());
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to save draft";
   } finally {
@@ -199,7 +206,8 @@ async function saveDraft() {
 }
 
 function discard() {
-  if (draftId.value) void api.deleteDraft(draftId.value);
+  // Remove the provider draft if we opened an existing one.
+  if (draftId.value) void api.delete([draftId.value]);
   router.push({ name: "mailbox" });
 }
 </script>

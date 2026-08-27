@@ -175,13 +175,12 @@ export const api = {
   // send / drafts
   send: (input: SendMessageInput) =>
     request<{ ok: boolean }>("/send/send", { method: "POST", body: JSON.stringify(input) }),
-  drafts: () => request<{ drafts: Draft[] }>("/send/drafts"),
-  saveDraft: (draft: Partial<DraftInput>) =>
-    request<{ ok: boolean; id: string }>("/send/drafts", {
+  /** Save a draft to the provider's Drafts folder. */
+  saveDraft: (draft: DraftInput) =>
+    request<{ ok: boolean }>("/send/drafts", {
       method: "POST",
       body: JSON.stringify(draft),
     }),
-  deleteDraft: (id: string) => request<{ ok: boolean }>(`/send/drafts/${id}`, { method: "DELETE" }),
 
   // settings
   settings: () => request<{ settings: Record<string, unknown> }>("/settings"),
@@ -189,21 +188,8 @@ export const api = {
     request<{ ok: boolean }>("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };
 
-export interface Draft {
-  id: string;
-  accountId: string | null;
-  to: string[];
-  cc: string[];
-  bcc: string[];
-  subject: string | null;
-  html: string | null;
-  text: string | null;
-  updatedAt: string;
-}
-
 export interface DraftInput {
-  id?: string;
-  accountId?: string | null;
+  accountId: string;
   to?: string[];
   cc?: string[];
   bcc?: string[];
