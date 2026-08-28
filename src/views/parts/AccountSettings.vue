@@ -546,12 +546,16 @@ async function syncOne(id: string) {
       </div>
     </div>
 
-    <!-- Account list -->
+    <!-- Account list: empty state (guides the user to add the first account) -->
     <div
       v-if="accountsState.accounts.length === 0 && !showAdd"
-      class="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+      class="rounded-lg border border-dashed border-border p-8 text-center"
     >
-      {{ t("emailAccounts") }}
+      <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
+      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{{ t("noAccountsHint") }}</p>
+      <UiButton variant="default" size="sm" class="mt-4" @click="showAdd = true">
+        <Plus class="h-4 w-4" /> {{ t("addAccount") }}
+      </UiButton>
     </div>
     <div
       v-for="a in accountsState.accounts"

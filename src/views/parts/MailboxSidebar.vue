@@ -94,7 +94,8 @@ const roleIcon: Record<string, typeof Inbox> = {
       </div>
     </div>
 
-    <div class="px-3 py-2">
+    <!-- Compose is only useful once there's an account to send from. -->
+    <div v-if="accountsState.accounts.length > 0" class="px-3 py-2">
       <Button class="w-full" variant="default" size="sm" as-child>
         <RouterLink to="/compose"> <Plus class="h-4 w-4" /> Compose </RouterLink>
       </Button>
@@ -102,6 +103,7 @@ const roleIcon: Record<string, typeof Inbox> = {
 
     <nav class="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
       <button
+        v-if="accountsState.accounts.length > 0"
         class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
         :class="activeMailboxId === 'unified' ? 'bg-accent text-accent-foreground' : ''"
         @click="emit('select', 'unified')"
@@ -114,7 +116,7 @@ const roleIcon: Record<string, typeof Inbox> = {
            after the accounts request settles (never flash while it loads). -->
       <div
         v-if="!accountsState.loading && accountsState.accounts.length === 0"
-        class="mt-6 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
+        class="mt-3 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
       >
         <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
         <p class="text-xs leading-relaxed text-muted-foreground">{{ t("noAccountsHint") }}</p>
