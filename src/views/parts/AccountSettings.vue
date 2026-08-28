@@ -40,19 +40,13 @@ import {
 
 defineProps<{
   meta: HealthPayload | null;
-  notice: string | null;
-}>();
-const emit = defineEmits<{
-  dismissNotice: [];
 }>();
 
 const showAdd = ref(false);
 const adding = ref(false);
 const testing = ref(false);
-const testResult = ref<{ ok: boolean; message: string } | null>(null);
-const error = ref<string | null>(null);
-/** Last sync failure message per account id (shown under the row). */
-const syncErrorMap = ref<Record<string, string>>({});
+/** Shared message for the IMAP form: test-connection result or add-account error. */
+const formMessage = ref<{ ok: boolean; message: string } | null>(null);
 const confirmDeleteId = ref<string | null>(null);
 /** Whether the confirm dialog is open (so the row can be deleted via modal). */
 const deleteDialogOpen = ref(false);
@@ -209,12 +203,12 @@ async function connectOAuth(provider: "google" | "microsoft") {
 
 async function testConnection() {
   testing.value = true;
-  testResult.value = null;
+  formMessage.value = null;
   try {
     const res = await api.testAccount({ provider: "imap", ...form.value });
-    testResult.value = { ok: res.ok, message: res.message ?? "OK" };
+    formMessage.value = { ok: res.ok, message: res.message ?? "OK" };
   } catch (err) {
-    testResult.value = { ok: false, message: err instanceof Error ? err.message : String(err) };
+    formMessage.value = { ok: false, message: err instanceof Error ? err.message : String(err) };
   } finally {
     testing.value = false;
   }
@@ -222,7 +216,7 @@ async function testConnection() {
 
 async function addAccount() {
   adding.value = true;
-  error.value = null;
+  formMessage.value = null;
   try {
     await api.addAccount({ provider: "imap", ...form.value });
     showAdd.value = false;
@@ -234,7 +228,10 @@ async function addAccount() {
     // for the next idle poll (up to a minute).
     kickAccountStatePoll();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to add account";
+    formMessage.value = {
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to add account",
+    };
   } finally {
     adding.value = false;
   }
@@ -259,15 +256,12 @@ async function confirmRemove() {
 
 async function syncOne(id: string) {
   // Optimistic: mark running immediately so the row spinner + "Syncing…"
-  // appear right away and the poller switches to 1s cadence.
+  // appear right away and the poller switches to 1s cadence. Sync failures
+  // surface via the account's own state (state_message) once the poll applies
+  // it, so there's no separate error line here.
   markAccountSyncing(id);
   try {
-    const res = await syncAccount(id);
-    if (!res.ok && res.message) {
-      syncErrorMap.value = { ...syncErrorMap.value, [id]: res.message };
-    } else {
-      syncErrorMap.value = { ...syncErrorMap.value, [id]: "" };
-    }
+    await syncAccount(id);
   } finally {
     // Always drop fast mode — on success the server has settled the state and
     // the next poll applies its truth; on failure the state never went
@@ -284,16 +278,6 @@ async function syncOne(id: string) {
       <UiButton variant="default" size="sm" @click="showAdd = !showAdd">
         <Plus class="h-4 w-4" /> {{ t("addAccount") }}
       </UiButton>
-    </div>
-
-    <div
-      v-if="notice"
-      class="mb-3 flex items-center justify-between gap-2 card-surface border-emerald-500/40 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400"
-    >
-      <span>{{ notice }}</span>
-      <button class="text-muted-foreground hover:text-foreground" @click="emit('dismissNotice')">
-        ✕
-      </button>
     </div>
 
     <!-- OAuth providers -->
@@ -523,15 +507,14 @@ async function syncOne(id: string) {
         </div>
 
         <div
-          v-if="testResult"
+          v-if="formMessage"
           class="mt-3 flex items-center gap-1.5 text-xs"
-          :class="testResult.ok ? 'text-emerald-600' : 'text-destructive'"
+          :class="formMessage.ok ? 'text-emerald-600' : 'text-destructive'"
         >
-          <CheckCircle2 v-if="testResult.ok" class="h-4 w-4" />
+          <CheckCircle2 v-if="formMessage.ok" class="h-4 w-4" />
           <XCircle v-else class="h-4 w-4" />
-          {{ testResult.message }}
+          {{ formMessage.message }}
         </div>
-        <div v-if="error" class="mt-1 text-xs text-destructive">{{ error }}</div>
 
         <div class="mt-3 flex gap-2">
           <UiButton variant="outline" size="sm" :disabled="testing" @click="testConnection">
@@ -589,13 +572,6 @@ async function syncOne(id: string) {
           <span v-if="a.lastSyncedAt" class="ml-2"
             >{{ t("syncedOn") }} {{ formatDate(a.lastSyncedAt) }}</span
           >
-        </div>
-        <div
-          v-if="syncErrorMap[a.id]"
-          class="mt-0.5 flex items-center gap-1.5 text-xs text-destructive"
-        >
-          <XCircle class="h-3.5 w-3.5 shrink-0" />
-          <span class="min-w-0 truncate">{{ syncErrorMap[a.id] }}</span>
         </div>
       </div>
       <UiToolTip :label="a.state === 'running' ? t('syncing') : t('syncNow')">

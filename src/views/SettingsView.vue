@@ -5,7 +5,7 @@
 //   PreferencesPanel (language/theme),
 //   AboutPanel.
 import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { loadAccounts, kickAccountStatePoll } from "../stores/accounts";
 import { api, type HealthPayload } from "../lib/api";
 import { t } from "../lib/i18n";
@@ -17,9 +17,7 @@ import AboutPanel from "./parts/AboutPanel.vue";
 import { ChevronLeft } from "lucide-vue-next";
 
 const router = useRouter();
-const route = useRoute();
 
-const notice = ref<string | null>(null);
 const meta = ref<HealthPayload | null>(null);
 
 onMounted(async () => {
@@ -32,14 +30,10 @@ onMounted(async () => {
   ]);
   // If any account is mid-sync ('running') — e.g. right after an OAuth connect
   // enqueued a sync — kick the poller to the 1s cadence so the settled state
-  // shows up promptly instead of waiting for the next idle poll.
+  // shows up promptly instead of waiting for the next idle poll. (No success
+  // notice on connect: the new account appearing and syncing in the list is
+  // confirmation enough.)
   kickAccountStatePoll();
-  // OAuth callback lands on /settings?connected=google|microsoft and shows
-  // a success notice.
-  const connected = route.query.connected;
-  if (connected === "google" || connected === "microsoft") {
-    notice.value = connected === "google" ? t("connectGmail") + " ✓" : t("connectOutlook") + " ✓";
-  }
 });
 </script>
 
@@ -62,7 +56,7 @@ onMounted(async () => {
 
     <main class="flex-1 overflow-y-auto p-4 md:p-6">
       <section class="mx-auto max-w-2xl space-y-6">
-        <AccountSettings :meta="meta" :notice="notice" @dismiss-notice="notice = null" />
+        <AccountSettings :meta="meta" />
         <PreferencesPanel />
         <AboutPanel />
       </section>
