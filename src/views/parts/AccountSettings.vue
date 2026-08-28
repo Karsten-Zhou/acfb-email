@@ -12,6 +12,7 @@ import {
   syncAccount,
   markAccountSyncing,
   clearAccountSyncing,
+  kickAccountStatePoll,
 } from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
 import { t, formatDate } from "../../lib/i18n";
@@ -227,6 +228,11 @@ async function addAccount() {
     showAdd.value = false;
     form.value.password = "";
     await loadAccounts();
+    // The new account's initial state is 'running' (a sync is enqueued
+    // server-side); kick the poller so it observes that and switches to the
+    // 1s cadence, picking up the settled state promptly instead of waiting
+    // for the next idle poll (up to a minute).
+    kickAccountStatePoll();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to add account";
   } finally {

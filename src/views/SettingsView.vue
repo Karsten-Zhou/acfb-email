@@ -6,7 +6,7 @@
 //   AboutPanel.
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { loadAccounts } from "../stores/accounts";
+import { loadAccounts, kickAccountStatePoll } from "../stores/accounts";
 import { api, type HealthPayload } from "../lib/api";
 import { t } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
@@ -30,6 +30,10 @@ onMounted(async () => {
       .then((h) => (meta.value = h))
       .catch(() => null),
   ]);
+  // If any account is mid-sync ('running') — e.g. right after an OAuth connect
+  // enqueued a sync — kick the poller to the 1s cadence so the settled state
+  // shows up promptly instead of waiting for the next idle poll.
+  kickAccountStatePoll();
   // OAuth callback lands on /settings?connected=google|microsoft and shows
   // a success notice.
   const connected = route.query.connected;

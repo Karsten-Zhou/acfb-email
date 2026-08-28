@@ -176,6 +176,24 @@ export function clearAccountSyncing() {
   }
 }
 
+/**
+ * Kick the adaptive poller to poll right now without arming the optimistic
+ * 'running' override. Use right after adding/connecting an account: the server
+ * already reports the new account as 'running' (a sync is enqueued), so a
+ * single immediate poll observes it and switches the loop to the 1s cadence
+ * until the sync settles. markAccountSyncing is NOT suitable here — its
+ * fastUntilHealthy override has no matching clearAccountSyncing for the
+ * queue-driven sync, so it would keep showing 'running' forever once armed.
+ */
+export function kickAccountStatePoll() {
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  if (active) void run();
+  else startAccountStatePolling();
+}
+
 export async function loadMailboxes(accountId: string) {
   const { mailboxes } = await api.mailboxes(accountId);
   accountsState.mailboxes = mailboxes;
