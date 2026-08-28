@@ -1,5 +1,6 @@
 // Generic OAuth 2.0 helper for third-party email providers (Google, Microsoft).
-// Handles the authorization-code flow (server-side) and token refresh.
+// Handles the authorization-code flow (server-side) and token refresh. The
+// access token is used for IMAP/SMTP XOAUTH2 authentication.
 import { HttpError } from "../http-error";
 
 export interface OAuthToken {
@@ -8,6 +9,8 @@ export interface OAuthToken {
   scope?: string;
   token_type?: string;
   expires_in?: number;
+  /** OpenID Connect ID token (present when the provider granted `openid`). */
+  id_token?: string;
   obtained_at: number; // epoch ms (we record this; providers may not return it)
 }
 
@@ -16,7 +19,11 @@ export interface OAuthProviderConfig {
   tokenUrl: string;
   clientId: string;
   clientSecret: string;
+  /** Scopes requested at consent. May span resources. */
   scopes: string[];
+  /** Single-resource scopes echoed on the token request so the access token is
+   *  minted for the provider's mail endpoints. */
+  tokenScopes?: string[];
   redirectUri: (envBase: string) => string;
 }
 
@@ -42,23 +49,26 @@ export function buildAuthorizeUrl(cfg: OAuthProviderConfig, state: string): stri
 
 /**
  * Exchange an authorization code for tokens.
- * base = e.g. "http://localhost:5173" (used to build redirect_uri).
  */
 export async function exchangeCode(
   cfg: OAuthProviderConfig,
   code: string,
   redirectUri: string,
 ): Promise<OAuthToken> {
+  const body = new URLSearchParams({
+    client_id: cfg.clientId,
+    client_secret: cfg.clientSecret,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+  });
+  // The token request targets a single resource so the access token is
+  // minted for the provider's mail endpoints.
+  if (cfg.tokenScopes) body.set("scope", cfg.tokenScopes.join(" "));
   const res = await fetch(cfg.tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: cfg.clientId,
-      client_secret: cfg.clientSecret,
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-    }),
+    body,
   });
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !data.access_token) {
@@ -80,15 +90,18 @@ export async function refreshToken(
   cfg: OAuthProviderConfig,
   refreshTokenValue: string,
 ): Promise<OAuthToken> {
+  const body = new URLSearchParams({
+    client_id: cfg.clientId,
+    client_secret: cfg.clientSecret,
+    refresh_token: refreshTokenValue,
+    grant_type: "refresh_token",
+  });
+  // Keep the refreshed access token scoped to the provider's mail endpoints.
+  if (cfg.tokenScopes) body.set("scope", cfg.tokenScopes.join(" "));
   const res = await fetch(cfg.tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: cfg.clientId,
-      client_secret: cfg.clientSecret,
-      refresh_token: refreshTokenValue,
-      grant_type: "refresh_token",
-    }),
+    body,
   });
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !data.access_token) {
@@ -114,6 +127,7 @@ function normalizeToken(data: Record<string, unknown>): OAuthToken {
     scope: (data.scope as string) ?? undefined,
     token_type: (data.token_type as string) ?? "Bearer",
     expires_in: typeof data.expires_in === "number" ? data.expires_in : undefined,
+    id_token: (data.id_token as string) ?? undefined,
     obtained_at: Date.now(),
   };
 }
@@ -129,29 +143,13 @@ export function makeRedirectUri(baseUrl: string, provider: "google" | "microsoft
   return `${baseUrl.replace(/\/$/, "")}/api/oauth/${provider}/callback`;
 }
 
-/** Issue an authenticated GET to the provider, refreshing if needed. */
+/** Issue an authenticated GET to the provider (identity/owner lookup). */
 export async function providerGet(
   url: string,
   accessToken: string,
 ): Promise<{ status: number; json: unknown }> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  });
-  const json = await res.json().catch(() => null);
-  return { status: res.status, json };
-}
-
-/** Issue an authenticated POST with a JSON body. */
-export async function providerJson(
-  url: string,
-  accessToken: string,
-  body: unknown,
-  method: "POST" | "PATCH" | "DELETE" = "POST",
-): Promise<{ status: number; json: unknown }> {
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => null);
   return { status: res.status, json };

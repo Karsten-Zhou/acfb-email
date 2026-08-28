@@ -1,6 +1,6 @@
-// Generic IMAP/SMTP provider adapter built on `imapflow`. Decouples protocol
-// work from the provider interface so Gmail/Microsoft can be added without
-// touching sync logic.
+// IMAP/SMTP provider adapter built on `imapflow`. This is the single provider
+// implementation — generic IMAP accounts use password auth, while Gmail and
+// Outlook connect through the same adapter using OAuth2 (XOAUTH2).
 
 import { ImapFlow } from "imapflow";
 import { smtpSend } from "../smtp/client";
@@ -21,7 +21,10 @@ import type {
 
 export interface ImapCredentials {
   username: string;
-  password: string;
+  /** Password login (AUTH PLAIN/LOGIN) — omitted when using OAuth2. */
+  password?: string;
+  /** OAuth2 access token (AUTH XOAUTH2) — used by Gmail/Outlook. */
+  accessToken?: string;
 }
 
 export interface ImapTransport {
@@ -48,7 +51,9 @@ export class ImapProvider implements IEmailProvider {
       port: this.transport.imapPort,
       secure: this.transport.imapSecure,
       servername: this.transport.imapHost,
-      auth: { user: this.creds.username, pass: this.creds.password },
+      auth: this.creds.accessToken
+        ? { user: this.creds.username, accessToken: this.creds.accessToken }
+        : { user: this.creds.username, pass: this.creds.password ?? "" },
       // Workerd's compressed stream chain drops large responses (e.g. UID
       // SEARCH), so COMPRESS=DEFLATE stays off.
       disableCompression: true,
@@ -256,6 +261,7 @@ export class ImapProvider implements IEmailProvider {
         secure: this.transport.smtpSecure,
         username: this.creds.username,
         password: this.creds.password,
+        accessToken: this.creds.accessToken,
         from: opts.from,
       },
       opts.rawMessage,

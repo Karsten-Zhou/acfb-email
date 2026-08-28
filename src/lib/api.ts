@@ -126,9 +126,9 @@ export const api = {
     request<{ mailboxes: Mailbox[] }>(`/mailboxes?accountId=${encodeURIComponent(accountId)}`),
 
   // messages
-  messages: (mailboxId: string, limit = 50, offset = 0, beforeUid?: number, beforeDate?: number) =>
+  messages: (mailboxId: string, limit = 50, offset = 0, beforeUid?: number) =>
     request<{ messages: Message[]; hasMore?: boolean }>(
-      `/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}${beforeDate ? `&beforeDate=${beforeDate}` : ""}`,
+      `/messages?mailboxId=${encodeURIComponent(mailboxId)}&limit=${limit}&offset=${offset}${beforeUid ? `&beforeUid=${beforeUid}` : ""}`,
     ),
   unified: (limit = 50, offset = 0) =>
     request<{ messages: Message[]; hasMore?: boolean }>(

@@ -42,11 +42,11 @@ export const AttachmentMetaSchema = z.object({
 
 /** A provider-side attachment handle, used to fetch binary content on demand. */
 export const AttachmentDownloadSchema = z.object({
-  /** The message's provider id (IMAP UID / Gmail id / Graph id). */
+  /** The message's provider id (the IMAP UID). */
   providerMessageId: z.string(),
-  /** The attachment's identifier within the provider (part number, Gmail attachmentId, Graph id). */
+  /** The attachment's MIME part handle within the provider. */
   providerAttachmentId: z.string().nullable(),
-  /** Raw MIME part identifier for IMAP (e.g. "1.2") or null for REST providers. */
+  /** Raw MIME part identifier for IMAP (e.g. "1.2"). */
   partNumber: z.string().nullable(),
 });
 

@@ -83,10 +83,13 @@ Some tooling details that matter:
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has
   `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its
   `setHeader In-Reply-To` expects a bare id (it adds the angle brackets itself).
-- **Provider abstraction**: `server/email/providers/` defines `GmailProvider`,
-  `MicrosoftProvider`, and an IMAP provider behind a common interface. Provider
-  ids for a message are resolved via `providerIdFor()` in `server/routes/messages.ts`
-  (IMAP uses `remote_uid`; Gmail/Graph use `remote_message_id`).
+- **Provider abstraction**: `server/email/providers/` defines a single
+  `ImapProvider` (imapflow) behind a common interface. Generic IMAP accounts
+  use password auth; Gmail and Outlook connect through the same adapter via
+  OAuth2 (XOAUTH2) on their well-known endpoints (`buildProvider` in
+  `server/email/providers/index.ts`). Provider ids for a message are resolved
+  via `providerIdFor()` in `server/routes/messages.ts` (all providers use the
+  IMAP `remote_uid`).
 - **Syncing**: account add / OAuth connect enqueue a sync job to the
   `email-sync` Queue; the `queue()` consumer in `server/index.ts` runs it
   (15-min wall-time budget vs waitUntil's 30 s). A manual `POST
@@ -140,9 +143,10 @@ Some tooling details that matter:
 ## Live-behavior gotchas worth remembering
 
 - **SMTP**: Cloudflare Workers can't do port 25 — always 465/587.
-- **MS Graph `Mail.Send`** is a separate delegated scope and is *not* included in
-  `Mail.ReadWrite`; scopes are fixed at OAuth consent, so gaining send reconsent
-  requires removing and reconnecting the account.
+- **Gmail/Outlook OAuth scopes** (XOAUTH2 for IMAP/SMTP):
+  Gmail needs `https://mail.google.com/`; Outlook needs
+  `https://outlook.office.com/IMAP.AccessAsUser.All` + `SMTP.Send` (send is a
+  separate scope).
 - Sync-state polling uses adaptive cadence (fast while any account is
   `running`, slow otherwise). Race conditions in this loop have bitten us — see
   the fast-poll/`clearAccountSyncing`/`runInFlight` guard notes in repo memory.

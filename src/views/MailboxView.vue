@@ -349,19 +349,15 @@ async function loadOlder() {
   loadingOlder.value = true;
   try {
     const offset = mailState.messages.length;
-    // Oldest remote UID + oldest receivedAt in the currently loaded set = the
-    // "before" cursors so the route can fetch even older messages from the
-    // provider when the local DB page is exhausted.
+    // Oldest remote UID in the currently loaded set = the "before" cursor so
+    // the route can fetch even older messages from the provider when the local
+    // DB page is exhausted.
     const remoteUids = mailState.messages.map((m) => m.remoteUid).filter((x): x is number => !!x);
     const beforeUid = remoteUids.length ? Math.min(...remoteUids) : 0;
-    const dates = mailState.messages
-      .map((m) => new Date(m.receivedAt).getTime())
-      .filter((n) => !Number.isNaN(n));
-    const beforeDate = dates.length ? Math.min(...dates) : 0;
     const incoming =
       activeMailboxId.value === "unified"
         ? await api.unified(pageSize, offset)
-        : await api.messages(activeMailboxId.value!, pageSize, offset, beforeUid, beforeDate);
+        : await api.messages(activeMailboxId.value!, pageSize, offset, beforeUid);
     const seen = new Set(mailState.messages.map((m) => m.id));
     const fresh = incoming.messages.filter((m) => !seen.has(m.id));
     hasOlder.value = incoming.messages.length === pageSize;

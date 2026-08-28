@@ -1,11 +1,34 @@
-// Constructs a concrete provider adapter from persisted account data.
+// Constructs a concrete provider adapter from persisted account data. All
+// providers run through the IMAP/SMTP adapter; Gmail and Outlook connect via
+// OAuth2 (XOAUTH2) on their well-known endpoints.
 import { decryptCredential } from "../../security/crypto";
 import { ImapProvider } from "./imap";
-import { GmailProvider } from "./gmail";
-import { MicrosoftProvider } from "./microsoft";
 import { loadOauthToken } from "../../routes/oauth";
+import type { ImapTransport } from "./imap";
 import type { IEmailProvider } from "./types";
 import type { Env } from "../../env";
+
+// Well-known IMAP/SMTP endpoints for OAuth-connected providers. Gmail and
+// Outlook disable password login, so these accounts always authenticate with
+// an OAuth2 access token (XOAUTH2) over the standard submission ports.
+const OAUTH_TRANSPORTS: Record<"gmail" | "microsoft", ImapTransport> = {
+  gmail: {
+    imapHost: "imap.gmail.com",
+    imapPort: 993,
+    imapSecure: true,
+    smtpHost: "smtp.gmail.com",
+    smtpPort: 465,
+    smtpSecure: true,
+  },
+  microsoft: {
+    imapHost: "outlook.office365.com",
+    imapPort: 993,
+    imapSecure: true,
+    smtpHost: "smtp.office365.com",
+    smtpPort: 587,
+    smtpSecure: false,
+  },
+};
 
 export interface AccountLike {
   id: string;
@@ -52,14 +75,15 @@ export async function buildProvider(
     case "microsoft": {
       if (!credential) throw new Error(`Missing OAuth token for ${account.provider}`);
       // Refresh an expired access token (and persist the fresh one) so the
-      // provider never runs with a stale token. Graph/Gmail access tokens
-      // expire after ~1h (Microsoft: expires_in ≈ 3600s), and without this
-      // the account silently fails auth every few hours.
+      // provider never runs with a stale token (Gmail/Outlook access tokens
+      // expire after ~1h).
       const token = await loadOauthToken(env, account, credential.credential);
       if (!token) throw new Error(`Invalid stored OAuth token for ${account.provider}`);
-      return account.provider === "gmail"
-        ? new GmailProvider(token, account.email)
-        : new MicrosoftProvider(token, account.email);
+      return new ImapProvider(
+        OAUTH_TRANSPORTS[account.provider],
+        { username: account.email, accessToken: token.access_token },
+        account.email,
+      );
     }
     default:
       throw new Error(`Provider "${account.provider}" is not implemented yet`);

@@ -177,8 +177,8 @@ async function upsertMessage(
   const receivedAt = isoDate(msg.internalDate) ?? isoDate(msg.date) ?? new Date().toISOString();
   const isRead = msg.flags.includes("\\Seen");
   const isStarred = msg.flags.includes("\\Flagged");
-  // Attachment presence is provider-reported where available (REST providers);
-  // IMAP stays false until the body is fetched (which persists metadata).
+  // Attachment presence is only known once the body is fetched (which
+  // persists the metadata); metadata-only rows keep this false.
   const hasAttachments = msg.hasAttachments === true;
   const threadId = msg.messageId ? msg.messageId : null;
 
@@ -186,8 +186,8 @@ async function upsertMessage(
   const hash = simpleHash([uidValidity, msg.remoteUid, isRead, isStarred, subject, date].join("|"));
 
   // remote_message_id holds the provider's id for this message in this mailbox
-  // (IMAP UID, Gmail message id, Outlook message id). We use it as the stable
-  // unique key because remote ids are per-mailbox.
+  // (the IMAP UID, as a string). We use it as the stable unique key because
+  // remote ids are per-mailbox.
   const providerKey = msg.providerId ?? String(msg.remoteUid);
 
   const existing = await env.DB.prepare(
@@ -196,14 +196,14 @@ async function upsertMessage(
     .bind(mailbox.id, providerKey)
     .first<{ id: string }>();
 
-  // Moving a message between folders changes its provider id (IMAP UID on a
-  // move, Microsoft Graph id on a move), so the per-mailbox provider-id key
-  // above cannot recognize the same physical message re-entering a folder — it
-  // would insert a duplicate row. The Message-ID header is stable across
-  // moves, so collapse any same-message rows (keeping the row we're about to
-  // update, if any). Safe for IMAP/Microsoft where a message lives in one
-  // folder; rows in "all"-role mailboxes (e.g. Gmail IMAP All Mail) are
-  // excluded because they legitimately mirror other folders.
+  // Moving a message between folders changes its IMAP UID, so the per-mailbox
+  // provider-id key above cannot recognize the same physical message
+  // re-entering a folder — it would insert a duplicate row. The Message-ID
+  // header is stable across moves, so collapse any same-message rows (keeping
+  // the row we're about to update, if any). Gmail is excluded because a Gmail
+  // message legitimately lives in multiple folders (labels); rows in
+  // "all"-role mailboxes (e.g. Gmail IMAP All Mail) are excluded because they
+  // mirror other folders.
   if (
     (account.provider === "microsoft" || account.provider === "imap") &&
     msg.messageId &&
@@ -375,7 +375,6 @@ export async function importOlderPage(
   mailboxPath: string,
   beforeUid: number,
   limit: number,
-  beforeDate?: number,
 ): Promise<{ imported: number; hasMore: boolean }> {
   const credential = await getCredential(env, account.id);
   const fullAccount = await getAccount(env, account.id);
@@ -387,7 +386,6 @@ export async function importOlderPage(
   );
   const result = await provider.fetchOlder(mailboxPath, {
     beforeUid,
-    beforeDate,
     fetchLimit: limit,
   });
   // The mailbox already exists (created during the initial sync, where its
@@ -448,8 +446,7 @@ function classifyError(err: unknown): string {
   if (/timeout|timed out|ETIMEDOUT|socket|connection|ECONN/i.test(m)) {
     return "Could not reach the mail server. It may be temporarily unavailable.";
   }
-  // Provider/REST errors already carry a usable detail (status + API message),
-  // e.g. "Failed to list Outlook messages (403 — …access token expired…)".
+  // IMAP/SMTP errors already carry a usable detail (server reply text).
   if (m.includes(" — ") || /\(\d{3}\)/.test(m)) return m;
   // Generic but safe fallback for opaque/unknown failures.
   return "Synchronization failed. Check the server settings.";

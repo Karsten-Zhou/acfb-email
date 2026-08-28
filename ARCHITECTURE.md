@@ -99,7 +99,7 @@ The Worker therefore has no CSRF token of its own.
 ```text
 1. POST /api/send { accountId, to, cc, bcc, subject, html, text, ... }
 2. Worker builds RFC5322 with mimetext (multipart/alternative for html+text)
-3. SMTP: implicit TLS (465) or STARTTLS (587), AUTH LOGIN, MAIL FROM, RCPT TO, DATA
+3. SMTP: implicit TLS (465) or STARTTLS (587), AUTH LOGIN or XOAUTH2, MAIL FROM, RCPT TO, DATA
 4. On success, deletes any matching local draft
 ```
 
@@ -178,8 +178,10 @@ slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls
 - `setFlags / move / delete`
 - `send(opts)`
 
-`ImapProvider` (imap.ts) implements it. Adding Gmail or Outlook later means adding
-a new class + a `buildProvider` case — sync, routes, and UI do not change.
+`ImapProvider` (imap.ts) implements it. Every provider — generic IMAP accounts
+(password auth) plus Gmail and Outlook (OAuth2/XOAUTH2 on their well-known
+IMAP/SMTP endpoints) — is served by this single adapter; `buildProvider` picks
+the transport and auth method. Sync, routes, and UI do not change per provider.
 
 ### IMAP via imapflow (patched)
 
@@ -199,9 +201,9 @@ large responses (verified live against QQ Mail, 2026-08-27).
 ---
 
 > **Status note (2026-08):** the IMAP/SMTP adapter is **tested live** (QQ Mail).
-> The Gmail (REST) and Microsoft Graph adapters are **implemented but not yet
-> live-verified** — they need Google Cloud / Entra app registrations with OAuth
-> consent. Until verified, treat them as untested experimental code paths.
+> Gmail and Outlook connect through the same adapter using **OAuth2 (XOAUTH2)**
+> — they need Google Cloud / Entra app registrations with OAuth consent to be
+> configured before they can be verified against real accounts.
 
 ## 7. Cloudflare resource usage
 

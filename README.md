@@ -80,28 +80,12 @@ for the threat model, [DEVELOPMENT.md](./DEVELOPMENT.md) for daily workflow, and
 
 - **Sending attachments** is not yet wired (send is text/HTML only). The data model
   supports attachment metadata; binary re-fetch for send/forward is a later phase.
-- **Gmail & Outlook adapters are implemented but UNTESTED against real accounts**
-  (they require Google Cloud / Microsoft Entra app registration + OAuth). The
-  **IMAP/SMTP provider is the tested path** (verified with a real QQ Mail account).
-  Outlook.com can also be connected via **IMAP/SMTP directly** (see below).
+- **Gmail & Outlook connect via OAuth → IMAP/SMTP (XOAUTH2)**. They require a
+  Google Cloud / Microsoft Entra app registration + OAuth (see DEPLOYMENT.md).
+  Generic IMAP/SMTP accounts (password auth) are the tested path (verified with
+  a real QQ Mail account).
 - **Background sync** is on account connect + manual "Sync now" (no Cron/Queues yet) — see
   ARCHITECTURE for the seam to add them.
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
 - Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain
-  must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).
-
-### Connecting Outlook.com via IMAP/SMTP (tested-compatible settings)
-
-Outlook.com supports IMAP/SMTP with an app password:
-
-| Field | Value |
-| --- | --- |
-| IMAP host | `outlook.office365.com` |
-| IMAP port | `993`, TLS |
-| SMTP host | `smtp.office365.com` |
-| SMTP port | `587`, TLS (STARTTLS) |
-| Username | your full email (e.g. `you@outlook.de`) |
-| Password | an **app password** (Microsoft Account security settings → App passwords) |
-
-See the [official Outlook POP/IMAP/SMTP settings](https://support.microsoft.com/outlook/pop-imap-and-smtp-settings-for-outlook-com)
-for confirmed values.
+must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).

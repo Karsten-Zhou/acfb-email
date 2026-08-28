@@ -1,6 +1,6 @@
 // A compact SMTP client built on the Workers TCP sockets API.
 // Supports implicit TLS (465) and STARTTLS (587) submission, plus
-// AUTH LOGIN/PLAIN.
+// AUTH LOGIN/PLAIN and AUTH XOAUTH2 (OAuth2 for Gmail/Outlook).
 
 import { connect } from "cloudflare:sockets";
 
@@ -9,7 +9,10 @@ export interface SmtpConfig {
   port: number;
   secure: boolean; // true = implicit TLS (465), false = STARTTLS (587)
   username: string;
-  password: string;
+  /** Password login (AUTH LOGIN) — omitted when using OAuth2. */
+  password?: string;
+  /** OAuth2 access token (AUTH XOAUTH2) — used by Gmail/Outlook. */
+  accessToken?: string;
   from: string;
 }
 
@@ -120,12 +123,19 @@ class SmtpClientCore {
     await this.ehlo();
   }
 
-  async auth(username: string, password: string): Promise<void> {
+  async auth(): Promise<void> {
+    if (this.cfg.accessToken) {
+      // XOAUTH2 initial response: user=<email>\x01auth=Bearer <token>\x01\x01.
+      const payload = `user=${this.cfg.username}\u0001auth=Bearer ${this.cfg.accessToken}\u0001\u0001`;
+      await this.send(`AUTH XOAUTH2 ${btoa(payload)}`);
+      await this.readReply(235);
+      return;
+    }
     await this.send("AUTH LOGIN");
     await this.readReply(334);
-    await this.send(btoa(username));
+    await this.send(btoa(this.cfg.username));
     await this.readReply(334);
-    await this.send(btoa(password));
+    await this.send(btoa(this.cfg.password ?? ""));
     await this.readReply(235);
   }
 
@@ -192,7 +202,7 @@ export async function smtpSend(
       // STARTTLS on 587
       await client.startTls();
     }
-    await client.auth(cfg.username, cfg.password);
+    await client.auth();
     await client.mailFrom(cfg.from);
     for (const r of recipients) {
       await client.rcptTo(r);

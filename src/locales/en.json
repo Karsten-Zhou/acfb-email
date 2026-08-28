@@ -38,7 +38,7 @@
   "connectGmail": "Gmail",
   "connectGmailHint": "Connect via Google OAuth",
   "connectOutlook": "Outlook / Microsoft",
-  "connectOutlookHint": "Connect via Microsoft Graph",
+  "connectOutlookHint": "Connect via Microsoft OAuth",
   "connect": "Connect",
   "imapSection": "IMAP / SMTP account",
   "label": "Label",

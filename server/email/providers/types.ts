@@ -1,6 +1,6 @@
 // Provider adapter contract. The rest of the application (sync, routes) only
-// ever talks to this interface, so adding Gmail/Microsoft/POP3 later is a
-// matter of implementing this interface.
+// ever talks to this interface. Every provider (generic IMAP, Gmail, Outlook)
+// is served by the IMAP adapter in imap.ts.
 
 import type { MailboxRole, ProviderType } from "@shared/constants";
 
@@ -9,8 +9,8 @@ export interface ProviderMailbox {
   delimiter: string | null;
   flags: string[];
   /** Canonical role when the provider can identify it reliably (IMAP
-   *  SPECIAL-USE flags, Gmail system label, Graph well-known folder name) —
-   *  independent of the folder's display name/locale. */
+   *  SPECIAL-USE flags, well-known folder names) — independent of the
+   *  folder's display name/locale. */
   role?: MailboxRole;
 }
 
@@ -20,8 +20,8 @@ export interface ProviderAddress {
 }
 
 export interface ProviderMessage {
-  /** Stable provider-side id: IMAP UID (numeric as string), Gmail message id,
-   *  Outlook message id. Used to perform operations on the message. */
+  /** Stable provider-side id: the IMAP UID (numeric, as string). Used to
+   *  perform operations on the message. */
   providerId: string;
   remoteUid: number;
   messageId: string | null;
@@ -33,7 +33,7 @@ export interface ProviderMessage {
   internalDate: string | null;
   flags: string[];
   size: number | null;
-  /** Provider-reported attachment presence (REST providers); IMAP unknown. */
+  /** Attachment presence, only known once the body is fetched. */
   hasAttachments?: boolean;
 }
 
@@ -57,7 +57,7 @@ export interface ProviderBody {
     isInline: boolean;
     contentId: string | null;
     contentBase64: string | null; // base64 content (small attachments)
-    /** Provider-side handle for the attachment part (IMAP part number, Gmail attachmentId, Graph attachment id). */
+    /** Provider-side handle for the attachment part (IMAP part number). */
     partNumber: string | null;
     disposition: "attachment" | "inline" | null;
   }[];
@@ -75,9 +75,6 @@ export interface ProviderSyncOptions {
   sinceUid?: number;
   // If set, only fetch messages with UID < this (older page).
   beforeUid?: number;
-  // If set, only fetch messages received before this epoch-ms (older page,
-  // for date-based REST providers like Graph).
-  beforeDate?: number;
   fetchLimit?: number;
 }
 
@@ -94,11 +91,7 @@ export interface SendOptions {
   cc?: string[];
   bcc?: string[];
   subject: string;
-  rawMessage: Uint8Array; // pre-built MIME — IMAP/SMTP adapter relays this
-  html?: string; // for REST providers (Gmail/Graph) that build their own body
-  text?: string;
-  inReplyTo?: string | null;
-  references?: string[];
+  rawMessage: Uint8Array; // pre-built MIME — the adapter relays this as-is
 }
 
 /** Draft content written to the provider's Drafts folder on save. */
@@ -109,8 +102,6 @@ export interface SaveDraftOptions {
   bcc?: string[];
   subject: string;
   rawMessage: Uint8Array; // pre-built MIME
-  html?: string; // for REST providers (Gmail/Graph) that build their own body
-  text?: string;
 }
 
 export interface IEmailProvider {

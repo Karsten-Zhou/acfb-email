@@ -27,9 +27,6 @@ messageRoutes.get("/", async (c) => {
   const beforeUid = c.req.query("beforeUid")
     ? Math.max(parseInt(c.req.query("beforeUid")!, 10) || 0, 0)
     : 0;
-  const beforeDate = c.req.query("beforeDate")
-    ? Math.max(parseInt(c.req.query("beforeDate")!, 10) || 0, 0)
-    : 0;
 
   if (!mailboxId) throw new HttpError(400, "mailboxId is required");
   const box = await repo.mailboxById(c.env, mailboxId);
@@ -41,7 +38,7 @@ messageRoutes.get("/", async (c) => {
   // If this is a load-older request and we ran out of local rows, ask the
   // provider for older messages and import them (so scrolling keeps working
   // beyond what was synced).
-  if (offset > 0 && rows.length < limit && (beforeUid > 0 || beforeDate > 0)) {
+  if (offset > 0 && rows.length < limit && beforeUid > 0) {
     const account = await repo.accountById(c.env, box.account_id);
     if (account) {
       const res = await importOlderPage(
@@ -50,7 +47,6 @@ messageRoutes.get("/", async (c) => {
         box.provider_path,
         beforeUid,
         limit,
-        beforeDate || undefined,
       ).catch(() => ({ imported: 0, hasMore: false }));
       rows = await repo.listMessages(c.env, mailboxId, limit, offset);
       // Signal the client: the provider still has older mail we imported, so
@@ -89,29 +85,23 @@ messageRoutes.get("/unified", async (c) => {
     // Import one older page from each inbox so older mail shows up in the
     // unified list. Cursor = the oldest message in that inbox.
     for (const boxRow of boxes.results) {
-      const oldest = await c.env.DB.prepare(
-        `SELECT received_at FROM messages WHERE mailbox_id = ? ORDER BY received_at ASC LIMIT 1`,
-      )
-        .bind(boxRow.id)
-        .first<{ received_at: string }>();
-      if (!oldest) continue;
       const box = await repo.mailboxById(c.env, boxRow.id);
       if (!box) continue;
       const account = await repo.accountById(c.env, box.account_id);
       if (!account) continue;
-      const beforeDate = new Date(oldest.received_at).getTime();
-      const uids = await c.env.DB.prepare(
+      const cursor = await c.env.DB.prepare(
         `SELECT remote_uid FROM messages WHERE mailbox_id = ? ORDER BY received_at ASC LIMIT 1`,
       )
         .bind(boxRow.id)
         .first<{ remote_uid: number | null }>();
+      const beforeUid = cursor?.remote_uid ?? 0;
+      if (beforeUid <= 0) continue;
       const res = await importOlderPage(
         c.env,
         { id: account.id, provider: account.provider },
         box.provider_path,
-        uids?.remote_uid ?? 0,
+        beforeUid,
         Math.ceil(limit / Math.max(boxes.results.length, 1)),
-        beforeDate,
       ).catch(() => ({ imported: 0, hasMore: false }));
       imported += res.imported;
     }
@@ -141,7 +131,7 @@ messageRoutes.get("/:id", async (c) => {
     if (!account) throw new HttpError(404, "Account not found");
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const providerId = providerIdFor(account.provider, row);
+    const providerId = providerIdFor(row);
     let body: ProviderBody;
     try {
       body = await provider.fetchBody(row.provider_path, providerId);
@@ -196,7 +186,7 @@ messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
   if (!account) throw new HttpError(404, "Account not found");
   const cred = await repo.credential(c.env, account.id);
   const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-  const providerId = providerIdFor(account.provider, row);
+  const providerId = providerIdFor(row);
   try {
     const part = await provider.fetchAttachment(row.provider_path, providerId, att.part_number);
     const filename = (att.filename || "attachment").replace(/[\r\n"]/g, "_");
@@ -241,7 +231,7 @@ messageRoutes.patch("/flags", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(m)).filter(Boolean);
     const flags: { read?: boolean; starred?: boolean } = {};
     if (input.read !== undefined) flags.read = input.read;
     if (input.starred !== undefined) flags.starred = input.starred;
@@ -273,7 +263,7 @@ messageRoutes.post("/move", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(m)).filter(Boolean);
     await provider.move(source.provider_path, pids, target.provider_path);
     for (const m of msgs) await repo.moveMessage(c.env, m.id, target.id);
     await repo.refreshUnseen(c.env, mailboxId);
@@ -301,7 +291,7 @@ messageRoutes.post("/delete", async (c) => {
     if (!account) continue;
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
-    const pids = msgs.map((m) => providerIdFor(account.provider, m)).filter(Boolean);
+    const pids = msgs.map((m) => providerIdFor(m)).filter(Boolean);
     try {
       await provider.delete(box.provider_path, pids);
     } catch (err) {
@@ -397,18 +387,11 @@ async function rowToDetail(
 }
 
 /**
- * The provider-side id of a message. IMAP identifies messages by a numeric UID
- * (stored in remote_uid); REST providers (Gmail/Graph) use their string id in
- * remote_message_id.
+ * The provider-side id of a message. All providers run over IMAP, where a
+ * message is identified by its numeric UID within the mailbox (remote_uid).
  */
-function providerIdFor(
-  provider: string,
-  row: { remote_message_id: string | null; remote_uid: number | null },
-): string {
-  if (provider === "imap") {
-    return String(row.remote_uid ?? "");
-  }
-  return row.remote_message_id ?? "";
+function providerIdFor(row: { remote_uid: number | null }): string {
+  return String(row.remote_uid ?? "");
 }
 /** True when a provider error means the message no longer exists upstream. */
 function isMessageGone(err: unknown): boolean {

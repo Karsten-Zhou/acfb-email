@@ -45,12 +45,6 @@ sendRoutes.post("/send", async (c) => {
       bcc: input.bcc,
       subject: input.subject,
       rawMessage: raw,
-      // REST providers (Graph/Gmail) build their own body from html/text;
-      // without these the body goes out empty even though the raw MIME is built.
-      html: input.html || undefined,
-      text: input.text || undefined,
-      inReplyTo: input.inReplyTo,
-      references: input.references,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Send failed";
@@ -86,8 +80,6 @@ sendRoutes.post("/drafts", async (c) => {
       bcc: input.bcc,
       subject: input.subject,
       rawMessage: raw,
-      html: input.html || undefined,
-      text: input.text || undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Draft save failed";

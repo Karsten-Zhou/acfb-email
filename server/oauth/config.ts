@@ -1,4 +1,5 @@
-// OAuth provider configurations (Google / Microsoft).
+// OAuth provider configurations (Google / Microsoft). Tokens are used for
+// IMAP/SMTP access (XOAUTH2).
 import type { Env } from "../env";
 import type { OAuthProviderConfig } from "./client";
 
@@ -9,10 +10,12 @@ export function googleConfig(env: Env): OAuthProviderConfig {
     clientId: env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
     scopes: [
-      "https://www.googleapis.com/auth/gmail.modify",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile",
+      // Full Gmail access over IMAP/SMTP. Google only accepts this scope for
+      // OAuth-based IMAP/SMTP/POP access (XOAUTH2).
+      "https://mail.google.com/",
       "openid",
+      "email",
+      "profile",
     ],
     redirectUri: () => `${env.APP_URL.replace(/\/$/, "")}/api/oauth/google/callback`,
   };
@@ -29,10 +32,26 @@ export function microsoftConfig(env: Env): OAuthProviderConfig {
     tokenUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
     clientId: env.MICROSOFT_CLIENT_ID ?? "",
     clientSecret: env.MICROSOFT_CLIENT_SECRET ?? "",
-    // Mail.ReadWrite covers read/modify/delete + attachments. Sending mail is a
-    // SEPARATE permission: per MS docs, sendMail requires `Mail.Send` (delegated)
-    // and Mail.ReadWrite explicitly does NOT include sending. Keep both.
-    scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send", "offline_access"],
+    // Outlook.com has password auth disabled, so IMAP and SMTP both require
+    // OAuth2 (XOAUTH2). IMAP.AccessAsUser.All covers read/flag/move/delete;
+    // SMTP.Send covers sending (separate scope). The OIDC scopes (openid,
+    // profile, email) provide the owner's identity via the ID token;
+    // offline_access keeps the refresh token.
+    scopes: [
+      "openid",
+      "profile",
+      "email",
+      "https://outlook.office.com/IMAP.AccessAsUser.All",
+      "https://outlook.office.com/SMTP.Send",
+      "offline_access",
+    ],
+    // The token request must list scopes from a single resource, so the
+    // access token is minted for the Outlook mail endpoints only.
+    tokenScopes: [
+      "https://outlook.office.com/IMAP.AccessAsUser.All",
+      "https://outlook.office.com/SMTP.Send",
+      "offline_access",
+    ],
     redirectUri: () => `${env.APP_URL.replace(/\/$/, "")}/api/oauth/microsoft/callback`,
   };
 }

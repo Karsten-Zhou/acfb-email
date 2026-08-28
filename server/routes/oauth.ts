@@ -1,8 +1,9 @@
 // OAuth route handlers for Google + Microsoft email providers.
 // Flow: user clicks "Connect Gmail" -> GET /api/oauth/google/start
 //      -> redirects to provider -> provider redirects to /api/oauth/google/callback
-//      -> we exchange code, identify the mailbox owner via the provider API,
-//         store encrypted tokens, and create the account row.
+//      -> we exchange code, identify the mailbox owner, store encrypted
+//         tokens, and create the account row. The stored access token is
+//         later used for IMAP/SMTP XOAUTH2 authentication.
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { randomUUID } from "crypto";
@@ -59,7 +60,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   const token = await exchangeCode(cfg, code, redirectUri);
 
   // Identify the user from the provider.
-  const info = await fetchOwnerInfo(provider, token.access_token);
+  const info = await fetchOwnerInfo(provider, token);
 
   // Look for an existing account with the same email; else create one.
   let accountId = await existingAccountId(c.env, info.email);
@@ -119,24 +120,44 @@ oauthRoutes.get("/:provider/callback", async (c) => {
 
 async function fetchOwnerInfo(
   provider: "google" | "microsoft",
-  accessToken: string,
+  token: OAuthToken,
 ): Promise<{ email: string; name: string | null }> {
   if (provider === "google") {
     const { status, json } = await providerGet(
       "https://www.googleapis.com/oauth2/v2/userinfo",
-      accessToken,
+      token.access_token,
     );
     if (status === 401) throw new HttpError(502, "Provider rejected token");
     const d = json as { email?: string; name?: string };
     if (!d.email) throw new HttpError(502, "Could not determine Gmail address");
     return { email: d.email, name: d.name ?? null };
   }
-  const { status, json } = await providerGet("https://graph.microsoft.com/v1.0/me", accessToken);
-  if (status === 401) throw new HttpError(502, "Provider rejected token");
-  const d = json as { mail?: string; userPrincipalName?: string; displayName?: string };
-  const email = (d.mail || d.userPrincipalName || "").toLowerCase();
+  // Outlook: the token endpoint returns an OIDC ID token alongside the
+  // mail-scoped access token — that carries the owner's identity.
+  const claims = token.id_token ? decodeIdToken(token.id_token) : null;
+  const email = (claims?.email ?? claims?.preferred_username ?? "").toLowerCase();
   if (!email) throw new HttpError(502, "Could not determine Outlook address");
-  return { email, name: d.displayName ?? null };
+  return { email, name: claims?.name ?? null };
+}
+
+/** Decode an OIDC ID token's claims (base64url JWT payload). */
+function decodeIdToken(
+  idToken: string,
+): { email?: string; name?: string; preferred_username?: string } | null {
+  const payload = idToken.split(".")[1];
+  if (!payload) return null;
+  try {
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
+    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as {
+      email?: string;
+      name?: string;
+      preferred_username?: string;
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function existingAccountId(env: Env, email: string): Promise<string | null> {
