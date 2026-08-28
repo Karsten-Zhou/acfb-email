@@ -149,7 +149,7 @@ function onTouchEnd() {
       v-if="loading"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
-      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("content") }}…
+      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("loading") }}
     </div>
     <div
       v-else-if="messages.length === 0"
