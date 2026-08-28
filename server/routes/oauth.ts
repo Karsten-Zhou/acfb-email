@@ -66,7 +66,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   const now = new Date().toISOString();
   if (accountId) {
     await c.env.DB.prepare(
-      `UPDATE accounts SET state='healthy', state_message=NULL, last_synced_at = ? WHERE id = ?`,
+      `UPDATE accounts SET state='running', state_message=NULL, last_synced_at = ? WHERE id = ?`,
     )
       .bind(now, accountId)
       .run();
@@ -75,7 +75,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO accounts
         (id, provider, name, email, display_name, state, sync_enabled, created_at)
-       VALUES (?, ?, ?, ?, ?, 'healthy', 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, 'running', 1, ?)`,
     )
       .bind(
         accountId,
@@ -106,6 +106,11 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     await c.env.SYNC_QUEUE.send({ accountId });
   } catch (err) {
     console.error("[sync-queue] enqueue failed for account", accountId, err);
+    // No sync will ever run for this account; revert the optimistic 'running'
+    // so it isn't stuck showing as syncing forever.
+    await c.env.DB.prepare(`UPDATE accounts SET state = 'healthy' WHERE id = ?`)
+      .bind(accountId)
+      .run();
   }
 
   // Back to Settings with a query flag so the page shows a success notice.

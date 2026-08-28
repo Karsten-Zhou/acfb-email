@@ -137,7 +137,7 @@ accountRoutes.post("/", async (c) => {
       (id, provider, name, email, display_name,
        imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure,
        state, sync_enabled, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'healthy', 1, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', 1, ?)`,
   )
     .bind(
       id,
@@ -170,6 +170,9 @@ accountRoutes.post("/", async (c) => {
     await c.env.SYNC_QUEUE.send({ accountId: id });
   } catch (err) {
     console.error("[sync-queue] enqueue failed for account", id, err);
+    // No sync will ever run for this account; revert the optimistic 'running'
+    // so it isn't stuck showing as syncing forever.
+    await c.env.DB.prepare(`UPDATE accounts SET state = 'healthy' WHERE id = ?`).bind(id).run();
   }
 
   const summary = AccountSummarySchema.parse({
@@ -178,7 +181,7 @@ accountRoutes.post("/", async (c) => {
     name: input.name,
     email: input.email,
     displayName: input.displayName || null,
-    state: "healthy",
+    state: "running",
     stateMessage: null,
     createdAt: now,
     lastSyncedAt: null,
