@@ -1,9 +1,5 @@
 // Shared constant values used across client and server.
 
-export const SESSION_COOKIE = "ec_session";
-export const CSRF_HEADER = "x-csrf-token";
-export const CSRF_COOKIE = "ec_csrf";
-
 export const PROVIDER_TYPES = ["imap", "gmail", "microsoft", "pop3"] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 

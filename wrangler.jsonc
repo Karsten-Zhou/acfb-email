@@ -34,9 +34,16 @@
     ],
   },
   "vars": {
-    "APP_URL": "https://email.24218079.xyz",
-    "SESSION_DAYS": "7",
+    "APP_URL": "http://localhost:5173",
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
   },
+  // "access": {
+  //   // Local dev: simulates a signed-in user via ctx.access so the API gate
+  //   // passes. Remove this block to simulate Access not being enabled (403).
+  //   "dev": {
+  //     "aud": "email-client",
+  //     "identity": { "email": "owner@example.com" }
+  //   }
+  // },
 }

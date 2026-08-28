@@ -16,10 +16,9 @@ you to a provider.
 ```text
 Browser (Vue SPA)
    |
-   | HTTP/JSON (HTTPS)
+   | HTTPS (Cloudflare Access enforced at edge)
    v
 Cloudflare Worker
-   |- /api/auth/*     GitHub OAuth + sessions + CSRF
    |- /api/accounts/* account CRUD + sync trigger
    |- /api/mailboxes  folder list
    |- /api/messages/* list / read / flags / move / delete
@@ -44,8 +43,8 @@ Cloudflare Worker
 | Component | Path | Responsibility |
 | --- | --- | --- |
 | Vue SPA | `src/` | views, reactive stores, router (hash-based so deep links work without server rewrites), DOMPurify sanitization |
-| Hono router | `server/index.ts` | mounts `/api`, error handling, CSRF + logging middleware |
-| Auth | `server/auth/` | GitHub OAuth callback, session creation/validation, allowlist check, CSRF constant-time compare |
+| Hono router | `server/index.ts` | mounts `/api`, error handling, logging middleware |
+| Cloudflare Access | dashboard/API | edge gatekeeper (worker-level, account members only); CSRF handled at the edge via `CF_AppSession` |
 | IMAP client | `imapflow` (patched) | IMAP4rev1 over workerd `node:net`/`node:tls`/`node:stream` |
 | SMTP client | `server/email/smtp/client.ts` | submission via ports 587/465 (Workers forbid port 25) |
 | MIME parse | `postal-mime` | RFC5322/MIME parsing of received messages (verified Workers-compatible) |
@@ -60,21 +59,20 @@ Cloudflare Worker
 
 ## 3. End-to-end flows
 
-### Login flow
+### Access & authentication
 
-```text
-1. Browser -> GET /api/auth/login
-2. Worker sets ec_state cookie (random), redirects to GitHub /authorize
-3. GitHub -> GET /api/auth/callback?code=...&state=...
-4. Worker: verifies state (constant-time), exchanges code for token,
-   fetches GitHub user, compares numeric id against ALLOWED_GITHUB_USER_ID
-5. Creates/upserts users row, creates session:
-     - random opaque token
-     - stores SHA-256 hash in D1 sessions (DB leak does not grant sessions)
-     - sets httpOnly Secure SameSite=Lax cookie (ec_session)
-6. Sets CSRF cookie (ec_csrf, non-httpOnly so JS can read it back as a header)
-7. Redirect to /mail
-```
+Cloudflare Access is the gatekeeper. In production the Worker is protected by a
+worker-level Access application (policy: **Cloudflare account** — only account
+members can sign in). Access enforces sign-in at the edge before the Worker
+runs, so the Worker does no authentication of its own: no auth middleware, no
+per-user model, no app cookies. (Behind the static-assets router, `ctx.access`
+is not even forwarded to the user Worker, so there is no Access identity to
+read either.)
+
+CSRF is handled by Cloudflare Access at the edge, not by the app: Access issues
+a `CF_AppSession` CSRF cookie for the application domain, and the admin can set
+the `SameSite` attribute on the `CF_Authorization` cookie (see DEPLOYMENT.md).
+The Worker therefore has no CSRF token of its own.
 
 ### Add account + first sync
 
@@ -110,9 +108,7 @@ Cloudflare Worker
 ## 4. Data model (D1)
 
 ```text
-users(id, github_id UNIQUE, github_login, display_name, avatar_url, created_at)
-sessions(id=sha256(token), user_id FK, expires_at, revoked)
-accounts(id, user_id FK, provider, name, email, display_name,
+accounts(id, provider, name, email, display_name,
          imap_host/port/secure, smtp_host/port/secure,
          state, state_message, sync_enabled, created_at, last_synced_at)
 account_credentials(account_id PK FK, credential=encrypted blob, updated_at)
@@ -126,9 +122,8 @@ message_recipients(id, message_id FK, type, name, address)
 attachments(id, message_id FK, filename, mime_type, size, is_inline, content_id, disposition)
 sync_state(account_id FK, mailbox_id FK, uid_validity, last_uid, last_sync_at,
            state, last_error, error_count, PRIMARY KEY(account_id, mailbox_id))
-push_subscriptions(id, user_id FK, account_id FK, endpoint, p256dh, auth, enabled)
-app_settings(user_id PK FK, data JSON)
-drafts(id, user_id FK, account_id FK, to/cc/bcc JSON, subject, html, text, updated_at)
+push_subscriptions(id, account_id FK, endpoint, p256dh, auth, enabled)
+app_settings(id PK, data JSON)   -- singleton
 ```
 
 **Design notes**
@@ -213,7 +208,7 @@ large responses (verified live against QQ Mail, 2026-08-27).
 | Resource | Used? | Why |
 | --- | --- | --- |
 | Workers | ✅ | Serves SPA + API (free-tier 100k req/day is far above personal use) |
-| D1 | ✅ | Relational data (accounts, mailboxes, messages, sessions) |
+| D1 | ✅ | Relational data (accounts, mailboxes, messages) |
 | Workers Assets | ✅ | Serves the Vue SPA from edge (free) |
 | `cloudflare:sockets` | ✅ | Outbound SMTP TCP (IMAP runs via workerd `node:net`/`node:tls`) |
 | KV | ❌ | No need in v1; possible later for short-lived caches |

@@ -1,18 +1,13 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { authState, bootstrap } from "../stores/auth";
 
 export const router = createRouter({
   // HTML5 history: non-API routes are handled by the Workers SPA fallback
   // (assets.not_found_handling = single_page_application), so deep links work
-  // without hash fragments.
+  // without hash fragments. Cloudflare Access gates the whole app at the
+  // edge, so the SPA has no login page of its own.
   history: createWebHistory(),
   routes: [
     { path: "/", redirect: "/mail" },
-    {
-      path: "/login",
-      name: "login",
-      component: () => import("../views/LoginView.vue"),
-    },
     {
       path: "/mail",
       name: "mailbox",
@@ -44,17 +39,4 @@ export const router = createRouter({
       component: () => import("../views/SettingsView.vue"),
     },
   ],
-});
-
-// Global auth guard.
-router.beforeEach(async (to) => {
-  if (!authState.ready) {
-    await bootstrap();
-  }
-  if (to.name !== "login" && !authState.user) {
-    return { name: "login" };
-  }
-  if (to.name === "login" && authState.user) {
-    return { name: "mailbox" };
-  }
 });

@@ -100,14 +100,6 @@ export const AccountDetailSchema = AccountSummarySchema.extend({
   syncEnabled: z.boolean(),
 });
 
-export const UserSchema = z.object({
-  id: z.string(),
-  githubId: z.number().int(),
-  githubLogin: z.string(),
-  displayName: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
-});
-
 export const SyncStatusSchema = z.object({
   state: z.enum(["idle", "running", "error"]),
   message: z.string().nullable(),

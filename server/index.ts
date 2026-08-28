@@ -6,8 +6,6 @@ import { cors } from "hono/cors";
 import type { Env, SyncMessage } from "./env";
 import { syncAccount } from "./sync/sync-service";
 import { HttpError } from "./http-error";
-import { csrfGuard } from "./auth";
-import { authRoutes } from "./routes/auth";
 import { accountRoutes } from "./routes/accounts";
 import { oauthRoutes } from "./routes/oauth";
 import { mailboxRoutes } from "./routes/mailboxes";
@@ -32,15 +30,28 @@ app.use(
   "/api/*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "x-csrf-token"],
+    allowHeaders: ["Content-Type"],
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),
 );
-app.use("/api/*", csrfGuard);
+
+// Cloudflare Access gates the app at the edge. This fail-safe refuses API
+// requests when Access isn't running, so an accidental dashboard disable can't
+// silently open the API. Access adds the Cf-Access-Jwt-Assertion header to
+// approved requests in production; local dev supplies ctx.access via the
+// `access.dev` block in wrangler.jsonc.
+app.use("/api/*", async (c, next) => {
+  const executionCtx = c.executionCtx as { access?: unknown } | undefined;
+  const throughAccess =
+    Boolean(executionCtx?.access) || Boolean(c.req.header("cf-access-jwt-assertion"));
+  if (!throughAccess) {
+    return c.json({ error: "Access required", code: "access_required" }, 403);
+  }
+  await next();
+});
 
 // ----- api routes -----
 const api = new Hono<AppEnv>();
-api.route("/auth", authRoutes);
 api.route("/oauth", oauthRoutes);
 api.route("/accounts", accountRoutes);
 api.route("/mailboxes", mailboxRoutes);
@@ -61,7 +72,6 @@ app.get("/api/health", (c) => {
     config: {
       gmailOauth: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
       outlookOauth: Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET),
-      githubOauth: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
     },
   });
 });
@@ -82,8 +92,9 @@ app.onError((err, c) => {
   }
   // Log the real error (safe: no credentials should reach here).
   console.error("[error]", c.req.method, c.req.path, err);
-  // The app is behind a GitHub login, so surface the underlying error detail
-  // to help debugging instead of a generic 500 (no credentials reach here).
+  // The app is behind Cloudflare Access, so surface the underlying error
+  // detail to help debugging instead of a generic 500 (no credentials reach
+  // here).
   const message = err instanceof Error ? err.message : "Internal server error";
   return c.json({ error: message }, 500);
 });

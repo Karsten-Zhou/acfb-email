@@ -1,36 +1,10 @@
 -- Initial schema for the Cloudflare email client.
 
 -- ------------------------------------------------------------------
--- users: application identity (one per allowed GitHub account)
--- ------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS users (
-  id            TEXT PRIMARY KEY,            -- uuid (crypto.randomUUID)
-  github_id     INTEGER NOT NULL UNIQUE,
-  github_login  TEXT NOT NULL,
-  display_name  TEXT,
-  avatar_url    TEXT,
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-
--- ------------------------------------------------------------------
--- sessions: server-side login sessions (short-lived, revocable)
--- ------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sessions (
-  id         TEXT PRIMARY KEY,               -- the opaque session token (hashed)
-  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  expires_at TEXT NOT NULL,
-  revoked    INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-
--- ------------------------------------------------------------------
--- accounts: connected email accounts (provider-agnostic metadata)
+-- accounts: connected email accounts (provider-agnostic metadata).
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS accounts (
   id             TEXT PRIMARY KEY,           -- uuid
-  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   provider       TEXT NOT NULL,              -- 'imap' | 'gmail' | 'microsoft' | 'pop3'
   name           TEXT NOT NULL,              -- user label, e.g. "Work"
   email          TEXT NOT NULL,
@@ -53,8 +27,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   last_synced_at TEXT,
   sort_order     INTEGER NOT NULL DEFAULT 0   -- user-controlled display order
 );
-CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
-CREATE INDEX IF NOT EXISTS idx_accounts_user_order ON accounts(user_id, sort_order, created_at);
+CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(sort_order, created_at);
 
 -- ------------------------------------------------------------------
 -- account_credentials: encrypted secrets (AES-GCM). Separated so the
@@ -164,11 +137,10 @@ CREATE TABLE IF NOT EXISTS sync_state (
 );
 
 -- ------------------------------------------------------------------
--- push_subscriptions: browser push subscriptions (per user/account)
+-- push_subscriptions: browser push subscriptions (per account)
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id          TEXT PRIMARY KEY,              -- uuid
-  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   account_id  TEXT REFERENCES accounts(id) ON DELETE CASCADE,
   endpoint    TEXT NOT NULL,
   p256dh      TEXT NOT NULL,
@@ -177,12 +149,11 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (endpoint)
 );
-CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
 
 -- ------------------------------------------------------------------
--- app_settings: per-user settings (JSON blob)
+-- app_settings: app-wide settings (JSON blob, single row)
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_settings (
-  user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  data       TEXT NOT NULL DEFAULT '{}'
+  id     INTEGER PRIMARY KEY CHECK (id = 1),
+  data   TEXT NOT NULL DEFAULT '{}'
 );

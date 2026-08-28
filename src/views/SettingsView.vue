@@ -6,7 +6,6 @@
 //   AboutPanel.
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { logout } from "../stores/auth";
 import { loadAccounts } from "../stores/accounts";
 import { api, type HealthPayload } from "../lib/api";
 import { t } from "../lib/i18n";
@@ -38,11 +37,6 @@ onMounted(async () => {
     notice.value = connected === "google" ? t("connectGmail") + " ✓" : t("connectOutlook") + " ✓";
   }
 });
-
-async function doLogout() {
-  await logout();
-  router.push({ name: "login" });
-}
 </script>
 
 <template>
@@ -60,9 +54,6 @@ async function doLogout() {
       </UiToolTip>
       <h1 class="text-sm font-semibold">{{ t("settings") }}</h1>
       <div class="flex-1" />
-      <UiButton variant="ghost-destructive" size="sm" @click="doLogout">{{
-        t("signOut")
-      }}</UiButton>
     </header>
 
     <main class="flex-1 overflow-y-auto p-4 md:p-6">

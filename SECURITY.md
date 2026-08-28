@@ -12,11 +12,10 @@ are:
 
 1. **Your email account credentials** (IMAP/SMTP username/password)
 2. **Your mail content** and its previews
-3. **Your session** (ability to act as you in this app)
-4. **Your GitHub identity**
 
-The system's security is layered: Cloudflare protects the edge, providers protect
-their own endpoints, and the app protects its own data and sessions.
+The system's security is layered: Cloudflare protects the edge (including who
+can reach the app, via Cloudflare Access), providers protect their own
+endpoints, and the app protects its own data.
 
 ### Responsibility boundary
 
@@ -24,8 +23,8 @@ their own endpoints, and the app protects its own data and sessions.
 | --- | --- |
 | Transport security (TLS) browser<->Cloudflare, Worker<->provider | Cloudflare + provider |
 | Authentication to mail provider (OAuth/password) | Provider |
-| Authentication to *this app* (GitHub) | GitHub + app |
-| Session integrity for *this app* | App (cookies + hashed DB sessions) |
+| Authentication to *this app* | Cloudflare Access (worker-level, account members only) |
+| CSRF for *this app* | Cloudflare Access (`CF_AppSession` cookie + `SameSite` setting) |
 | Password storage | App (AES-GCM, key in Cloudflare secret) |
 | HTML email sanitization | App (DOMPurify in browser) |
 | Abuse/DoS of endpoints | Cloudflare (rate limiting optional) + app (input limits) |
@@ -37,15 +36,12 @@ their own endpoints, and the app protects its own data and sessions.
 | Threat | Control |
 | --- | --- |
 | DB dump / backup leak exposes passwords | Passwords encrypted with AES-256-GCM; key never in DB; separate credentials table |
-| DB dump exposes usable sessions | Only SHA-256 hashes stored; raw token only in your cookie |
-| Attacker steals session cookie (XSS) | `HttpOnly` + `Secure` + `SameSite=Lax`; sessions expire; server-side revoke |
-| Login CSRF (attacker logs you into my account) | OAuth `state` bound to a 10-min httpOnly cookie, verified constant-time |
-| API CSRF (attacker triggers actions through your browser) | `x-csrf-token` header must match `ec_csrf` cookie (constant-time); all mutations enforce |
+| API CSRF (attacker triggers actions through your browser) | Cloudflare Access edge CSRF (`CF_AppSession` cookie) + `SameSite=Lax` on `CF_Authorization` |
+| Access rule disabled in dashboard | No in-app guard — the app becomes publicly reachable (Access, not code, is the boundary) |
+| Replay of OAuth authorization codes (Gmail/Outlook connect) | `state` bound to a 10-min httpOnly cookie, verified constant-time |
 | XSS via email HTML | DOMPurify sanitization on every render; no raw `v-html` without it; previews only in list |
 | Malicious links in mail | Standard `mailto:`/`http(s):` handling; no auto-open; sanitized HTML |
-| IDOR (accessing another user's data) | Every query scoped by `user_id` join; account/mailbox/message ownership verified |
-| GitHub account mismatch | Numeric GitHub ID allowlist; everyone else denied at callback |
-| Replay of OAuth authorization codes | `state` one-time use (cookie cleared at callback) |
+| IDOR (accessing another user's data) | Single-user app — Access admits only account members; no user dimension in the data |
 | Leaking credentials in logs | Credentials never logged; error messages are generic; structured logging avoids bodies |
 | Unbounded memory/body (malicious mail) | PostalMime nesting/header limits; request size schema caps; fetch limits |
 
@@ -56,21 +52,20 @@ their own endpoints, and the app protects its own data and sessions.
   Server-side encryption protects against *offline* DB theft, not runtime pwn.
 - **Provider-side compromise**: if your mail provider is compromised, all bets are
   off (the provider already holds your mail and can reset your account).
-- **Client machine compromise**: local malware can read the session cookie or view
-  the UI. We minimize exposure (short sessions) but cannot prevent it.
+- **Client machine compromise**: local malware can use the authenticated browser
+  session (Cloudflare Access) or view the UI. We cannot prevent that.
 
 ---
 
-## 3. Application login & sessions
+## 3. Application access (Cloudflare Access)
 
-- GitHub OAuth web flow, scope `read:user`.
-- **Allowlist**: `ALLOWED_GITHUB_USER_ID` (a Cloudflare secret) must equal the
-  numeric GitHub user id. A username change does not grant access.
-- Session cookie `ec_session`: `HttpOnly`, `Secure` (production), `SameSite=Lax`,
-  default 7 days (configurable), server-side row with SHA-256 hash + expiry, and
-  a `revoked` flag for logout.
-- Session lookup is a DB query per request; no client-visible token stored in
-  localStorage/IndexedDB.
+- The Worker is protected by worker-level Cloudflare Access (policy: account
+  members only). Access authenticates at the edge before the Worker runs;
+  requests that fail Access never reach the Worker.
+- The Worker performs no authentication of its own: no guard, no sessions, no
+  app cookies. (Behind Workers Static Assets, `ctx.access` is not even
+  forwarded to the user Worker, so there is no Access identity to read.)
+- The app has no per-user model: Cloudflare Access decides who can reach it.
 
 ## 4. Email credentials
 
@@ -97,10 +92,8 @@ their own endpoints, and the app protects its own data and sessions.
 
 | Secret | Where |
 | --- | --- |
-| `GITHUB_CLIENT_ID/SECRET` | Cloudflare secrets (prod); `.env` (local, git-ignored) |
-| `ALLOWED_GITHUB_USER_ID` | Cloudflare secret |
 | `CREDENTIAL_ENCRYPTION_KEY` | Cloudflare secret |
-| `APP_URL`, `SESSION_DAYS`, `SYNC_FETCH_LIMIT` | Wrangler vars (non-secret config) |
+| `APP_URL`, `SYNC_FETCH_LIMIT` | Wrangler vars (non-secret config) |
 
 `.env.example` contains placeholders only. `.env` is never committed (gitignore).
 No secrets in client bundles: the SPA has no access to any of the above; it can
@@ -108,18 +101,19 @@ only call our API.
 
 ## 7. CSRF design
 
-Browsers send cookies on cross-site requests automatically, so any dangerous
-mutation must require a value the attacker's page cannot read. We use the
-**double-submit cookie** pattern:
+Cloudflare Access protects the app against cross-site request forgery at the
+edge — there is no application-level CSRF token. Two mechanisms (per Cloudflare
+docs):
 
-1. On login, server sets `ec_csrf` (httpOnly **false** so JS can read it, SameSite=Strict).
-2. All non-GET API requests must include `x-csrf-token: <cookie value>`.
-3. Server compares header vs cookie with a constant-time XOR compare.
-4. `csrfGuard` runs on `/api/*` before route handlers (auth runs first, so
-   unauthenticated requests get 401 before CSRF — intentional).
+- **`CF_AppSession` cookie**: a CSRF token Access issues per application domain
+  (HttpOnly, required) and validates at Cloudflare's network.
+- **SameSite attribute on `CF_Authorization`**: set to **Lax** (recommended) so
+  the auth cookie is not sent on cross-site subresource requests. The docs
+  default is `None`; `Strict` can cause `ERR_TOO_MANY_REDIRECTS` and is not
+  recommended.
 
-Because `ec_csrf` is SameSite=Strict, cross-site requests don't even carry it;
-the header check is the defense-in-depth.
+Configure both under **Zero Trust → Access controls → Applications → Configure
+→ Advanced settings → Cookie settings** (see DEPLOYMENT.md).
 
 ## 8. Provider/Cloudflare security boundary
 
@@ -128,9 +122,9 @@ the header check is the defense-in-depth.
   we correctly authenticate and fail loudly when the provider revokes access.
 - Cloudflare terminates TLS, protects against DDoS at the edge, and hosts our
   secrets as encrypted bindings. We rely on that.
-- OAuth providers (GitHub now; Google/Microsoft later) hold the tokens — we only
-  ever hold short-lived application sessions derived from the login, never the
-  provider's long-lived tokens client-side.
+- Gmail/Outlook OAuth access + refresh tokens are stored encrypted in D1 and
+  never exposed to the client. Cloudflare Access (not the app) owns the browser
+  session that gates the app.
 
 ## 9. Error handling & logging
 
@@ -142,9 +136,8 @@ the header check is the defense-in-depth.
 
 ## 10. Security checklist status (v1)
 
-- [x] GitHub OAuth + numeric allowlist
-- [x] HttpOnly/Secure/SameSite session cookie, hashed in DB, server-side revocation
-- [x] CSRF double-submit on all mutations
+- [x] Cloudflare Access (worker-level, account members only) — enforced at the edge
+- [x] CSRF: Cloudflare Access `CF_AppSession` cookie + `SameSite=Lax` on `CF_Authorization`
 - [x] AES-GCM credential encryption (Web Crypto), key in secret
 - [x] DOMPurify HTML sanitization on all render paths
 - [x] Ownership-scoped queries (no IDOR)
@@ -152,4 +145,4 @@ the header check is the defense-in-depth.
 - [x] No secrets in client bundle; `.env.example` placeholders only
 - [ ] Browser Push (phase 8) — subscription storage table exists
 - [ ] Remote-image blocking setting (privacy enhancement) — not yet
-- [x] OAuth state validation + code exchange server-side
+- [x] OAuth state validation + code exchange server-side (Gmail/Outlook connect)

@@ -1,4 +1,5 @@
 // Thin typed API client for the backend.
+import { reactive } from "vue";
 import { toastError } from "../stores/toast";
 import type {
   AccountDetail,
@@ -8,21 +9,7 @@ import type {
   Message,
   MessageDetail,
   SendMessageInput,
-  User,
 } from "@shared/types";
-
-const CSRF_HEADER = "x-csrf-token";
-const CSRF_COOKIE = "ec_csrf";
-
-/**
- * Registered by main.ts: called on any 401 so the app can reset auth state
- * and redirect to /login. Kept as a hook instead of importing the auth store
- * / router here to avoid an import cycle (auth.ts and router both import api).
- */
-let unauthorizedHandler: (() => void) | null = null;
-export function setUnauthorizedHandler(handler: (() => void) | null) {
-  unauthorizedHandler = handler;
-}
 
 export class ApiError extends Error {
   constructor(
@@ -34,10 +21,8 @@ export class ApiError extends Error {
   }
 }
 
-function csrfToken(): string {
-  const m = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
-  return m ? decodeURIComponent(m[1]) : "";
-}
+/** True when the API reported that Cloudflare Access isn't enabled (403). */
+export const accessState = reactive({ missing: false });
 
 async function request<T>(
   path: string,
@@ -46,13 +31,8 @@ async function request<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  const method = (init.method ?? "GET").toUpperCase();
   if (init.body !== undefined) {
     headers.set("Content-Type", "application/json");
-  }
-  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-    const csrf = csrfToken();
-    if (csrf) headers.set(CSRF_HEADER, csrf);
   }
   const res = await fetch(`/api${path}`, { ...init, headers, credentials: "same-origin" });
   if (!res.ok) {
@@ -65,12 +45,13 @@ async function request<T>(
     } catch {
       /* non-json */
     }
-    // Session gone (GitHub credential missing/revoked/expired): let the app
-    // reset auth state and route to the login page.
-    if (res.status === 401) unauthorizedHandler?.();
-    // Surface failures to the user unless the caller renders its own inline
-    // error (e.g. the IMAP test-connection form).
-    if (res.status !== 401 && !opts.noToast) {
+    // Cloudflare Access isn't enabled: switch to the "Access required" screen
+    // instead of toasting every failing request.
+    if (res.status === 403 && code === "access_required") {
+      accessState.missing = true;
+    } else if (!opts.noToast) {
+      // Surface failures to the user unless the caller renders its own inline
+      // error (e.g. the IMAP test-connection form).
       toastError(message);
     }
     throw new ApiError(message, res.status, code);
@@ -82,10 +63,6 @@ async function request<T>(
 export const api = {
   // meta
   health: () => request<HealthPayload>("/health"),
-
-  // auth
-  me: () => request<{ user: User }>("/auth/me"),
-  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
 
   // accounts
   accounts: () => request<{ accounts: AccountSummary[] }>("/accounts"),
@@ -203,6 +180,5 @@ export interface HealthPayload {
   config: {
     gmailOauth: boolean;
     outlookOauth: boolean;
-    githubOauth: boolean;
   };
 }

@@ -10,9 +10,6 @@ export interface Env {
   // Queue binding for background account syncs (consumer in server/index.ts)
   SYNC_QUEUE: Queue<SyncMessage>;
   // Secrets
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-  ALLOWED_GITHUB_USER_ID: string;
   CREDENTIAL_ENCRYPTION_KEY: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -20,7 +17,6 @@ export interface Env {
   MICROSOFT_CLIENT_SECRET?: string;
   // Vars
   APP_URL: string;
-  SESSION_DAYS: string;
   SYNC_FETCH_LIMIT: string;
   SYNC_TIMEOUT_MS: string;
 }

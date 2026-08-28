@@ -8,7 +8,8 @@ End-to-end guide for shipping this app to Cloudflare Workers (Free tier).
 
 - One Worker (`cloudflare-email-client`) serving the SPA + `/api`
 - One D1 database (`cloudflare-email-client`)
-- Secrets: GitHub OAuth, allowed-user id, credential-encryption key
+- Worker-level **Cloudflare Access** protecting the app (account members only)
+- Secrets: credential-encryption key
 
 ---
 
@@ -25,26 +26,56 @@ End-to-end guide for shipping this app to Cloudflare Workers (Free tier).
    bunx wrangler whoami
    ```
 
-## 2. GitHub OAuth App setup
+## 2. Cloudflare Access (production gatekeeper)
 
-1. Go to GitHub → Settings → Developer settings → **OAuth Apps → New OAuth App**.
-2. Homepage URL: your deployed URL (e.g. `https://your-worker.workers.dev`) or `http://localhost:8787` for local dev.
-3. Authorization callback URL:
-   - Local: `http://localhost:8787/api/auth/callback`
-   - Production: `https://<your-worker>.workers.dev/api/auth/callback`
-4. Copy the **Client ID** and generate a **Client Secret**.
-5. Find your **numeric GitHub user ID**:
-   ```bash
-   curl -s https://api.github.com/user | jq .id   # your numeric id
-   ```
-   (Set `ALLOWED_GITHUB_USER_ID` to that number, not your username.)
+The app is protected by **worker-level Cloudflare Access**: only members of
+your Cloudflare account can sign in. This is configured in the Cloudflare
+dashboard / API — Wrangler cannot create Access applications.
+
+### Manual dashboard steps
+
+1. If Zero Trust is not already enabled on your account, enable it once
+   (<https://one.dash.cloudflare.com> → **Setup**). New accounts default to the
+   **Cloudflare identity provider** (sign in with your Cloudflare account),
+   which is what the "Cloudflare account" policy matches against.
+2. In the Cloudflare dashboard, go to **Workers & Pages** → select your Worker
+   → **Access** tab.
+3. Select **Protect this Worker behind Access**.
+4. **Traffic scope**: All traffic (production + previews).
+5. **Authentication policy**: **Cloudflare account** — only members of this
+   account can sign in.
+6. Select **Apply Access**.
+
+### Cookie / CSRF settings (recommended)
+
+Access sets cookies on the application domain: `CF_Authorization` (the auth
+cookie) and `CF_AppSession` (Access's own CSRF token for the application,
+validated at Cloudflare's network). Cloudflare does not require an
+application-level CSRF token, and this app has none.
+
+Recommended hardening — **Zero Trust → Access controls → Applications →
+Configure → Advanced settings → Cookie settings**:
+
+- **SameSite**: **Lax**. The docs default is `None` (cookie sent on
+  cross-site requests); `Lax` restricts it to top-level navigations and adds
+  CSRF protection. Do not use `Strict` — Access can hit
+  `ERR_TOO_MANY_REDIRECTS` with it.
+- **HttpOnly**: enabled (default) — keeps the cookie out of scripts.
+
+### How it enforces
+
+Access checks every request before the Worker runs and blocks anyone who isn't
+signed in, so the Worker itself performs no authentication (no guard, no
+sessions, no cookies of its own). If Access is disabled in the dashboard, the
+app becomes publicly reachable — Access (not code) is the access boundary.
+
+> The same result can be achieved through the Workers API
+> (`POST /accounts/{account_id}/access/apps` with a `worker` destination and an
+> account-membership policy). See the [Workers + Access docs](https://developers.cloudflare.com/workers/configuration/cloudflare-access/).
 
 ## 3. Create secrets
 
 ```bash
-bunx wrangler secret put GITHUB_CLIENT_ID
-bunx wrangler secret put GITHUB_CLIENT_SECRET
-bunx wrangler secret put ALLOWED_GITHUB_USER_ID
 bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
 ```
 
@@ -87,7 +118,7 @@ Set the production `APP_URL` (your deployed URL) in `wrangler.jsonc` under
 ```jsonc
 "env": {
   "production": {
-    "vars": { "APP_URL": "https://your-worker.workers.dev", "SESSION_DAYS": "7" },
+    "vars": { "APP_URL": "https://your-worker.workers.dev" },
     "d1_databases": [/* as above */]
   }
 }
@@ -111,10 +142,12 @@ First deployment asks you to confirm the Worker name and creates
 
 ## 7. Post-deploy verification
 
-1. Visit the URL → you should see the login screen.
-2. Click "Continue with GitHub" → authorize → you land in the mailbox.
-3. Add an IMAP/SMTP account (see below), press "Sync now", and confirm messages
-   appear.
+1. Visit the URL → you are asked to sign in with your Cloudflare account
+   (worker-level Access).
+2. After signing in you land in the mailbox directly — there is no app-level
+   login page.
+3. Add an IMAP/SMTP account (see below), press "Sync now", and confirm
+   messages appear.
 
 ---
 
@@ -169,7 +202,7 @@ Then create the app registration and set the redirect URI:
 | **Microsoft (Entra)** | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps> | `https://<your-worker>.workers.dev/api/oauth/microsoft/callback` | `User.Read`, `Mail.ReadWrite`, `Mail.Send`, `offline_access` |
 
 For local development use `http://localhost:5173/api/oauth/<provider>/callback`
-(the same placeholder used by GitHub OAuth).
+(the same placeholder used for local dev).
 
 ### Microsoft Entra app (Outlook)
 
@@ -215,7 +248,11 @@ For local development use `http://localhost:5173/api/oauth/<provider>/callback`
   If you delete the Worker, your D1 data remains (delete it explicitly).
 - **Lost encryption key**: credentials stored in D1 become undecryptable. There is
   no backdoor — export/rotate credentials first if you ever change the key.
-- **Sessions**: users can simply log in again (sessions expire).
+- **Access sessions**: Cloudflare Access manages the browser session; sign out
+  via your Cloudflare account session or by clearing browser cookies.
+- **DB reset**: during early development, schema changes may require recreating
+  the D1 database (`wrangler d1 delete` / re-create + re-apply migrations), after
+  which connected email accounts must be re-added.
 
 ## In use: Queue (sync jobs)
 

@@ -8,8 +8,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { randomUUID } from "crypto";
 import type { Env } from "../env";
 import { HttpError } from "../http-error";
-import { requireAuth, randomToken, safeEqual } from "../auth";
-import { currentUser } from "../auth/session";
+import { randomToken, safeEqual } from "../utils/token";
 import { decryptCredential, encryptCredential } from "../security/crypto";
 import {
   buildAuthorizeUrl,
@@ -24,12 +23,9 @@ import { configFor } from "../oauth/config";
 const OAUTH_STATE_COOKIE = "ec_oauth_state";
 
 export const oauthRoutes = new Hono<{ Bindings: Env }>();
-// Require auth for every /api/oauth/* route (start + callback).
-oauthRoutes.use("*", requireAuth);
 
 // GET /api/oauth/:provider/start?action=connect|reconnect
 oauthRoutes.get("/:provider/start", async (c) => {
-  const user = currentUser(c);
   const provider = parseProvider(c.req.param("provider"));
   const cfg = configFor(c.env, provider);
   if (!cfg.clientId || !cfg.clientSecret) {
@@ -44,7 +40,6 @@ oauthRoutes.get("/:provider/start", async (c) => {
     maxAge: 600,
   });
   const url = buildAuthorizeUrl(cfg, state);
-  void user;
   return c.redirect(url);
 });
 
@@ -66,10 +61,8 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   // Identify the user from the provider.
   const info = await fetchOwnerInfo(provider, token.access_token);
 
-  const user = currentUser(c);
-
   // Look for an existing account with the same email; else create one.
-  let accountId = await existingAccountId(c.env, user.id, info.email);
+  let accountId = await existingAccountId(c.env, info.email);
   const now = new Date().toISOString();
   if (accountId) {
     await c.env.DB.prepare(
@@ -81,12 +74,11 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     accountId = randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO accounts
-        (id, user_id, provider, name, email, display_name, state, sync_enabled, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'healthy', 1, ?)`,
+        (id, provider, name, email, display_name, state, sync_enabled, created_at)
+       VALUES (?, ?, ?, ?, ?, 'healthy', 1, ?)`,
     )
       .bind(
         accountId,
-        user.id,
         provider === "google" ? "gmail" : "microsoft",
         info.name || info.email,
         info.email,
@@ -142,11 +134,9 @@ async function fetchOwnerInfo(
   return { email, name: d.displayName ?? null };
 }
 
-async function existingAccountId(env: Env, userId: string, email: string): Promise<string | null> {
-  const row = await env.DB.prepare(
-    `SELECT id FROM accounts WHERE user_id = ? AND lower(email) = lower(?)`,
-  )
-    .bind(userId, email)
+async function existingAccountId(env: Env, email: string): Promise<string | null> {
+  const row = await env.DB.prepare(`SELECT id FROM accounts WHERE lower(email) = lower(?)`)
+    .bind(email)
     .first<{ id: string }>();
   return row?.id ?? null;
 }

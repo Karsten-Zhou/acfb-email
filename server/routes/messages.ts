@@ -2,8 +2,6 @@
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
 import type { Env } from "../env";
-import { requireAuth } from "../auth";
-import { currentUser } from "../auth/session";
 import { buildProvider } from "../email/providers";
 import { repo } from "../db/repo";
 import { importOlderPage } from "../sync/sync-service";
@@ -20,11 +18,9 @@ import type { MessageRow } from "../db/repo";
 import type { ProviderBody } from "../email/providers/types";
 
 export const messageRoutes = new Hono<{ Bindings: Env }>();
-messageRoutes.use("*", requireAuth);
 
 // GET /api/messages?mailboxId=...&limit=...&offset=...&beforeUid=...
 messageRoutes.get("/", async (c) => {
-  const user = currentUser(c);
   const mailboxId = c.req.query("mailboxId") ?? "";
   const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
   const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
@@ -36,7 +32,7 @@ messageRoutes.get("/", async (c) => {
     : 0;
 
   if (!mailboxId) throw new HttpError(400, "mailboxId is required");
-  const box = await repo.mailboxForUser(c.env, user.id, mailboxId);
+  const box = await repo.mailboxById(c.env, mailboxId);
   if (!box) throw new HttpError(404, "Mailbox not found");
 
   let rows = await repo.listMessages(c.env, mailboxId, limit, offset);
@@ -70,7 +66,6 @@ messageRoutes.get("/", async (c) => {
 
 // GET /api/messages/unified?limit=...&offset=...
 messageRoutes.get("/unified", async (c) => {
-  const user = currentUser(c);
   const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
   const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
 
@@ -79,11 +74,8 @@ messageRoutes.get("/unified", async (c) => {
   // import one older page per account's inbox so the unified list keeps
   // growing instead of stopping at the local aggregate.
   const boxes = await c.env.DB.prepare(
-    `SELECT m.id FROM mailboxes m JOIN accounts a ON a.id = m.account_id
-     WHERE a.user_id = ? AND (m.role = 'inbox' OR m.role = 'all')`,
-  )
-    .bind(user.id)
-    .all<{ id: string }>();
+    `SELECT id FROM mailboxes WHERE role = 'inbox' OR role = 'all'`,
+  ).all<{ id: string }>();
   let rows = await repo.unifiedMessages(
     c.env,
     boxes.results.map((b) => b.id),
@@ -138,15 +130,14 @@ messageRoutes.get("/unified", async (c) => {
 
 // GET /api/messages/:id
 messageRoutes.get("/:id", async (c) => {
-  const user = currentUser(c);
   const id = c.req.param("id");
-  const row = await repo.messageForUser(c.env, user.id, id);
+  const row = await repo.messageById(c.env, id);
   if (!row) throw new HttpError(404, "Message not found");
 
   let html = row.html_preview;
   let text = row.text_preview;
   if (!row.body_fetched) {
-    const account = await repo.accountForUser(c.env, user.id, row.account_id);
+    const account = await repo.accountById(c.env, row.account_id);
     if (!account) throw new HttpError(404, "Account not found");
     const cred = await repo.credential(c.env, account.id);
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
@@ -194,15 +185,14 @@ messageRoutes.get("/:id", async (c) => {
 // is stored in Cloudflare infra — the binary travels provider -> worker ->
 // browser on demand.
 messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
-  const user = currentUser(c);
   const id = c.req.param("id");
   const attachmentId = c.req.param("attachmentId");
-  const row = await repo.messageForUser(c.env, user.id, id);
+  const row = await repo.messageById(c.env, id);
   if (!row) throw new HttpError(404, "Message not found");
   const att = await repo.attachmentById(c.env, attachmentId);
   if (!att || att.message_id !== row.id) throw new HttpError(404, "Attachment not found");
 
-  const account = await repo.accountForUser(c.env, user.id, row.account_id);
+  const account = await repo.accountById(c.env, row.account_id);
   if (!account) throw new HttpError(404, "Account not found");
   const cred = await repo.credential(c.env, account.id);
   const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
@@ -233,9 +223,8 @@ messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
 
 // PATCH /api/messages/flags
 messageRoutes.patch("/flags", async (c) => {
-  const user = currentUser(c);
   const input = await readJson(c, UpdateFlagsInputSchema);
-  const owned = await repo.ownedMessageIds(c.env, user.id, input.ids);
+  const owned = await repo.ownedMessageIds(c.env, input.ids);
   if (owned.length === 0) throw new HttpError(404, "No messages found");
 
   const byMailbox = new Map<string, typeof owned>();
@@ -265,11 +254,10 @@ messageRoutes.patch("/flags", async (c) => {
 
 // POST /api/messages/move
 messageRoutes.post("/move", async (c) => {
-  const user = currentUser(c);
   const input = await readJson(c, MoveMessagesInputSchema);
-  const target = await repo.mailboxForUser(c.env, user.id, input.targetMailboxId);
+  const target = await repo.mailboxById(c.env, input.targetMailboxId);
   if (!target) throw new HttpError(404, "Target mailbox not found");
-  const owned = await repo.ownedMessageIds(c.env, user.id, input.ids);
+  const owned = await repo.ownedMessageIds(c.env, input.ids);
   if (owned.length === 0) throw new HttpError(404, "No messages found");
 
   const byMailbox = new Map<string, typeof owned>();
@@ -296,9 +284,8 @@ messageRoutes.post("/move", async (c) => {
 
 // POST /api/messages/delete
 messageRoutes.post("/delete", async (c) => {
-  const user = currentUser(c);
   const input = await readJson(c, DeleteMessagesInputSchema);
-  const owned = await repo.ownedMessageIds(c.env, user.id, input.ids);
+  const owned = await repo.ownedMessageIds(c.env, input.ids);
   if (owned.length === 0) throw new HttpError(404, "No messages found");
 
   const byMailbox = new Map<string, typeof owned>();

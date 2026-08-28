@@ -4,16 +4,17 @@ A personal, polished web email client that runs on **Cloudflare Workers (Free ti
 Connect multiple email accounts (IMAP/SMTP first; Gmail/Microsoft via OAuth planned)
 and read, send, and organize mail through one unified interface.
 
-> This is a **personal, single-user** application. Access is restricted by an
-> explicit allowlist of your GitHub account. It is not designed for multi-user hosting.
+> This is a **personal, single-user** application. Access is gated by
+> Cloudflare Access (only members of your Cloudflare account can sign in). It
+> is not designed for multi-user hosting.
 
 ---
 
 ## Features (v1)
 
-- 🔐 **Login with GitHub** — OAuth web flow, server-side sessions, allowlist by numeric GitHub ID
+- 🔐 **Cloudflare Access** — sign in at the edge with your Cloudflare account; the worker refuses requests with no Access evidence
 - 📬 **Connect IMAP/SMTP accounts** — test connection before saving; credentials encrypted with AES-GCM
-- 📥 **Incremental mailbox sync** — IMAP UID/UIDVALIDITY cursors; sync on login + manual refresh
+- 📥 **Incremental mailbox sync** — IMAP UID/UIDVALIDITY cursors; sync on connect + manual refresh
 - 📁 **Mailboxes & folders** — inbox, sent, drafts, trash, spam, archive recognition
 - 📄 **Read email** — safe HTML/plain-text rendering (DOMPurify), attachments listing
 - ✍️ **Compose & send** — plain text or HTML, CC/BCC, reply prefill, draft save/load
@@ -35,7 +36,8 @@ bun run lint                # eslint
 bun dev                     # local dev (Vite + Cloudflare plugin)
 ```
 
-Open <http://localhost:8787> and sign in with GitHub.
+Open <http://localhost:5173>. There is no app-level login: Cloudflare Access
+gates the app at the edge in production, and local dev has no access controls.
 
 ---
 
@@ -44,7 +46,6 @@ Open <http://localhost:8787> and sign in with GitHub.
 ```
 client/            ->  src/   Vue 3 SPA (views, stores, router, styles)
 server/  ->  server/   Hono API + Workers runtime code
-  auth/             GitHub OAuth, sessions, CSRF
   email/            IMAP/SMTP clients, MIME parse/build, provider adapters
   routes/           Hono HTTP routes
   sync/             synchronization orchestrator
@@ -83,7 +84,7 @@ for the threat model, [DEVELOPMENT.md](./DEVELOPMENT.md) for daily workflow, and
   (they require Google Cloud / Microsoft Entra app registration + OAuth). The
   **IMAP/SMTP provider is the tested path** (verified with a real QQ Mail account).
   Outlook.com can also be connected via **IMAP/SMTP directly** (see below).
-- **Background sync** is on login + manual "Sync now" (no Cron/Queues yet) — see
+- **Background sync** is on account connect + manual "Sync now" (no Cron/Queues yet) — see
   ARCHITECTURE for the seam to add them.
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
 - Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain

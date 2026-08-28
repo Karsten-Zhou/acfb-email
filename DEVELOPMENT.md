@@ -9,7 +9,6 @@ Everything you need to work on this project day to day.
 - **Bun** >= 1.3 (package manager + runtime for scripts)
 - Node 22+ (for some tooling internals)
 - A Cloudflare account (only for deploy/preview; local dev works offline)
-- A GitHub OAuth App (only for real login; see DEPLOYMENT.md)
 
 ## First-time setup
 
@@ -17,9 +16,7 @@ Everything you need to work on this project day to day.
 bun install
 cp .env.example .env
 # Edit .env with real values:
-#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET  (from GitHub OAuth App)
-#   ALLOWED_GITHUB_USER_ID                   (your numeric GitHub id)
-#   CREDENTIAL_ENCRYPTION_KEY                (64 hex chars; generate below)
+#   CREDENTIAL_ENCRYPTION_KEY   (64 hex chars; generate below)
 ```
 
 Generate a key:
@@ -34,14 +31,15 @@ Apply local D1 schema:
 bunx wrangler d1 execute cloudflare-email-client --local --file=./migrations/0001_initial.sql
 ```
 
-> In the future, add new tables via a new file `migrations/0002_....sql`
-> and apply the same way. Never edit production schema by hand.
+> During early development, editing an already-applied migration requires a
+> local DB reset: delete `.wrangler/state` and re-apply (a reset also clears
+> locally stored email accounts).
 
 ## Day-to-day commands
 
 | Task | Command |
 | --- | --- |
-| Local dev server | `bun dev` → http://localhost:8787 |
+| Local dev server | `bun dev` → http://localhost:5173 |
 | Type check (both sides) | `bun run typecheck` |
 | Type check app only | `bun run typecheck:app` |
 | Type check worker only | `bun run typecheck:server` |
@@ -64,23 +62,22 @@ bunx wrangler d1 execute cloudflare-email-client --local --file=./migrations/000
 
 ```text
 src/                  Vue 3 SPA
-  views/              Login, Mailbox (3-pane), Message, Compose, Settings
-  stores/             reactive singletons: auth, accounts, mail
-  router/             hash router + auth guard
-  lib/api.ts          typed fetch client (CSRF header auto-added)
+  views/              Mailbox (3-pane), Message, Compose, Settings
+  stores/             reactive singletons: accounts, mail, toast
+  router/             web-history router
+  lib/api.ts          typed fetch client
   styles/main.css     Tailwind v4 + email-body styles
 server/               Worker (Hono)
-  auth/               GitHub OAuth, sessions, CSRF, middleware
   email/
     imap/client.ts    IMAP4rev1 client (cloudflare:sockets)
     smtp/client.ts    SMTP submission client
     compose.ts        mimetext build
     providers/        IEmailProvider + ImapProvider + role mapping
-  routes/             Hono route modules (auth, accounts, mailboxes, messages, send, settings)
+  routes/             Hono route modules (accounts, mailboxes, messages, send, settings, oauth)
   sync/               syncAccount orchestrator
   security/           AES-GCM crypto
   db/repo.ts          D1 repository
-  index.ts            app entry (mounts /api, error handler, CSRF)
+  index.ts            app entry (mounts /api, error handler)
 shared/               Zod schemas, constants, inferred types
 migrations/           D1 SQL migrations
 e2e/                  integration tests + migration setup
@@ -118,5 +115,5 @@ e2e/                  integration tests + migration setup
 | `bun dev` hangs on `Request.cf` timeout | Local miniflare talking to Cloudflare API through a proxy; disable proxy for `api.cloudflare.com` or retry |
 | `/api/*` returns 503 at startup | D1 binding misconfigured; check `database_id` in `wrangler.jsonc` (use zeros for local) |
 | IMAP connection fails locally | Verify host/port/security; Workers sockets blocked by proxy can mimic this — check with `curl -v imaps://...` |
-| `Failed to load` in browser console | Dev server not running, or you need to re-login after `bun dev` restart |
+| `Failed to load` in browser console | Dev server not running |
 | Type errors in editor but not CLI | Restart the language server / `bun run typecheck` to sync tsbuildinfo |

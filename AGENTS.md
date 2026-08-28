@@ -55,6 +55,13 @@ Some tooling details that matter:
 
 ## Architecture / key seams
 
+- **Access control**: worker-level Cloudflare Access gates the whole app at the
+  edge (configured in the dashboard/API — `worker` destination + "Cloudflare
+  account" policy; Wrangler cannot create Access apps). Access enforces before
+  the Worker runs, so the Worker does no authentication of its own: no auth
+  middleware, no per-user model, no app cookies. (With Workers Static Assets,
+  `ctx.access` is not forwarded to the user Worker, so the app never reads
+  Access identity either.)
 - **Single worker, SPA routing**: `src/router/index.ts` uses `createWebHistory`
   (no hash routing). Server redirects use plain paths — the Workers asset SPA
   fallback handles deep links. `/mail/message/:id` maps to `MailboxView`, which
@@ -103,6 +110,11 @@ Some tooling details that matter:
 
 ## Security & sanitization
 
+- Cloudflare Access (edge) is the authentication boundary. Access also handles
+  CSRF at the edge: it issues a `CF_AppSession` CSRF cookie for the app domain
+  (validated at Cloudflare's network) and supports a `SameSite` attribute on
+  the `CF_Authorization` cookie (set to Lax — see DEPLOYMENT.md). The app has
+  no CSRF tokens of its own.
 - Email HTML is sanitized client-side with DOMPurify before `v-html`. The shared
   entry is `sanitizeHtml()` in `src/lib/sanitize.ts`:
   - Rewrites `cid:` inline-image references to the app's attachment endpoint.

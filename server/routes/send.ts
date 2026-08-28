@@ -2,8 +2,6 @@
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
 import type { Env } from "../env";
-import { requireAuth } from "../auth";
-import { currentUser } from "../auth/session";
 import { buildProvider } from "../email/providers";
 import { repo } from "../db/repo";
 import { buildRawMessage } from "../email/compose";
@@ -11,14 +9,12 @@ import { readJson } from "../utils/http";
 import { SendMessageInputSchema, DraftInputSchema } from "@shared/schemas";
 
 export const sendRoutes = new Hono<{ Bindings: Env }>();
-sendRoutes.use("*", requireAuth);
 
 // POST /api/send
 sendRoutes.post("/send", async (c) => {
-  const user = currentUser(c);
   const input = await readJson(c, SendMessageInputSchema);
 
-  const account = await repo.accountForUser(c.env, user.id, input.accountId);
+  const account = await repo.accountById(c.env, input.accountId);
   if (!account) throw new HttpError(404, "Account not found");
   const cred = await repo.credential(c.env, account.id);
   const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
@@ -66,9 +62,8 @@ sendRoutes.post("/send", async (c) => {
 
 // POST /api/drafts  (save/update a draft into the provider's Drafts folder)
 sendRoutes.post("/drafts", async (c) => {
-  const user = currentUser(c);
   const input = await readJson(c, DraftInputSchema);
-  const account = await repo.accountForUser(c.env, user.id, input.accountId);
+  const account = await repo.accountById(c.env, input.accountId);
   if (!account) throw new HttpError(404, "Account not found");
   const cred = await repo.credential(c.env, account.id);
   const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);

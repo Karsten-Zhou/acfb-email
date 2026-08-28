@@ -53,17 +53,6 @@ export interface MessageRow {
 
 export const repo = {
   // --- accounts ---
-  async accountForUser(env: Env, userId: string, accountId: string): Promise<AccountRow | null> {
-    return env.DB.prepare(
-      `SELECT id, provider, email, display_name, imap_host, imap_port, imap_secure,
-              smtp_host, smtp_port, smtp_secure, state, state_message, name, created_at,
-              last_synced_at, sync_enabled
-       FROM accounts WHERE id = ? AND user_id = ?`,
-    )
-      .bind(accountId, userId)
-      .first<AccountRow>();
-  },
-
   async accountById(env: Env, accountId: string): Promise<AccountRow | null> {
     return env.DB.prepare(
       `SELECT id, provider, email, display_name, imap_host, imap_port, imap_secure,
@@ -85,16 +74,6 @@ export const repo = {
   },
 
   // --- mailboxes ---
-  async mailboxForUser(env: Env, userId: string, mailboxId: string): Promise<MailboxRow | null> {
-    return env.DB.prepare(
-      `SELECT m.id, m.account_id, m.provider_path
-       FROM mailboxes m JOIN accounts a ON a.id = m.account_id
-       WHERE m.id = ? AND a.user_id = ?`,
-    )
-      .bind(mailboxId, userId)
-      .first<MailboxRow>();
-  },
-
   async mailboxById(env: Env, mailboxId: string): Promise<MailboxRow | null> {
     return env.DB.prepare(`SELECT id, account_id, provider_path FROM mailboxes WHERE id = ?`)
       .bind(mailboxId)
@@ -150,7 +129,7 @@ export const repo = {
     return rows.results;
   },
 
-  async messageForUser(env: Env, userId: string, messageId: string): Promise<MessageRow | null> {
+  async messageById(env: Env, messageId: string): Promise<MessageRow | null> {
     return env.DB.prepare(
       `SELECT m.id, m.account_id, m.mailbox_id, m.remote_uid, m.remote_message_id, m.subject,
               m.snippet, m.from_name, m.from_address, m.date, m.received_at, m.is_read,
@@ -159,15 +138,14 @@ export const repo = {
        FROM messages m
        JOIN mailboxes mb ON mb.id = m.mailbox_id
        JOIN accounts a ON a.id = m.account_id
-       WHERE m.id = ? AND a.user_id = ?`,
+       WHERE m.id = ?`,
     )
-      .bind(messageId, userId)
+      .bind(messageId)
       .first<MessageRow>();
   },
 
   async ownedMessageIds(
     env: Env,
-    userId: string,
     ids: string[],
   ): Promise<
     {
@@ -181,10 +159,10 @@ export const repo = {
     const ph = ids.map(() => "?").join(",");
     const rows = await env.DB.prepare(
       `SELECT m.id, m.mailbox_id, m.remote_message_id, m.remote_uid
-       FROM messages m JOIN accounts a ON a.id = m.account_id
-       WHERE m.id IN (${ph}) AND a.user_id = ?`,
+       FROM messages m
+       WHERE m.id IN (${ph})`,
     )
-      .bind(...ids, userId)
+      .bind(...ids)
       .all<{
         id: string;
         mailbox_id: string;
