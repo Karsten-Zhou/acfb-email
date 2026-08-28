@@ -17,7 +17,7 @@ A self-hosted, personal email client deployed to a single Cloudflare Worker:
   `run_worker_first=["/api/*"]`) — the SPA and one API worker ship together
 
 The frontend talks to the API through `src/lib/api.ts`. Cross-provider abstractions
-and their types are defined in `server/email/providers/`.
+and their types are defined in `server/email/`.
 
 ## Commands (bun)
 
@@ -73,7 +73,7 @@ Some tooling details that matter:
   guard is still held — so a tagged response is dropped and commands hang. The
   patch makes `socketReadable` remember the missed event and re-run the reader.
   Keep it in sync when bumping imapflow. SMTP is implemented over sockets in
-  `server/email/smtp/client.ts`.
+  `server/email/smtp.ts`.
   - Don't pass `tls.rejectUnauthorized` to imapflow (workerd throws
     `ERR_OPTION_NOT_IMPLEMENTED`); pass an explicit `servername`.
   - **`COMPRESS=DEFLATE` must stay disabled** (`disableCompression: true` in
@@ -83,11 +83,11 @@ Some tooling details that matter:
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has
   `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its
   `setHeader In-Reply-To` expects a bare id (it adds the angle brackets itself).
-- **Provider abstraction**: `server/email/providers/` defines a single
+- **Provider abstraction**: `server/email/` defines a single
   `ImapProvider` (imapflow) behind a common interface. Generic IMAP accounts
   use password auth; Gmail and Outlook connect through the same adapter via
   OAuth2 (XOAUTH2) on their well-known endpoints (`buildProvider` in
-  `server/email/providers/index.ts`). Provider ids for a message are resolved
+  `server/email/build-provider.ts`). Provider ids for a message are resolved
   via `providerIdFor()` in `server/routes/messages.ts` (all providers use the
   IMAP `remote_uid`).
 - **Syncing**: account add / OAuth connect enqueue a sync job to the

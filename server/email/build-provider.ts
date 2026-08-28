@@ -1,12 +1,12 @@
 // Constructs a concrete provider adapter from persisted account data. All
 // providers run through the IMAP/SMTP adapter; Gmail and Outlook connect via
 // OAuth2 (XOAUTH2) on their well-known endpoints.
-import { decryptCredential } from "../../security/crypto";
+import { decryptCredential } from "../security/crypto";
 import { ImapProvider } from "./imap";
-import { loadOauthToken } from "../../routes/oauth";
+import { loadOauthToken } from "../routes/oauth";
 import type { ImapTransport } from "./imap";
 import type { IEmailProvider } from "./types";
-import type { Env } from "../../env";
+import type { Env } from "../env";
 
 // Well-known IMAP/SMTP endpoints for OAuth-connected providers. Gmail and
 // Outlook disable password login, so these accounts always authenticate with

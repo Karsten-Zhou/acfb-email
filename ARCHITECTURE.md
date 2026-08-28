@@ -46,10 +46,10 @@ Cloudflare Worker
 | Hono router | `server/index.ts` | mounts `/api`, error handling, logging middleware |
 | Cloudflare Access | dashboard/API | edge gatekeeper (worker-level, account members only); CSRF handled at the edge via `CF_AppSession` |
 | IMAP client | `imapflow` (patched) | IMAP4rev1 over workerd `node:net`/`node:tls`/`node:stream` |
-| SMTP client | `server/email/smtp/client.ts` | submission via ports 587/465 (Workers forbid port 25) |
+| SMTP client | `server/email/smtp.ts` | submission via ports 587/465 (Workers forbid port 25) |
 | MIME parse | `postal-mime` | RFC5322/MIME parsing of received messages (verified Workers-compatible) |
 | MIME build | `mimetext` | builds outgoing RFC5322 messages |
-| Provider adapters | `server/email/providers/` | `IEmailProvider` interface; `ImapProvider` is the only adapter in v1 |
+| Provider adapters | `server/email/` | `IEmailProvider` interface; `ImapProvider` is the only adapter |
 | Sync | `server/sync/` | orchestrates mailbox+message upsert; per-mailbox UID cursors |
 | Repo | `server/db/repo.ts` | D1 access, ownership-scoped queries |
 | Crypto | `server/security/crypto.ts` | AES-GCM for stored credentials |
@@ -169,7 +169,7 @@ slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls
 
 ## 6. Provider abstraction
 
-`server/email/providers/types.ts` defines `IEmailProvider`:
+`server/email/types.ts` defines `IEmailProvider`:
 
 - `testConnection()`
 - `listMailboxes()`

@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
 import type { Env } from "../env";
-import { buildProvider } from "../email/providers";
+import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
 import { importOlderPage } from "../sync/sync-service";
 import { readJson } from "../utils/http";
@@ -15,7 +15,7 @@ import {
 } from "@shared/schemas";
 import type { Message, MessageDetail } from "@shared/types";
 import type { MessageRow } from "../db/repo";
-import type { ProviderBody } from "../email/providers/types";
+import type { ProviderBody } from "../email/types";
 
 export const messageRoutes = new Hono<{ Bindings: Env }>();
 

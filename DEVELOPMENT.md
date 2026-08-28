@@ -69,10 +69,12 @@ src/                  Vue 3 SPA
   styles/main.css     Tailwind v4 + email-body styles
 server/               Worker (Hono)
   email/
-    imap/client.ts    IMAP4rev1 client (cloudflare:sockets)
-    smtp/client.ts    SMTP submission client
+    imap.ts           ImapProvider (imapflow)
+    smtp.ts           SMTP submission client
     compose.ts        mimetext build
-    providers/        IEmailProvider + ImapProvider + role mapping
+    build-provider.ts provider construction from account data
+    role-map.ts       mailbox role detection
+    types.ts          IEmailProvider + shared types
   routes/             Hono route modules (accounts, mailboxes, messages, send, settings, oauth)
   sync/               syncAccount orchestrator
   security/           AES-GCM crypto
@@ -93,8 +95,8 @@ e2e/                  integration tests + migration setup
 
 ## Adding a new provider
 
-1. Implement `IEmailProvider` (see `server/email/providers/types.ts`).
-2. Register it in `buildProvider` (`server/email/providers/index.ts`).
+1. Implement `IEmailProvider` (see `server/email/types.ts`).
+2. Register it in `buildProvider` (`server/email/build-provider.ts`).
 3. If it needs OAuth tokens, store them encrypted in `account_credentials`
    (see SECURITY.md) and refresh on use.
 4. Update the add-account UI (`SettingsView.vue`) to offer the new provider.

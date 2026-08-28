@@ -6,9 +6,9 @@
 // Cron + Queues later is here (a function that just enqueues an account id).
 
 import { randomUUID } from "crypto";
-import { buildProvider } from "../email/providers";
-import { roleFromImapName, roleSortOrder } from "../email/providers/role-map";
-import type { ProviderMailbox, ProviderMessage } from "../email/providers/types";
+import { buildProvider } from "../email/build-provider";
+import { roleFromImapName, roleSortOrder } from "../email/role-map";
+import type { ProviderMailbox, ProviderMessage } from "../email/types";
 import type { Env } from "../env";
 
 interface AcctRow {

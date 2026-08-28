@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { HttpError } from "../http-error";
 import type { Env } from "../env";
 import { encryptCredential } from "../security/crypto";
-import { ImapProvider } from "../email/providers/imap";
+import { ImapProvider } from "../email/imap";
 import { syncAccount } from "../sync/sync-service";
 import { readJson } from "../utils/http";
 import {

@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
 import type { Env } from "../env";
-import { buildProvider } from "../email/providers";
+import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
 import { buildRawMessage } from "../email/compose";
 import { readJson } from "../utils/http";

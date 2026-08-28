@@ -3,7 +3,7 @@
 // Outlook connect through the same adapter using OAuth2 (XOAUTH2).
 
 import { ImapFlow } from "imapflow";
-import { smtpSend } from "../smtp/client";
+import { smtpSend } from "./smtp";
 import { roleFromImapName } from "./role-map";
 import type {
   IEmailProvider,
