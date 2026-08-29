@@ -173,6 +173,13 @@ Some tooling details that matter:
 
 ## Live-behavior gotchas worth remembering
 
+- **"Possible EventEmitter memory leak detected. 11 timeout listeners"** (per IMAP connection) is a
+  benign workerd `node:net` bug, NOT our code/imapflow. workerd's `Socket._unrefTimer()` calls
+  `socket.setTimeout(ms, cb)` on every read/write chunk, and its `setTimeout` adds a `once('timeout')`
+  listener each call (real Node uses `timers.enroll/active`, no leak). A single sync adds 300+ listeners
+  on one socket; all freed when the socket closes, so it's non-fatal. Can't be disabled via imapflow
+  (`socketTimeout: 0` falls back to the 5-min default) and can't be intercepted via `process.on('warning')`
+  (workerd doesn't route MaxListenersExceededWarning there). Accepted as-is.
 - **SMTP**: Cloudflare Workers can't do port 25 — always 465/587.
 - **Gmail/Outlook OAuth scopes** (XOAUTH2 for IMAP/SMTP):
   Gmail needs `https://mail.google.com/`; Outlook needs
