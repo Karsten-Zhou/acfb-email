@@ -19,8 +19,6 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   accounts: ["accounts"] as const,
   accountStates: ["account-states"] as const,
-  /** Mailboxes for a single account. */
-  mailboxes: (accountId: string) => ["mailboxes", accountId] as const,
   /** Full account → mailbox tree for the sidebar. */
   mailboxTree: ["mailbox-tree"] as const,
   /** Infinite message list for one mailbox. */

@@ -67,14 +67,6 @@ export function useAccountSummaries() {
   return { ...accounts, data };
 }
 
-export function useMailboxes(accountId: string) {
-  return useQuery({
-    queryKey: queryKeys.mailboxes(accountId),
-    queryFn: async () => (await api.mailboxes(accountId)).mailboxes,
-    enabled: !!accountId,
-  });
-}
-
 /** Flat account → mailbox tree for the sidebar, role-ordered. */
 export function useMailboxTree() {
   return useQuery({
