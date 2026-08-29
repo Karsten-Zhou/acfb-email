@@ -36,7 +36,7 @@ import {
   ArrowUp,
   ArrowDown,
   Pencil,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 defineProps<{
   meta: HealthPayload | null;

@@ -14,7 +14,7 @@ import Button from "./UiButton.vue";
 import AppTooltip from "./UiToolTip.vue";
 import { t } from "../lib/i18n";
 import { cn } from "../lib/cn";
-import { Bold, Italic, Underline, List, ListOrdered, Undo2, Redo2 } from "lucide-vue-next";
+import { Bold, Italic, Underline, List, ListOrdered, Undo2, Redo2 } from "@lucide/vue";
 
 const props = withDefaults(
   defineProps<{

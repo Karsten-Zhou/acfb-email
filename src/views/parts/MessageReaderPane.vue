@@ -23,7 +23,7 @@ import {
   Loader2,
   FolderInput,
   MoreHorizontal,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 const props = defineProps<{
   loading: boolean;

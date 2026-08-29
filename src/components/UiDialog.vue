@@ -9,7 +9,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui";
-import { X } from "lucide-vue-next";
+import { X } from "@lucide/vue";
 
 const props = withDefaults(
   defineProps<{

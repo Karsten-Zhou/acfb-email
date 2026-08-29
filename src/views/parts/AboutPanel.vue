@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // AboutPanel — version, build time, and source link.
 import { t, formatDateTime } from "../../lib/i18n";
-import { Info, ExternalLink } from "lucide-vue-next";
+import { Info, ExternalLink } from "@lucide/vue";
 
 const appVersion = __APP_VERSION__;
 const appBuildTime = __APP_BUILD_TIME__;

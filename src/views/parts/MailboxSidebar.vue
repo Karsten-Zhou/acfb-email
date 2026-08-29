@@ -19,7 +19,7 @@ import {
   Plus,
   Mail as MailIcon,
   Settings,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import type { Mailbox } from "@shared/types";
 
 defineProps<{

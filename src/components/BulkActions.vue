@@ -6,7 +6,7 @@
 import { t } from "../lib/i18n";
 import Button from "./UiButton.vue";
 import AppTooltip from "./UiToolTip.vue";
-import { FolderInput, Trash2 } from "lucide-vue-next";
+import { FolderInput, Trash2 } from "@lucide/vue";
 
 defineProps<{
   selectedCount: number;

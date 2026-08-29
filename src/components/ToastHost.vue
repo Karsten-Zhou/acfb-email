@@ -9,7 +9,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "reka-ui";
-import { CheckCircle2, CircleAlert, X } from "lucide-vue-next";
+import { CheckCircle2, CircleAlert, X } from "@lucide/vue";
 
 const AUTO_DISMISS_MS = 5000;
 /** Keep the item mounted long enough for reka's exit transition to play. */

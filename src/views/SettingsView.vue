@@ -14,7 +14,7 @@ import UiToolTip from "../components/UiToolTip.vue";
 import AccountSettings from "./parts/AccountSettings.vue";
 import PreferencesPanel from "./parts/PreferencesPanel.vue";
 import AboutPanel from "./parts/AboutPanel.vue";
-import { ChevronLeft } from "lucide-vue-next";
+import { ChevronLeft } from "@lucide/vue";
 
 const router = useRouter();
 

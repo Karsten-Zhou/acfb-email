@@ -14,7 +14,7 @@ import {
   Star,
   Loader2,
   Paperclip,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import type { Message } from "@shared/types";
 
 const props = defineProps<{

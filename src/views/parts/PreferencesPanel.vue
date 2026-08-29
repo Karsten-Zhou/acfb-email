@@ -4,7 +4,7 @@ import { computed } from "vue";
 import { t, setLocale, localeState, supportedLocales, type LocaleSetting } from "../../lib/i18n";
 import { themeState, setTheme, type ThemeSetting } from "../../lib/theme";
 import UiSelect from "../../components/UiSelect.vue";
-import { Languages, Monitor, Sun, Moon } from "lucide-vue-next";
+import { Languages, Monitor, Sun, Moon } from "@lucide/vue";
 
 const localeValue = computed({
   get: () => localeState.value.setting,

@@ -8,7 +8,7 @@ import { t, formatDateTime } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
 import UiDialog from "../components/UiDialog.vue";
-import { Star, Trash2, Reply, ChevronLeft, Paperclip, MailOpen, Loader2 } from "lucide-vue-next";
+import { Star, Trash2, Reply, ChevronLeft, Paperclip, MailOpen, Loader2 } from "@lucide/vue";
 import type { MessageDetail } from "@shared/types";
 
 const route = useRoute();

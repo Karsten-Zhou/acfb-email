@@ -43,7 +43,7 @@ import {
   AlertTriangle,
   Trash2,
   Mail as MailIcon,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import type { Mailbox, Message } from "@shared/types";
 
 const route = useRoute();

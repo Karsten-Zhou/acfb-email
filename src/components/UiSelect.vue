@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectViewport,
 } from "reka-ui";
-import { ChevronDown, Check } from "lucide-vue-next";
+import { ChevronDown, Check } from "@lucide/vue";
 
 interface Option {
   value: string;

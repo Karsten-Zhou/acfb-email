@@ -19,7 +19,7 @@ import Button from "../components/UiButton.vue";
 import AppTooltip from "../components/UiToolTip.vue";
 import RichTextEditor from "../components/RichTextEditor.vue";
 import UiSelect from "../components/UiSelect.vue";
-import { ChevronLeft, Send, Trash2, FilePlus2, Loader2, Paperclip, X } from "lucide-vue-next";
+import { ChevronLeft, Send, Trash2, FilePlus2, Loader2, Paperclip, X } from "@lucide/vue";
 
 const route = useRoute();
 const router = useRouter();
