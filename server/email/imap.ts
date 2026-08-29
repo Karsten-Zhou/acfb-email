@@ -348,17 +348,14 @@ export class ImapProvider implements IEmailProvider {
   private async parseBody(raw: Uint8Array): Promise<ProviderBody> {
     const { default: PostalMime } = await import("postal-mime");
     const email = await PostalMime.parse(raw);
-    // Map attachments to their MIME part numbers (IMAP BODY[part] addresses):
-    // postal-mime exposes a part number on each attachment when parsing raw
-    // bytes — fall back to the attachment index if unavailable.
     const attachments = (email.attachments ?? []).map((a, i) => ({
       filename: a.filename ?? null,
       mimeType: a.mimeType ?? "application/octet-stream",
       size: a.content ? byteLength(a.content) : 0,
       isInline: a.disposition === "inline" || !!a.contentId || !!a.related,
       contentId: a.contentId ?? null,
-      // The deterministic index within the parsed attachment list; used to
-      // re-fetch this part directly from the provider on download.
+      // partNumber is the attachment's index within the parsed list — capture
+      // it now so the download route can re-fetch this exact part on demand.
       partNumber: String(i),
       disposition: (a.disposition === "attachment" || a.disposition === "inline"
         ? a.disposition

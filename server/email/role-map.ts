@@ -15,7 +15,6 @@ export function roleFromImapName(name: string, flags: string[]): MailboxRole {
   if (flags.includes("\\Archive")) return "archive";
   if (flags.includes("\\Inbox")) return "inbox";
 
-  // INBOX is the reserved mailbox name (RFC 3501).
   if (name.toUpperCase() === "INBOX") return "inbox";
 
   return "other";
