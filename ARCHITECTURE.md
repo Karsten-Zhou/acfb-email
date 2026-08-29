@@ -42,7 +42,7 @@ Cloudflare Worker
 
 | Component | Path | Responsibility |
 | --- | --- | --- |
-| Vue SPA | `src/` | views, reactive stores, router (hash-based so deep links work without server rewrites), DOMPurify sanitization |
+| Vue SPA | `src/` | views, reactive stores, router (HTML5 history; deep links handled by the Workers SPA fallback), DOMPurify sanitization |
 | Hono router | `server/index.ts` | mounts `/api`, error handling, logging middleware |
 | Cloudflare Access | dashboard/API | edge gatekeeper (worker-level, account members only); CSRF handled at the edge via `CF_AppSession` |
 | IMAP client | `imapflow` (patched) | IMAP4rev1 over workerd `node:net`/`node:tls`/`node:stream` |
@@ -80,9 +80,9 @@ The Worker therefore has no CSRF token of its own.
 1. Client POST /api/accounts (IMAP host/port, SMTP host/port, username, password)
 2. Worker tests IMAP login first; on failure returns 400 (nothing persisted)
 3. On success: stores account row + AES-GCM-encrypted credentials in separate table
-4. Fire-and-forget: syncAccount() (bounded; the request already returned)
+4. Enqueue a sync job to the email-sync Queue (the request has already returned)
 5. Sync: for each mailbox (LIST), SELECT, then UID SEARCH since last cursor,
-   FETCH envelopes, upsert into D1 messages + recipients
+   FETCH envelopes, upsert into D1 messages + locations + recipients
 ```
 
 ### Reading a message
@@ -98,10 +98,14 @@ The Worker therefore has no CSRF token of its own.
 
 ```text
 1. POST /api/send { accountId, to, cc, bcc, subject, html, text, ... }
-2. Worker builds RFC5322 with mimetext (multipart/alternative for html+text)
-3. SMTP: implicit TLS (465) or STARTTLS (587), AUTH LOGIN or XOAUTH2, MAIL FROM, RCPT TO, DATA
-4. On success, deletes any matching local draft
+2. Worker builds RFC5322 with mimetext (multipart/alternative for html+text; client
+   attachments are added as MIME parts)
+3. SMTP: implicit TLS (465) or STARTTLS (587), AUTH LOGIN/PLAIN or XOAUTH2, MAIL FROM, RCPT TO, DATA
+4. On success, the client deletes the provider-side draft it was composing
 ```
+
+Drafts are stored provider-side (IMAP APPEND to the Drafts folder); there is no
+local drafts table.
 
 ---
 
@@ -142,8 +146,8 @@ app_settings(id PK, data JSON)   -- singleton
 - `sync_state` is keyed **per mailbox** because IMAP UIDs are per-mailbox. The
   cursor (`uid_validity` + `last_uid`) only advances after every change it
   covers is durably applied (changes + cursor update share one D1 batch) and
-  never regresses. A UIDVALIDITY change purges the mailbox's locations and
-  re-imports from scratch.
+  never regresses. On a UIDVALIDITY change the replacement set is fetched
+  first, then the purge, imports, and cursor advance land in one atomic batch.
 - Credentials live in a separate table so a query that dumps account metadata never
   accidentally includes ciphertext, let alone plaintext.
 - We store only small text/html previews in `messages`. Full bodies are fetched
@@ -205,11 +209,14 @@ sync needs. A manual "Sync now" button still calls
 
 - `testConnection()`
 - `listMailboxes()`
-- `syncMailbox(path, {sinceUid}, signal?)`
+- `syncMailbox(path, {sinceUid, beforeUid, fetchLimit}, signal?)`
+- `fetchOlder(path, options)` — older page for load-older
 - `findByMessageId(path, messageId)` — resolves a message's new UID after a move
 - `fetchBody(path, uid)`
+- `fetchAttachment(path, uid, partNumber)` — re-fetches binary bytes on demand
 - `setFlags / move / delete`
-- `send(opts)`
+- `send(opts)` — relays pre-built MIME over SMTP
+- `saveDraft(opts)` — writes a draft to the provider's Drafts folder
 
 `ImapProvider` (imap.ts) implements it. Every provider — generic IMAP accounts
 (password auth) plus Gmail and Outlook (OAuth2/XOAUTH2 on their well-known
@@ -278,8 +285,10 @@ large responses (verified live against QQ Mail, 2026-08-27).
    connect and consumed by the `email-sync` Queue consumer (15-min wall-time,
    vs waitUntil's 30 s cap). `syncAccount` is the single entry point so a Cron
    trigger could be added later.
-3. **Attachments are metadata-only in v1**: the `attachments` table tracks
-   filename/type/size; binary content is not re-fetched for forwarding yet.
+3. **Attachments are metadata-only**: the `attachments` table tracks
+   filename/type/size/part handle; binary bytes are never stored in Cloudflare
+   infra and are re-fetched live from the provider on download via
+   `fetchAttachment`. **Forward** is not wired (only reply/reply-all).
 4. **POP3 is not implemented**: POP3 has materially weaker semantics than IMAP and
    would not provide inbox-style UX. Deferred; the provider interface allows a
    read/import-oriented adapter later.

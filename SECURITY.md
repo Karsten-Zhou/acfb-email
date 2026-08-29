@@ -37,7 +37,7 @@ endpoints, and the app protects its own data.
 | --- | --- |
 | DB dump / backup leak exposes passwords | Passwords encrypted with AES-256-GCM; key never in DB; separate credentials table |
 | API CSRF (attacker triggers actions through your browser) | Cloudflare Access edge CSRF (`CF_AppSession` cookie) + `SameSite=Lax` on `CF_Authorization` |
-| Access rule disabled in dashboard | No in-app guard — the app becomes publicly reachable (Access, not code, is the boundary) |
+| Access rule disabled in dashboard | Worker fail-safe refuses API requests that carry no Access evidence (403, code `access_required`), so the API can't be silently opened |
 | Replay of OAuth authorization codes (Gmail/Outlook connect) | `state` bound to a 10-min httpOnly cookie, verified constant-time |
 | XSS via email HTML | DOMPurify sanitization on every render; no raw `v-html` without it; previews only in list |
 | Malicious links in mail | Standard `mailto:`/`http(s):` handling; no auto-open; sanitized HTML |
@@ -62,9 +62,12 @@ endpoints, and the app protects its own data.
 - The Worker is protected by worker-level Cloudflare Access (policy: account
   members only). Access authenticates at the edge before the Worker runs;
   requests that fail Access never reach the Worker.
-- The Worker performs no authentication of its own: no guard, no sessions, no
-  app cookies. (Behind Workers Static Assets, `ctx.access` is not even
-  forwarded to the user Worker, so there is no Access identity to read.)
+- The Worker performs no authentication of its own — no sessions, no app cookies,
+  no per-user identity. (Behind Workers Static Assets, `ctx.access` is not
+  forwarded to the user Worker, so there is no Access identity to read.) As a
+  fail-safe it refuses API requests that carry no Access evidence (a 403,
+  code `access_required`), accepting requests only when the runtime `access`
+  object is present or the `Cf-Access-Jwt-Assertion` header is set.
 - The app has no per-user model: Cloudflare Access decides who can reach it.
 
 ## 4. Email credentials

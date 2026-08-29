@@ -39,7 +39,7 @@ bunx wrangler d1 execute cloudflare-email-client --local --file=./migrations/000
 
 | Task | Command |
 | --- | --- |
-| Local dev server | `bun dev` → http://localhost:5173 |
+| Local dev server | `bun run dev` → http://localhost:5173 |
 | Type check (both sides) | `bun run typecheck` |
 | Type check app only | `bun run typecheck:app` |
 | Type check worker only | `bun run typecheck:server` |
