@@ -39,15 +39,22 @@ export interface ProviderMessage {
 
 export interface ProviderFetchResult {
   messages: ProviderMessage[];
-  // Highest UID seen during this fetch (for incremental sync cursor).
+  /**
+   * Max UID included in `messages` this pass. The sync layer advances the
+   * cursor only after every message through this UID is durably applied — it
+   * is NEVER the server's max UID when the fetch was truncated.
+   */
   highestUid: number;
-  // Authoritative set of UIDs currently present in the mailbox. The sync layer
-  // reconciles local rows against this so a moved or deleted message never
-  // leaves a stale row behind.
+  /**
+   * Complete authoritative UID set currently in the mailbox (a full
+   * `UID SEARCH 1:*`), NOT merely the UIDs included in `messages`. The sync
+   * layer deletes local locations whose UID is absent here — if this were ever
+   * changed to a partial set, deletion reconciliation would mass-delete rows.
+   */
   currentUids: number[];
-  // UIDVALIDITY of the mailbox (to detect a mailbox reset).
+  /** UIDVALIDITY of the mailbox (to detect a mailbox reset). */
   uidValidity: number | null;
-  // Total/EXISTS count in mailbox after select.
+  /** Total/EXISTS count in mailbox after select. */
   total: number | null;
 }
 

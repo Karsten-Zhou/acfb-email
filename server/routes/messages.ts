@@ -4,7 +4,8 @@ import { HttpError } from "../http-error";
 import type { Env } from "../env";
 import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
-import { importOlderPage, pruneOrphanMessages } from "../sync/sync-service";
+import { importOlderPage } from "../sync/sync-service";
+import { pruneOrphanMessages } from "../sync/sync-reconciliation";
 import { readJson } from "../utils/http";
 import {
   UpdateFlagsInputSchema,

@@ -93,10 +93,13 @@ Some tooling details that matter:
 - **Syncing**: account add / OAuth connect enqueue a sync job to the
   `email-sync` Queue; the `queue()` consumer in `server/index.ts` runs it
   (15-min wall-time budget vs waitUntil's 30 s). A manual `POST
-  /api/accounts/:id/sync` trigger also exists. `server/sync/sync-service.ts`
-  is the orchestrator: `syncMailbox` is the durable unit, `syncAccount`
-  discovers mailboxes and syncs each. The queue also accepts `{accountId,
-  mailboxId}` to retry a single mailbox.
+  /api/accounts/:id/sync` trigger also exists. `server/sync/` is split into
+  three modules: `sync-service.ts` (orchestration — `syncMailbox` is the
+  durable unit, `syncAccount` discovers mailboxes and syncs each, plus
+  `importOlderPage`), `sync-persistence.ts` (all D1 statement building +
+  account/mailbox state + the logical-message identity), and
+  `sync-reconciliation.ts` (stale-location delete + orphan prune). The queue
+  accepts `{accountId, mailboxId}` to retry a single mailbox.
 - **Attachments are metadata-only on Cloudflare** — binary content is never
   stored in Worker infra. The download route re-fetches the part live from the
   provider on demand (`GET /api/messages/:id/attachments/:attachId`).
@@ -107,15 +110,21 @@ Some tooling details that matter:
   per-location IMAP UID/UIDVALIDITY + read/starred flags) live in D1
   (`migrations/0001_initial.sql`). A UID is a location identity, never the
   logical message: locations are keyed `UNIQUE(mailbox_id, uid_validity, uid)`.
-  The logical message id is a deterministic hash of `(account_id, Message-ID)`
-  when a header exists, else of the location — sync is idempotent (safe to run
+  The logical message id is a SHA-256 of `(account_id, Message-ID)` when a
+  header exists, else of the location — sync is idempotent (safe to run
   repeatedly) and a self-sent mail shares one row across Inbox + Sent.
 - Sync invariants: a provider cursor only advances after every change it covers
-  is durably applied (changes + cursor update land in one `env.DB.batch()`);
-  on UIDVALIDITY reset the mailbox's locations are purged and re-imported.
-  Reconciliation (full UID SEARCH + stale-location delete + orphan prune) runs
-  each mailbox sync; IMAP has no incremental delete events, and the search is
-  cheap relative to the envelope fetches it gates.
+  is durably applied. Message/location/recipient upserts are batched together,
+  chunked to stay within D1's per-batch statement cap, with the cursor update
+  always in the FINAL batch. Recipients are deduped by
+  `UNIQUE(message_id, type, address)` + `INSERT OR IGNORE`. A location
+  re-points to the latest logical message if the provider changes its
+  Message-ID; orphaned messages are pruned each reconcile. On a UIDVALIDITY
+  reset the replacement set is fetched FIRST, then the purge + imports +
+  cursor land in one atomic batch (a failed re-fetch never empties the local
+  folder). Reconciliation (full UID SEARCH + stale-location delete + orphan
+  prune) runs each mailbox sync; IMAP has no incremental delete events, and the
+  search is cheap relative to the envelope fetches it gates.
 - `received_at` is stored via a normalized `isoDate()` (IMAP INTERNALDATE and
   provider ISO dates otherwise sort lexically wrong, e.g. `7-Mar-…` vs ISO).
 - Account list ordering is user-controlled via `accounts.sort_order`

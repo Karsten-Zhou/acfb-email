@@ -164,9 +164,14 @@ minutes of wall-time (vs `waitUntil`'s 30 s), which a slow multi-mailbox IMAP
 sync needs. A manual "Sync now" button still calls
 `POST /api/accounts/:id/sync` synchronously.
 
-- `server/sync/sync-service.ts` — `syncMailbox(accountId, mailboxId)` is the
-  durable unit; `syncAccount` discovers mailboxes and runs one per folder. The
-  queue payload is `{accountId, mailboxId?}` so a single mailbox can be retried.
+- `server/sync/` is split into three modules:
+  - `sync-service.ts` — orchestration: `syncMailbox(accountId, mailboxId)` is
+    the durable unit; `syncAccount` discovers mailboxes and runs one per
+    folder; `importOlderPage` serves the load-older path. The queue payload is
+    `{accountId, mailboxId?}` so a single mailbox can be retried.
+  - `sync-persistence.ts` — all D1 statement building + account/mailbox state,
+    the logical-message identity (SHA-256), and `applyProviderMessages`.
+  - `sync-reconciliation.ts` — stale-location delete + orphan prune.
 - Sync runs within a hard time budget enforced by a cooperative `AbortSignal`
   (checked between provider round-trips) rather than a racing timeout — a
   cancelled sync never leaves a competing writer mutating the DB.
@@ -180,12 +185,16 @@ sync needs. A manual "Sync now" button still calls
 1. Load the mailbox cursor (uid_validity, last_uid) from sync_state.
 2. SELECT + UID SEARCH 1:* (authoritative current UID set).
 3. Fetch envelopes for UIDs > last_uid (or the newest page on first sync).
-4. Upsert each message into `messages` + `message_locations` — plus the cursor
-   advance — in ONE env.DB.batch() (all-or-nothing). last_uid never regresses.
+4. Upsert each message into `messages` + `message_locations` + recipients,
+   chunked into batches (D1 caps batch size), with the cursor advance always in
+   the FINAL batch — so it never advances past work that wasn't applied.
+   last_uid never regresses.
 5. Reconcile: drop locations whose UID is no longer in the set, prune orphaned
    logical messages.
-6. If UIDVALIDITY changed vs the stored cursor: purge the mailbox's locations,
-   reset the cursor, and re-import from scratch.
+6. On a UIDVALIDITY change: fetch the replacement set FIRST, then purge the
+   mailbox's locations + imports + cursor advance land in one atomic batch
+   (a failed re-fetch never empties the local folder). The cursor restarts at
+   the newest page; older mail is backfilled by load-older.
 ```
 
 ---

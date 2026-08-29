@@ -1,4 +1,4 @@
-// Unit tests for the sync reconciliation primitives.
+// Unit tests for the sync primitives.
 //
 // The sync models a message's presence in a mailbox as a message_locations row
 // keyed by (mailbox_id, uid_validity, uid). Reconcile drops locations whose UID
@@ -9,7 +9,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env as testEnv } from "cloudflare:workers";
 import type { Env } from "../env";
-import { reconcileMailboxLocations, logicalMessageId } from "./sync-service";
+import { reconcileMailboxLocations } from "./sync-reconciliation";
+import { applyProviderMessages, logicalMessageId, locationKey } from "./sync-persistence";
 import type { ProviderMessage } from "../email/types";
 
 // The test binding is a real D1 database, but its type is the generic
@@ -51,6 +52,28 @@ async function messagesWithNoLocations(): Promise<number> {
      WHERE NOT EXISTS (SELECT 1 FROM message_locations ml WHERE ml.message_id = messages.id)`,
   ).first<{ n: number }>();
   return r?.n ?? 0;
+}
+
+function providerMessage(opts: {
+  uid: number;
+  messageId?: string | null;
+  to?: string[];
+  cc?: string[];
+}): ProviderMessage {
+  const addr = (s: string) => ({ name: null, address: s });
+  return {
+    providerId: String(opts.uid),
+    remoteUid: opts.uid,
+    messageId: opts.messageId ?? null,
+    subject: "Subject",
+    from: { name: "A", address: "a@b.c" },
+    to: (opts.to ?? []).map(addr),
+    cc: (opts.cc ?? []).map(addr),
+    date: "2026-01-01T00:00:00.000Z",
+    internalDate: "2026-01-01T00:00:00.000Z",
+    flags: [],
+    size: null,
+  };
 }
 
 beforeEach(async () => {
@@ -131,37 +154,127 @@ describe("reconcileMailboxLocations", () => {
 });
 
 describe("logicalMessageId", () => {
-  function msg(messageId: string | null, remoteUid: number): ProviderMessage {
-    return {
-      providerId: String(remoteUid),
-      remoteUid,
-      messageId,
-      subject: null,
-      from: null,
-      to: [],
-      cc: [],
-      date: null,
-      internalDate: null,
-      flags: [],
-      size: null,
-    };
-  }
-
-  it("shares one id for the same Message-ID across mailboxes", () => {
-    const a = logicalMessageId("acct", msg("<a@b.c>", 1), "inbox|1|1");
-    const b = logicalMessageId("acct", msg("<a@b.c>", 500), "sent|1|500");
+  it("shares one id for the same Message-ID across mailboxes", async () => {
+    const a = await logicalMessageId(
+      "acct",
+      providerMessage({ uid: 1, messageId: "<a@b.c>" }),
+      locationKey("inbox", 1, 1),
+    );
+    const b = await logicalMessageId(
+      "acct",
+      providerMessage({ uid: 500, messageId: "<a@b.c>" }),
+      locationKey("sent", 1, 500),
+    );
     expect(a).toBe(b);
   });
 
-  it("keeps Message-IDs distinct per account", () => {
-    const a = logicalMessageId("acct-1", msg("<a@b.c>", 1), "inbox|1|1");
-    const b = logicalMessageId("acct-2", msg("<a@b.c>", 1), "inbox|1|1");
+  it("keeps Message-IDs distinct per account", async () => {
+    const a = await logicalMessageId(
+      "acct-1",
+      providerMessage({ uid: 1, messageId: "<a@b.c>" }),
+      locationKey("inbox", 1, 1),
+    );
+    const b = await logicalMessageId(
+      "acct-2",
+      providerMessage({ uid: 1, messageId: "<a@b.c>" }),
+      locationKey("inbox", 1, 1),
+    );
     expect(a).not.toBe(b);
   });
 
-  it("falls back to a per-location identity when no Message-ID exists", () => {
-    const a = logicalMessageId("acct", msg(null, 1), "inbox|1|1");
-    const b = logicalMessageId("acct", msg(null, 2), "inbox|1|2");
+  it("falls back to a per-location identity when no Message-ID exists", async () => {
+    const a = await logicalMessageId(
+      "acct",
+      providerMessage({ uid: 1 }),
+      locationKey("inbox", 1, 1),
+    );
+    const b = await logicalMessageId(
+      "acct",
+      providerMessage({ uid: 2 }),
+      locationKey("inbox", 1, 2),
+    );
     expect(a).not.toBe(b);
+  });
+});
+
+describe("applyProviderMessages", () => {
+  it("inserts the message, its location, and its recipients", async () => {
+    const msg = providerMessage({ uid: 100, messageId: "<a@b.c>", to: ["x@y.z"], cc: ["c@d.e"] });
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [msg]);
+
+    const messageId = await logicalMessageId(ACCOUNT, msg, locationKey("inbox", 1, 100));
+    const message = await env.DB.prepare(`SELECT id FROM messages WHERE id = ?`)
+      .bind(messageId)
+      .first();
+    expect(message).not.toBeNull();
+    const loc = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM message_locations WHERE mailbox_id = 'inbox'`,
+    ).first<{ n: number }>();
+    expect(loc?.n).toBe(1);
+    const recips = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM message_recipients WHERE message_id = ?`,
+    )
+      .bind(messageId)
+      .first<{ n: number }>();
+    expect(recips?.n).toBe(2);
+  });
+
+  it("is idempotent: re-applying the same message never duplicates rows", async () => {
+    const msg = providerMessage({ uid: 100, messageId: "<a@b.c>", to: ["x@y.z"] });
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [msg]);
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [msg]);
+
+    const messages = await env.DB.prepare(`SELECT COUNT(*) AS n FROM messages`).first<{
+      n: number;
+    }>();
+    expect(messages?.n).toBe(1);
+    const locs = await env.DB.prepare(`SELECT COUNT(*) AS n FROM message_locations`).first<{
+      n: number;
+    }>();
+    expect(locs?.n).toBe(1);
+    const messageId = await logicalMessageId(ACCOUNT, msg, locationKey("inbox", 1, 100));
+    const recips = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM message_recipients WHERE message_id = ?`,
+    )
+      .bind(messageId)
+      .first<{ n: number }>();
+    expect(recips?.n).toBe(1);
+  });
+
+  it("shares one logical message across two mailboxes (self-sent)", async () => {
+    const inInbox = providerMessage({ uid: 100, messageId: "<a@b.c>" });
+    const inSent = providerMessage({ uid: 200, messageId: "<a@b.c>" });
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [inInbox]);
+    await applyProviderMessages(env, ACCOUNT, "sent", 1, [inSent]);
+
+    const messages = await env.DB.prepare(`SELECT COUNT(*) AS n FROM messages`).first<{
+      n: number;
+    }>();
+    expect(messages?.n).toBe(1);
+    const locs = await env.DB.prepare(`SELECT COUNT(*) AS n FROM message_locations`).first<{
+      n: number;
+    }>();
+    expect(locs?.n).toBe(2);
+  });
+
+  it("re-points a location when the provider changes its Message-ID, pruning the old message", async () => {
+    const before = providerMessage({ uid: 100, messageId: "<a@b.c>" });
+    const after = providerMessage({ uid: 100, messageId: "<b@c.d>" });
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [before]);
+
+    const oldId = await logicalMessageId(ACCOUNT, before, locationKey("inbox", 1, 100));
+    const newId = await logicalMessageId(ACCOUNT, after, locationKey("inbox", 1, 100));
+    await applyProviderMessages(env, ACCOUNT, "inbox", 1, [after]);
+
+    const loc = await env.DB.prepare(
+      `SELECT message_id FROM message_locations WHERE mailbox_id = 'inbox' AND uid = 100`,
+    ).first<{ message_id: string }>();
+    // The same (mailbox, uid_validity, uid) location now points at the new
+    // logical message; the old one is orphaned and pruned by reconcile.
+    expect(loc?.message_id).toBe(newId);
+    await reconcileMailboxLocations(env, "inbox", [100]);
+    const oldRow = await env.DB.prepare(`SELECT id FROM messages WHERE id = ?`).bind(oldId).first();
+    expect(oldRow).toBeNull();
+    expect(await messagesWithNoLocations()).toBe(0);
   });
 });

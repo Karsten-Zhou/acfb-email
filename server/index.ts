@@ -4,7 +4,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env, SyncMessage } from "./env";
-import { syncAccount, syncMailbox, markAccountSyncSucceeded } from "./sync/sync-service";
+import { syncAccount, syncMailbox } from "./sync/sync-service";
+import { markAccountSyncSucceeded } from "./sync/sync-persistence";
 import { HttpError } from "./http-error";
 import { accountRoutes } from "./routes/accounts";
 import { oauthRoutes } from "./routes/oauth";

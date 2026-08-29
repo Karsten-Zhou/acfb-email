@@ -116,7 +116,8 @@ CREATE TABLE IF NOT EXISTS message_recipients (
   message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
   type       TEXT NOT NULL,                  -- 'to' | 'cc' | 'bcc'
   name       TEXT,
-  address    TEXT NOT NULL
+  address    TEXT NOT NULL,
+  UNIQUE (message_id, type, address)
 );
 CREATE INDEX IF NOT EXISTS idx_recipients_message ON message_recipients(message_id);
 
