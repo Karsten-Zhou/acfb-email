@@ -82,15 +82,13 @@ class SmtpClientCore {
 
   async connect(): Promise<void> {
     const { host, port, secure } = this.cfg;
-    let s = connect(
+    // "on" = TLS from the start (465); "starttls" = plaintext until the
+    // STARTTLS command upgrades the socket (587).
+    const s = connect(
       { hostname: host, port },
       { secureTransport: secure ? "on" : "starttls", allowHalfOpen: true },
     );
     await s.opened;
-    if (!secure) {
-      s = s.startTls();
-      await s.opened;
-    }
     this.socket = s;
     this.reader = s.readable.getReader();
     this.writer = s.writable.getWriter();
@@ -113,7 +111,10 @@ class SmtpClientCore {
     await this.send("STARTTLS");
     await this.readReply(220);
     if (!this.socket) throw new SmtpError("No socket");
-    // Upgrade our reader/writer to the TLS socket.
+    // Release the plaintext reader/writer locks so the socket can upgrade to
+    // TLS (the runtime finalizes the old socket when its streams are free).
+    this.reader?.releaseLock();
+    this.writer?.releaseLock();
     const upgraded = this.socket.startTls();
     await upgraded.opened;
     this.socket = upgraded;
