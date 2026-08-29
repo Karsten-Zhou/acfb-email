@@ -130,6 +130,20 @@ async function syncOneMailbox(
     added++;
   }
 
+  // Reconcile local rows against the folder's authoritative UID set: a row
+  // whose UID is no longer present belongs to a message that moved away or
+  // was deleted, so drop it. This replaces the old Message-ID dedup, which
+  // could not tell a move apart from a self-sent copy living in two folders.
+  // Gated on UIDVALIDITY: if the server reset the mailbox, the old UIDs are
+  // meaningless and must not be used to judge rows.
+  const uidValidityChanged =
+    syncRow?.uid_validity != null &&
+    result.uidValidity != null &&
+    syncRow.uid_validity !== result.uidValidity;
+  if (!uidValidityChanged) {
+    await reconcileMailboxUids(env, mailbox.id, result.currentUids);
+  }
+
   // Save cursors (per-mailbox).
   await env.DB.prepare(
     `INSERT INTO sync_state (account_id, mailbox_id, uid_validity, last_uid, last_sync_at, state)
@@ -157,10 +171,38 @@ async function syncOneMailbox(
   return { synced: added > 0 || result.highestUid > 0, seen: added };
 }
 
+/**
+ * Reconcile a mailbox's local rows against the provider's authoritative UID
+ * set. A row whose UID is no longer present belongs to a message that moved
+ * away or was deleted, so it is removed. A message that legitimately lives in
+ * several folders at once (e.g. an email you send to yourself appears in
+ * Inbox AND Sent) is untouched, because its UID is present in each folder's
+ * set. Returns the number of rows removed.
+ */
+export async function reconcileMailboxUids(
+  env: Env,
+  mailboxId: string,
+  currentUids: number[],
+): Promise<number> {
+  const present = new Set(currentUids);
+  const local = await env.DB.prepare(`SELECT id, remote_uid FROM messages WHERE mailbox_id = ?`)
+    .bind(mailboxId)
+    .all<{ id: string; remote_uid: number | null }>();
+
+  let removed = 0;
+  for (const row of local.results) {
+    if (row.remote_uid != null && !present.has(row.remote_uid)) {
+      await env.DB.prepare(`DELETE FROM messages WHERE id = ?`).bind(row.id).run();
+      removed++;
+    }
+  }
+  return removed;
+}
+
 async function upsertMessage(
   env: Env,
   account: AcctRow,
-  mailbox: { id: string; role: string },
+  mailbox: { id: string },
   uidValidity: number | null,
   msg: ProviderMessage,
 ): Promise<void> {
@@ -193,28 +235,6 @@ async function upsertMessage(
   )
     .bind(mailbox.id, providerKey)
     .first<{ id: string }>();
-
-  // Moving a message between folders changes its IMAP UID, so the per-mailbox
-  // provider-id key above cannot recognize the same physical message
-  // re-entering a folder — it would insert a duplicate row. The Message-ID
-  // header is stable across moves, so collapse any same-message rows (keeping
-  // the row we're about to update, if any). Gmail is excluded because a Gmail
-  // message legitimately lives in multiple folders (labels); rows in
-  // "all"-role mailboxes (e.g. Gmail IMAP All Mail) are excluded because they
-  // mirror other folders.
-  if (
-    (account.provider === "microsoft" || account.provider === "imap") &&
-    msg.messageId &&
-    mailbox.role !== "all"
-  ) {
-    await env.DB.prepare(
-      `DELETE FROM messages
-         WHERE account_id = ? AND maybe_thread_id = ? AND id != ?
-           AND mailbox_id NOT IN (SELECT id FROM mailboxes WHERE role = 'all')`,
-    )
-      .bind(account.id, msg.messageId, existing?.id ?? "")
-      .run();
-  }
 
   if (existing) {
     // Update flags/read state if changed.

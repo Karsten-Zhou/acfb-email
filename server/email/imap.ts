@@ -106,18 +106,20 @@ export class ImapProvider implements IEmailProvider {
     return this.withClient(async (client) => {
       const lock = await client.getMailboxLock(mailboxPath);
       try {
-        let uids: number[];
-        if (options.sinceUid && options.sinceUid > 0) {
-          uids = (await client.search({ uid: `${options.sinceUid + 1}:*` }, { uid: true })) || [];
-        } else {
-          const all = (await client.search({ uid: "1:*" }, { uid: true })) || [];
-          const limit = options.fetchLimit ?? 200;
-          uids = all.slice(-limit); // newest `limit`
-        }
+        // One authoritative search for the folder's current UID set. It both
+        // selects which messages to fetch (the new ones) and lets the sync
+        // layer reconcile local rows — a message that moved or was deleted
+        // leaves no stale row behind because its UID is simply absent here.
+        const all = (await client.search({ uid: "1:*" }, { uid: true })) || [];
+        const sinceUid = options.sinceUid ?? 0;
+        const limit = options.fetchLimit ?? 200;
+        // Incremental: everything above the cursor. First sync: newest page.
+        const uids = sinceUid > 0 ? all.filter((u) => u > sinceUid) : all.slice(-limit);
         const messages = await this.fetchEnvelopes(client, uids);
         const mailbox = client.mailbox;
         return {
           messages,
+          currentUids: all,
           highestUid: uids.length ? Math.max(...uids) : 0,
           uidValidity:
             mailbox && typeof mailbox.uidValidity === "bigint" ? Number(mailbox.uidValidity) : null,

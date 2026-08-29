@@ -41,6 +41,10 @@ export interface ProviderFetchResult {
   messages: ProviderMessage[];
   // Highest UID seen during this fetch (for incremental sync cursor).
   highestUid: number;
+  // Authoritative set of UIDs currently present in the mailbox. The sync layer
+  // reconciles local rows against this so a moved or deleted message never
+  // leaves a stale row behind.
+  currentUids: number[];
   // UIDVALIDITY of the mailbox (to detect a mailbox reset).
   uidValidity: number | null;
   // Total/EXISTS count in mailbox after select.
