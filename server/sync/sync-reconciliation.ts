@@ -50,7 +50,6 @@ export async function reconcileMailboxLocations(
   return removed;
 }
 
-/** Delete logical messages that have no remaining location anywhere. */
 export async function pruneOrphanMessages(env: Env): Promise<void> {
   await env.DB.prepare(
     `DELETE FROM messages

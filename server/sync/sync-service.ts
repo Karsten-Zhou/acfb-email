@@ -46,9 +46,9 @@ export interface MailboxSyncResult {
 
 /**
  * Discover an account's mailboxes and sync each one. Runs within a hard time
- * budget enforced by cooperative cancellation (the loop checks an AbortSignal
- * between provider round-trips), so a hanging provider socket can never leave
- * a competing writer mutating the DB after the caller has moved on.
+ * budget enforced by cooperative cancellation: the loop checks an AbortSignal
+ * between provider round-trips, so a hung provider socket is cut off rather
+ * than blocking the queue consumer indefinitely.
  */
 export async function syncAccount(env: Env, accountId: string): Promise<SyncResult> {
   const account = await getAccount(env, accountId);
