@@ -122,7 +122,8 @@ CREATE TABLE IF NOT EXISTS message_recipients (
 CREATE INDEX IF NOT EXISTS idx_recipients_message ON message_recipients(message_id);
 
 -- ------------------------------------------------------------------
--- attachments: metadata (and small content in R2 in later phase)
+-- attachments: metadata only. Binary content is never stored in Worker
+-- infra; the download route re-fetches the part live from the provider.
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS attachments (
   id         TEXT PRIMARY KEY,               -- uuid
