@@ -4,12 +4,15 @@
 // When the pane itself is narrow the icon actions collapse behind a "…" menu
 // (decided by the pane's measured width, not the viewport, since the sidebar
 // + list can squeeze it on any screen size); a roomy pane shows them inline.
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+// The "…" menu itself is a generic useOverflowMenu; this file only decides
+// which header renders (ResizeObserver on the pane) and maps actions to emits.
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { sanitizeHtml } from "../../lib/sanitize";
 import type { MessageDetail } from "@shared/types";
 import { t, formatDateTime } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { formatAttachmentSize } from "../../lib/utils";
+import { useOverflowMenu } from "../../composables/useOverflowMenu";
 import Button from "../../components/UiButton.vue";
 import AppTooltip from "../../components/UiToolTip.vue";
 import {
@@ -49,11 +52,15 @@ const emit = defineEmits<{
 /** Actions reachable from the mobile "…" menu (map 1:1 to emits). */
 type ReaderAction = "reply" | "toggle-star" | "toggle-read" | "move-message" | "confirm-delete";
 
-// ---- mobile "…" action menu ----
-const moreOpen = ref(false);
-const moreBtnEl = ref<HTMLElement | null>(null);
-const moreMenuEl = ref<HTMLElement | null>(null);
-const morePos = ref<{ left: number; top: number } | null>(null);
+// ---- mobile "…" action menu (generic anchored menu) ----
+const {
+  open: moreOpen,
+  triggerEl: moreBtnEl,
+  menuEl: moreMenuEl,
+  pos: morePos,
+  toggle: toggleMore,
+  close: closeMore,
+} = useOverflowMenu();
 
 // ---- header layout: inline buttons vs "…" menu ----
 // The pane's own width decides which header renders (ResizeObserver on the
@@ -71,51 +78,7 @@ watch(compactHeader, (compact) => {
   if (!compact) closeMore();
 });
 
-async function toggleMore() {
-  if (moreOpen.value) {
-    closeMore();
-    return;
-  }
-  moreOpen.value = true;
-  await nextTick();
-  placeMore();
-}
-
-function closeMore() {
-  moreOpen.value = false;
-  morePos.value = null;
-}
-
-/** Pin the menu below the trigger, right-aligned so it stays on-screen. */
-function placeMore() {
-  const btn = moreBtnEl.value;
-  const menu = moreMenuEl.value;
-  if (!btn || !menu) return;
-  const r = btn.getBoundingClientRect();
-  const mw = menu.offsetWidth;
-  const mh = menu.offsetHeight;
-  const dropUp = window.innerHeight - r.bottom < mh && r.top > mh;
-  const top = dropUp ? r.top - mh - 4 : r.bottom + 4;
-  const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
-  morePos.value = { left, top };
-}
-
-function onDocMouseDown(e: MouseEvent) {
-  if (!moreOpen.value) return;
-  const target = e.target as Node;
-  if (moreBtnEl.value?.contains(target) || moreMenuEl.value?.contains(target)) return;
-  closeMore();
-}
-
-function onDocKey(e: KeyboardEvent) {
-  if (e.key === "Escape") closeMore();
-}
-
 onMounted(() => {
-  document.addEventListener("mousedown", onDocMouseDown);
-  window.addEventListener("keydown", onDocKey);
-  window.addEventListener("resize", closeMore);
-  window.addEventListener("scroll", closeMore, { capture: true, passive: true });
   resizeObserver = new ResizeObserver((entries) => {
     const w = entries[0]?.contentRect.width;
     if (typeof w === "number") paneWidth.value = w;
@@ -123,10 +86,6 @@ onMounted(() => {
   if (paneEl.value) resizeObserver.observe(paneEl.value);
 });
 onUnmounted(() => {
-  document.removeEventListener("mousedown", onDocMouseDown);
-  window.removeEventListener("keydown", onDocKey);
-  window.removeEventListener("resize", closeMore);
-  window.removeEventListener("scroll", closeMore, { capture: true });
   resizeObserver?.disconnect();
   resizeObserver = null;
 });

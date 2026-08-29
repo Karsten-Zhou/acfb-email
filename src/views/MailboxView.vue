@@ -2,22 +2,24 @@
 // Mailbox view — composition root over three panes:
 //   MailboxSidebar (accounts + folder tree), MessageListPane (middle column),
 //   MessageReaderPane (rightmost reader). Mobile top/bottom bars live here.
+// Domain logic lives in composables: useMessageActions (selection, move /
+// delete / read / star) and useMailboxSync (sync orchestration). This file
+// wires server state, route-driven state, and the message-list derived data
+// into those panes.
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useAccounts, useMailboxTree, useSyncAccounts } from "../stores/accounts";
+import { useAccounts, useMailboxTree } from "../stores/accounts";
 import {
   useMessages,
   useUnified,
   useMessage,
   useUpdateFlags,
-  useMoveMessages,
-  useDeleteMessages,
   flattenMessages,
 } from "../stores/mail";
-import { queryClient, queryKeys } from "../lib/query";
-import { t, syncErrorLabel } from "../lib/i18n";
+import { t } from "../lib/i18n";
 import { roleLabel } from "../lib/roles";
-import { toastError, toastSuccess } from "../stores/toast";
+import { useMessageActions } from "../composables/useMessageActions";
+import { useMailboxSync } from "../composables/useMailboxSync";
 import Button from "../components/UiButton.vue";
 import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
@@ -49,27 +51,8 @@ const initialMailbox = typeof route.query.mailbox === "string" ? route.query.mai
 const activeMailboxId = ref<string | null>(initialMailbox || "unified");
 /** Mobile drawer: whether the folder sidebar is open (only below md). */
 const sidebarOpen = ref(false);
-/** Last sync failure shown in the list-pane banner (null = none). */
-const syncError = ref<string | null>(null);
 const reading = ref(false); // mobile: whether the compact reader is open
 const onlyUnread = ref(false);
-const confirmDelete = ref(false);
-/** Read-toggle in flight: spinner shows on the reader's mark-read button. */
-const togglingRead = ref(false);
-/** Star-toggle in flight: spinner shows on the reader's star button (and in
- *  the compact "…" menu when the pane is narrow). */
-const togglingStar = ref(false);
-/** Pull-to-refresh in flight (mobile touch drag). */
-const refreshing = ref(false);
-/** If set, the confirm dialog targets a single message (from the reading pane). */
-const pendingDeleteId = ref<string | null>(null);
-/** Move-to-folder dialog: open state + the ids to move when a folder is picked. */
-const confirmMove = ref(false);
-const pendingMoveIds = ref<string[]>([]);
-/** The account whose mailboxes the move dialog lists (moves stay in-account). */
-const moveAccountId = ref<string | null>(null);
-/** Bulk-selection state (pure UI). */
-const selectedIds = ref<Set<string>>(new Set());
 
 // ---- server state (TanStack Query) ----
 const accountsQuery = useAccounts();
@@ -92,11 +75,43 @@ const messageQuery = useMessage(routeId, readingMailboxId);
 const selected = computed(() => messageQuery.data.value ?? null);
 const loadingMessage = computed(() => messageQuery.isLoading.value);
 
-// ---- mutations ----
 const { mutate: updateFlags } = useUpdateFlags();
-const { mutateAsync: moveMessages, isPending: moving } = useMoveMessages();
-const { mutateAsync: deleteMessages, isPending: deleting } = useDeleteMessages();
-const { mutateAsync: syncAccounts, isPending: syncing } = useSyncAccounts();
+
+// ---- domain composables ----
+const actions = useMessageActions({
+  getMessages: () => messages.value,
+  getMailboxTree: () => mailboxTree.value,
+  getSelected: () => selected.value,
+  route,
+  router,
+});
+const {
+  selectedIds,
+  selectedCount,
+  confirmDelete,
+  confirmMove,
+  moving,
+  deleting,
+  togglingRead,
+  togglingStar,
+  moveTargetMailboxes,
+  toggleSelect,
+  markSelectedRead,
+  confirmDeleteSelected,
+  confirmDeleteOne,
+  doDeleteSelected,
+  openMoveSelected,
+  openMoveMessage,
+  doMove,
+  toggleReadFromReader,
+  toggleStar,
+  clearSelection,
+} = actions;
+
+const { syncing, syncError, refreshing, syncNow, pullRefresh, syncAccountNow } = useMailboxSync({
+  getAccountIds: () => (accountsQuery.data.value ?? []).map((a) => a.id),
+  refetchMessages: () => messagesQuery.value.refetch(),
+});
 
 const roleIcon: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -121,57 +136,12 @@ const unreadByMailbox = computed<Record<string, number>>(() => {
   return counts;
 });
 
-/** Refresh the mailbox tree + active message list (used after a manual sync). */
-async function refresh() {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: queryKeys.mailboxTree }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts }),
-  ]);
-  await messagesQuery.value.refetch();
-}
-
-async function syncNow() {
-  syncError.value = null;
-  // Marks every account running optimistically (instant spinners, 1s poll) and
-  // invalidates state/accounts/tree/messages on settle so the server's truth
-  // and any new mail show up.
-  const results = await syncAccounts((accountsQuery.data.value ?? []).map((a) => a.id));
-  const failed = results.find((r) => !r.ok);
-  if (failed && failed.message) {
-    const msg = syncErrorLabel(failed.message);
-    syncError.value = msg;
-    toastError(msg);
-  }
-  await refresh();
-}
-
-/** Pull-to-refresh: same sync as the toolbar button, with the list spinner. */
-async function pullRefresh() {
-  refreshing.value = true;
-  try {
-    await syncNow();
-  } finally {
-    refreshing.value = false;
-  }
-}
-
-async function syncAccountNow(id: string) {
-  syncError.value = null;
-  const [result] = await syncAccounts([id]);
-  if (result && !result.ok && result.message) {
-    const msg = syncErrorLabel(result.message);
-    syncError.value = msg;
-    toastError(msg);
-  }
-  await refresh();
-}
-
 function selectMailbox(id: string) {
   activeMailboxId.value = id;
-  selectedIds.value = new Set();
+  clearSelection();
   sidebarOpen.value = false; // close the mobile drawer after picking a folder
   // Clear any open message when switching folders.
-  if (route.params.id) router.replace("/mail");
+  if (route.params.id) void router.replace("/mail");
   // The messages query re-keys off activeMailboxId and fetches the new folder.
 }
 
@@ -181,104 +151,11 @@ function selectMailbox(id: string) {
 function openMessageRow(m: Message) {
   const box = mailboxTree.value.find((t) => t.mailbox.id === m.mailboxId);
   if (box?.mailbox.role === "drafts") {
-    router.push({ name: "compose-draft", params: { draftId: m.id } });
+    void router.push({ name: "compose-draft", params: { draftId: m.id } });
     return;
   }
-  router.push({ name: "message", params: { id: m.id } });
+  void router.push({ name: "message", params: { id: m.id } });
   reading.value = true; // mobile: show the compact reader
-}
-
-function toggleSelect(id: string) {
-  const set = new Set(selectedIds.value);
-  if (set.has(id)) set.delete(id);
-  else set.add(id);
-  selectedIds.value = set;
-}
-
-const selectedCount = computed(() => selectedIds.value.size);
-
-function markSelectedRead() {
-  const ids = [...selectedIds.value];
-  updateFlags({ ids, flags: { read: true } });
-  selectedIds.value = new Set();
-}
-
-async function confirmDeleteSelected() {
-  pendingDeleteId.value = null;
-  confirmDelete.value = true;
-}
-
-/** Confirm dialog for a single message (from the reading pane). */
-function confirmDeleteOne(id: string) {
-  pendingDeleteId.value = id;
-  confirmDelete.value = true;
-}
-
-async function doDeleteSelected() {
-  const ids = pendingDeleteId.value ? [pendingDeleteId.value] : [...selectedIds.value];
-  await deleteMessages(ids);
-  if (pendingDeleteId.value) {
-    pendingDeleteId.value = null;
-    if (route.params.id) await router.replace("/mail");
-  } else {
-    selectedIds.value = new Set();
-  }
-  confirmDelete.value = false;
-}
-
-/** Mailboxes the move dialog offers (same account, minus the pending messages' own folders). */
-const moveExcludedMailboxIds = computed(() => {
-  const ids = new Set<string>();
-  for (const m of messages.value) {
-    if (pendingMoveIds.value.includes(m.id)) ids.add(m.mailboxId);
-  }
-  if (selected.value && pendingMoveIds.value.includes(selected.value.id)) {
-    ids.add(selected.value.mailboxId);
-  }
-  return ids;
-});
-
-const moveTargetMailboxes = computed(() =>
-  mailboxTree.value.filter(
-    (item) =>
-      item.accountId === moveAccountId.value && !moveExcludedMailboxIds.value.has(item.mailbox.id),
-  ),
-);
-
-/** Open the move dialog for the bulk selection (all messages must share one account). */
-function openMoveSelected() {
-  const ids = [...selectedIds.value];
-  const msgs = messages.value.filter((m) => ids.includes(m.id));
-  const accounts = new Set(msgs.map((m) => m.accountId));
-  if (accounts.size !== 1) {
-    toastError(t("message.moveMixedAccounts"));
-    return;
-  }
-  pendingMoveIds.value = ids;
-  moveAccountId.value = [...accounts][0];
-  confirmMove.value = true;
-}
-
-/** Open the move dialog for a single message (from the reading pane). */
-function openMoveMessage(id: string) {
-  const m = selected.value;
-  if (!m) return;
-  pendingMoveIds.value = [id];
-  moveAccountId.value = m.accountId;
-  confirmMove.value = true;
-}
-
-/** Move the pending messages into the picked mailbox. */
-async function doMove(targetMailboxId: string) {
-  if (moving.value || pendingMoveIds.value.length === 0) return;
-  await moveMessages({ ids: pendingMoveIds.value, targetMailboxId });
-  toastSuccess(t("message.movedMessages"));
-  // If the open reading message was moved, close the reader.
-  if (selected.value && pendingMoveIds.value.includes(selected.value.id)) {
-    if (route.params.id) await router.replace("/mail");
-  }
-  selectedIds.value = new Set();
-  confirmMove.value = false;
 }
 
 /** Messages after applying the "only unread" filter. */
@@ -309,51 +186,10 @@ function onListScroll(e: Event) {
 function replyTo() {
   const m = selected.value;
   if (!m) return;
-  router.push({
+  void router.push({
     name: "compose",
     query: { to: m.from?.address ?? "", subject: m.subject ? `Re: ${m.subject}` : "" },
   });
-}
-
-/**
- * Toggle read/unread from the reader. When marking a message *unread*, on
- * success deselect it (close the reader) so it disappears from the read view
- * and stays visible in the unread filter. Shows a loading state while the
- * flag update is in flight.
- */
-async function toggleReadFromReader() {
-  const m = selected.value;
-  if (!m) return;
-  togglingRead.value = true;
-  try {
-    // Toggle: the new desired read flag.
-    const newRead = !m.isRead;
-    await updateFlags({ ids: [m.id], flags: { read: newRead } });
-    // If the message *became unread*, close the reader so the changed entry
-    // is only visible in the list (bolded, unread count bumped). If it became
-    // read, keep it open as usual.
-    if (!newRead) {
-      // Navigate FIRST so the route watch clears the selection cleanly and
-      // never re-opens the (now unread) message with a stale id — that would
-      // re-run the auto-read and mark it read again.
-      if (route.params.id) await router.replace("/mail");
-    }
-  } finally {
-    togglingRead.value = false;
-  }
-}
-
-/** Toggle star/unstar on the open reading message. Shows a spinner on the
- *  reader's star button (and in the compact "…" menu) while in flight. */
-async function toggleStar() {
-  const m = selected.value;
-  if (!m) return;
-  togglingStar.value = true;
-  try {
-    await updateFlags({ ids: [m.id], flags: { starred: !m.isStarred } });
-  } finally {
-    togglingStar.value = false;
-  }
 }
 
 // ---- route-driven reading pane ----
@@ -393,7 +229,7 @@ watch(
     const id = typeof q === "string" ? q : "";
     if (id && id !== activeMailboxId.value) {
       activeMailboxId.value = id;
-      selectedIds.value = new Set();
+      clearSelection();
     }
   },
 );
