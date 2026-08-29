@@ -59,10 +59,9 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   const redirectUri = cfg.redirectUri(c.env.APP_URL);
   const token = await exchangeCode(cfg, code, redirectUri);
 
-  // Identify the user from the provider.
   const info = await fetchOwnerInfo(provider, token);
 
-  // Look for an existing account with the same email; else create one.
+  // Reuse an existing account with the same email; else create one.
   let accountId = await existingAccountId(c.env, info.email);
   const now = new Date().toISOString();
   if (accountId) {
