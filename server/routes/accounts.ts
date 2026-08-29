@@ -207,9 +207,9 @@ accountRoutes.post("/test", async (c) => {
   );
   try {
     await testProvider.testConnection();
-    return c.json({ ok: true, message: "Connection successful" });
+    return c.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Connection failed";
+    const message = err instanceof Error ? err.message : undefined;
     // Return 200 so the client can read {ok:false, message}; a non-2xx makes
     // the generic client throw and lose the message.
     return c.json({ ok: false, message }, 200);
@@ -285,7 +285,7 @@ accountRoutes.post("/:id/sync", async (c) => {
     const row = await c.env.DB.prepare(`SELECT state_message FROM accounts WHERE id = ?`)
       .bind(id)
       .first<{ state_message: string | null }>();
-    const message = row?.state_message ?? (err instanceof Error ? err.message : "Sync failed");
+    const message = row?.state_message ?? (err instanceof Error ? err.message : "errSyncFailed");
     return c.json({ ok: false, message }, 200);
   }
 });

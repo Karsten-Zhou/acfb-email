@@ -68,6 +68,25 @@ export function t(key: MessageKey, params?: Record<string, string>): string {
 }
 
 // ---------------------------------------------------------------
+// Account sync error codes. The server stores a stable code in the
+// account's state_message; translate it here (raw provider detail passes
+// through unchanged).
+// ---------------------------------------------------------------
+const SYNC_ERROR_KEYS = new Set<MessageKey>([
+  "errOauthRequired",
+  "errAuth",
+  "errNetwork",
+  "errTimeout",
+  "errSyncFailed",
+]);
+
+/** Translate a server-stored sync error code; pass through raw detail. */
+export function syncErrorLabel(codeOrMessage: string): string {
+  const key = codeOrMessage as MessageKey;
+  return SYNC_ERROR_KEYS.has(key) ? t(key) : codeOrMessage;
+}
+
+// ---------------------------------------------------------------
 // Locale-aware date/time formatting.
 // Uses the *selected* app locale (not the browser/os default) so dates
 // follow the language set in Settings. `localeState.value.locale` is

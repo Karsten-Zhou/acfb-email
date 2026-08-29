@@ -20,7 +20,7 @@ import {
   mailState,
 } from "../stores/mail";
 import { api } from "../lib/api";
-import { t } from "../lib/i18n";
+import { t, syncErrorLabel } from "../lib/i18n";
 import { roleLabel } from "../lib/roles";
 import { toastError, toastSuccess } from "../stores/toast";
 import Button from "../components/UiButton.vue";
@@ -159,8 +159,9 @@ async function syncNow() {
     );
     const failed = results.find((r) => !r.ok);
     if (failed && failed.message) {
-      syncError.value = failed.message;
-      toastError(failed.message);
+      const msg = syncErrorLabel(failed.message);
+      syncError.value = msg;
+      toastError(msg);
     }
     await refresh();
   } finally {
@@ -189,8 +190,9 @@ async function syncAccountNow(id: string) {
   try {
     const res = await api.syncAccount(id);
     if (!res.ok && res.message) {
-      syncError.value = res.message;
-      toastError(res.message);
+      const msg = syncErrorLabel(res.message);
+      syncError.value = msg;
+      toastError(msg);
     }
   } finally {
     // Always drop fast mode — on success the server has settled the state and

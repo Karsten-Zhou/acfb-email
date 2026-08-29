@@ -15,7 +15,7 @@ import {
   kickAccountStatePoll,
 } from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
-import { t, formatDate } from "../../lib/i18n";
+import { t, formatDate, syncErrorLabel } from "../../lib/i18n";
 import UiButton from "../../components/UiButton.vue";
 import UiInput from "../../components/UiInput.vue";
 import UiSwitch from "../../components/UiSwitch.vue";
@@ -110,24 +110,6 @@ async function reorder(id: string, dir: -1 | 1) {
 // IMAP host suggestions (common providers) — the form itself starts empty.
 const IMAP_HOSTS = [
   {
-    label: "Gmail",
-    imap: "imap.gmail.com",
-    smtp: "smtp.gmail.com",
-    imapPort: 993,
-    smtpPort: 465,
-    imapSecure: true,
-    smtpSecure: true,
-  },
-  {
-    label: "Outlook.com",
-    imap: "outlook.office365.com",
-    smtp: "smtp.office365.com",
-    imapPort: 993,
-    smtpPort: 587,
-    imapSecure: true,
-    smtpSecure: false,
-  },
-  {
     label: "Yahoo",
     imap: "imap.mail.yahoo.com",
     smtp: "smtp.mail.yahoo.com",
@@ -206,9 +188,11 @@ async function testConnection() {
   formMessage.value = null;
   try {
     const res = await api.testAccount({ provider: "imap", ...form.value });
-    formMessage.value = { ok: res.ok, message: res.message ?? "OK" };
-  } catch (err) {
-    formMessage.value = { ok: false, message: err instanceof Error ? err.message : String(err) };
+    formMessage.value = res.ok
+      ? { ok: true, message: t("connectionSuccess") }
+      : { ok: false, message: res.message || t("connectionFailed") };
+  } catch {
+    formMessage.value = { ok: false, message: t("connectionFailed") };
   } finally {
     testing.value = false;
   }
@@ -563,7 +547,7 @@ async function syncOne(id: string) {
             <Loader2 class="h-3 w-3 animate-spin" /> {{ t("syncing") }}
           </span>
           <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{
-            a.stateMessage || t("unavailable")
+            syncErrorLabel(a.stateMessage ?? "") || t("unavailable")
           }}</span>
           <span v-else-if="a.state === 'auth_required'" class="text-destructive">{{
             t("authRequired")

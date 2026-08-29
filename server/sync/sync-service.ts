@@ -93,9 +93,7 @@ export async function syncAccount(
   } catch (err) {
     if (timer) clearTimeout(timer);
     const message =
-      err instanceof Error && err.message === "sync_timeout"
-        ? "Synchronization timed out. The mail server may be slow or unreachable."
-        : classifyError(err);
+      err instanceof Error && err.message === "sync_timeout" ? "errTimeout" : classifyError(err);
     await setAccountState(env, accountId, "unavailable", message);
     await env.DB.prepare(
       `UPDATE sync_state SET state = 'error', last_error = ?, error_count = error_count + 1 WHERE account_id = ?`,
@@ -435,17 +433,10 @@ function isoDate(raw: string | null): string | null {
 
 function classifyError(err: unknown): string {
   const m = err instanceof Error ? err.message : String(err);
-  if (/basic authentication is disabled/i.test(m)) {
-    return "The mail server requires OAuth (Basic auth is disabled). Reconnect using the provider's OAuth button (Gmail/Outlook).";
-  }
-  if (/login|authentication|AUTHENTICATE|LOGIN/i.test(m)) {
-    return "Authentication failed. This account may need an app password or OAuth login.";
-  }
-  if (/timeout|timed out|ETIMEDOUT|socket|connection|ECONN/i.test(m)) {
-    return "Could not reach the mail server. It may be temporarily unavailable.";
-  }
+  if (/basic authentication is disabled/i.test(m)) return "errOauthRequired";
+  if (/login|authentication|AUTHENTICATE|LOGIN/i.test(m)) return "errAuth";
+  if (/timeout|timed out|ETIMEDOUT|socket|connection|ECONN/i.test(m)) return "errNetwork";
   // IMAP/SMTP errors already carry a usable detail (server reply text).
   if (m.includes(" — ") || /\(\d{3}\)/.test(m)) return m;
-  // Generic but safe fallback for opaque/unknown failures.
-  return "Synchronization failed. Check the server settings.";
+  return "errSyncFailed";
 }
