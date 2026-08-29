@@ -185,9 +185,15 @@ Some tooling details that matter:
   Gmail needs `https://mail.google.com/`; Outlook needs
   `https://outlook.office.com/IMAP.AccessAsUser.All` + `SMTP.Send` (send is a
   separate scope).
-- Sync-state polling uses adaptive cadence (fast while any account is
-  `running`, slow otherwise). Race conditions in this loop have bitten us — see
-  the fast-poll/`clearAccountSyncing`/`runInFlight` guard notes in repo memory.
+- **Frontend server state is TanStack Query** (`@tanstack/vue-query`, plugin in
+  `src/main.ts`, client + keys in `src/lib/query.ts`). Message lists are keyed
+  infinite queries (`src/stores/mail.ts`); accounts/mailboxes/sidebar tree are
+  cached queries (`src/stores/accounts.ts`); flags/move/delete/sync/add/etc. are
+  mutations with optimistic updates + invalidation. Sync-state polling is a
+  `useAccountStates()` query whose `refetchInterval` adapts (1s while any
+  account is `running`, 60s idle) — TanStack guarantees non-overlapping fetches.
+  Client/UI state (toasts, message selection, form/dialog refs) stays plain Vue
+  reactivity; it is deliberately NOT in TanStack.
 - imapflow decodes modified UTF-7 mailbox names to Unicode; provider mailbox
   `name`/`path` are already decoded, so no manual UTF-7 handling is needed.
 - Test-connection flow returns `{ ok, message }` so the UI can surface the real
