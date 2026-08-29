@@ -3,7 +3,7 @@
 // Desktop: a static column in the 3-pane layout (md+).
 // Mobile: rendered as a slide-in drawer toggled by `open` (with a backdrop).
 import { useRouter } from "vue-router";
-import { accountsState } from "../../stores/accounts";
+import { useAccountSummaries } from "../../stores/accounts";
 import { t } from "../../lib/i18n";
 import { roleLabel } from "../../lib/roles";
 import Button from "../../components/UiButton.vue";
@@ -38,6 +38,9 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+
+/** Accounts merged with live sync state — drives per-account sync spinners. */
+const { data: accounts, isLoading: accountsLoading } = useAccountSummaries();
 
 const roleIcon: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -95,7 +98,7 @@ const roleIcon: Record<string, typeof Inbox> = {
     </div>
 
     <!-- Compose is only useful once there's an account to send from. -->
-    <div v-if="accountsState.accounts.length > 0" class="px-3 py-2">
+    <div v-if="accounts.length > 0" class="px-3 py-2">
       <Button class="w-full" variant="default" size="sm" as-child>
         <RouterLink to="/compose"> <Plus class="h-4 w-4" /> Compose </RouterLink>
       </Button>
@@ -103,7 +106,7 @@ const roleIcon: Record<string, typeof Inbox> = {
 
     <nav class="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
       <button
-        v-if="accountsState.accounts.length > 0"
+        v-if="accounts.length > 0"
         class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground"
         :class="activeMailboxId === 'unified' ? 'bg-accent text-accent-foreground' : ''"
         @click="emit('select', 'unified')"
@@ -115,7 +118,7 @@ const roleIcon: Record<string, typeof Inbox> = {
       <!-- Empty state: guide the user to add an account in Settings. Only show
            after the accounts request settles (never flash while it loads). -->
       <div
-        v-if="!accountsState.loading && accountsState.accounts.length === 0"
+        v-if="!accountsLoading && accounts.length === 0"
         class="mt-3 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
       >
         <p class="text-sm font-medium text-foreground/80">{{ t("mailbox.noAccountsTitle") }}</p>
@@ -132,7 +135,7 @@ const roleIcon: Record<string, typeof Inbox> = {
         </Button>
       </div>
 
-      <template v-for="acct in accountsState.accounts" :key="acct.id">
+      <template v-for="acct in accounts" :key="acct.id">
         <div
           class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >

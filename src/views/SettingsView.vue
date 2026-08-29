@@ -6,7 +6,6 @@
 //   AboutPanel.
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { loadAccounts, kickAccountStatePoll } from "../stores/accounts";
 import { api, type HealthPayload } from "../lib/api";
 import { t } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
@@ -21,19 +20,11 @@ const router = useRouter();
 const meta = ref<HealthPayload | null>(null);
 
 onMounted(async () => {
-  await Promise.all([
-    loadAccounts(),
-    api
-      .health()
-      .then((h) => (meta.value = h))
-      .catch(() => null),
-  ]);
-  // If any account is mid-sync ('running') — e.g. right after an OAuth connect
-  // enqueued a sync — kick the poller to the 1s cadence so the settled state
-  // shows up promptly instead of waiting for the next idle poll. (No success
-  // notice on connect: the new account appearing and syncing in the list is
-  // confirmation enough.)
-  kickAccountStatePoll();
+  // Accounts + live sync-state are loaded by AccountSettings (TanStack Query).
+  api
+    .health()
+    .then((h) => (meta.value = h))
+    .catch(() => null);
 });
 </script>
 

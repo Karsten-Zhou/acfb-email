@@ -2,24 +2,19 @@
 // Mailbox view — composition root over three panes:
 //   MailboxSidebar (accounts + folder tree), MessageListPane (middle column),
 //   MessageReaderPane (rightmost reader). Mobile top/bottom bars live here.
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAccounts, useMailboxTree, useSyncAccounts } from "../stores/accounts";
 import {
-  accountsState,
-  loadAccounts,
-  markAccountSyncing,
-  clearAccountSyncing,
-} from "../stores/accounts";
-import {
-  loadUnified,
-  loadMessages,
-  deleteMessages,
-  moveMessages,
-  updateFlags,
-  openMessage,
-  mailState,
+  useMessages,
+  useUnified,
+  useMessage,
+  useUpdateFlags,
+  useMoveMessages,
+  useDeleteMessages,
+  flattenMessages,
 } from "../stores/mail";
-import { api } from "../lib/api";
+import { queryClient, queryKeys } from "../lib/query";
 import { t, syncErrorLabel } from "../lib/i18n";
 import { roleLabel } from "../lib/roles";
 import { toastError, toastSuccess } from "../stores/toast";
@@ -54,17 +49,11 @@ const initialMailbox = typeof route.query.mailbox === "string" ? route.query.mai
 const activeMailboxId = ref<string | null>(initialMailbox || "unified");
 /** Mobile drawer: whether the folder sidebar is open (only below md). */
 const sidebarOpen = ref(false);
-const syncing = ref(false);
 /** Last sync failure shown in the list-pane banner (null = none). */
 const syncError = ref<string | null>(null);
 const reading = ref(false); // mobile: whether the compact reader is open
 const onlyUnread = ref(false);
-const loadingOlder = ref(false);
-const pageSize = 50;
-const hasOlder = ref(true);
 const confirmDelete = ref(false);
-const deleting = ref(false);
-const loadingMessage = ref(false);
 /** Read-toggle in flight: spinner shows on the reader's mark-read button. */
 const togglingRead = ref(false);
 /** Star-toggle in flight: spinner shows on the reader's star button (and in
@@ -76,10 +65,38 @@ const refreshing = ref(false);
 const pendingDeleteId = ref<string | null>(null);
 /** Move-to-folder dialog: open state + the ids to move when a folder is picked. */
 const confirmMove = ref(false);
-const moving = ref(false);
 const pendingMoveIds = ref<string[]>([]);
 /** The account whose mailboxes the move dialog lists (moves stay in-account). */
 const moveAccountId = ref<string | null>(null);
+/** Bulk-selection state (pure UI). */
+const selectedIds = ref<Set<string>>(new Set());
+
+// ---- server state (TanStack Query) ----
+const accountsQuery = useAccounts();
+const mailboxTreeQuery = useMailboxTree();
+const mailboxTree = computed(() => mailboxTreeQuery.data.value ?? []);
+const mailboxMessages = useMessages(computed(() => activeMailboxId.value ?? ""));
+const unifiedMessages = useUnified();
+const messagesQuery = computed(() =>
+  activeMailboxId.value === "unified" ? unifiedMessages : mailboxMessages,
+);
+const messages = computed(() => flattenMessages(messagesQuery.value));
+const listLoading = computed(() => messagesQuery.value.isLoading.value);
+const loadingOlder = computed(() => messagesQuery.value.isFetchingNextPage.value);
+const hasOlder = computed(() => messagesQuery.value.hasNextPage.value);
+const routeId = computed(() => (typeof route.params.id === "string" ? route.params.id : undefined));
+const readingMailboxId = computed(() =>
+  activeMailboxId.value && activeMailboxId.value !== "unified" ? activeMailboxId.value : undefined,
+);
+const messageQuery = useMessage(routeId, readingMailboxId);
+const selected = computed(() => messageQuery.data.value ?? null);
+const loadingMessage = computed(() => messageQuery.isLoading.value);
+
+// ---- mutations ----
+const { mutate: updateFlags } = useUpdateFlags();
+const { mutateAsync: moveMessages, isPending: moving } = useMoveMessages();
+const { mutateAsync: deleteMessages, isPending: deleting } = useDeleteMessages();
+const { mutateAsync: syncAccounts, isPending: syncing } = useSyncAccounts();
 
 const roleIcon: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -91,10 +108,6 @@ const roleIcon: Record<string, typeof Inbox> = {
   trash: Trash2,
 };
 
-const mailboxTree = ref<
-  { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[]
->([]);
-
 /**
  * Unread count per mailbox, derived from *loaded* messages so badges react
  * instantly to read/unread/delete/move. For mailboxes whose messages aren't
@@ -102,75 +115,34 @@ const mailboxTree = ref<
  */
 const unreadByMailbox = computed<Record<string, number>>(() => {
   const counts: Record<string, number> = {};
-  for (const m of mailState.messages) {
+  for (const m of messages.value) {
     if (!m.isRead) counts[m.mailboxId] = (counts[m.mailboxId] ?? 0) + 1;
   }
   return counts;
 });
 
+/** Refresh the mailbox tree + active message list (used after a manual sync). */
 async function refresh() {
-  await loadAccounts();
-  const tree: { accountId: string; accountName: string; accountEmail: string; mailbox: Mailbox }[] =
-    [];
-  for (const acct of accountsState.accounts) {
-    const { mailboxes: boxes } = await api.mailboxes(acct.id);
-    for (const b of boxes) {
-      tree.push({
-        accountId: acct.id,
-        accountName: acct.name,
-        accountEmail: acct.email,
-        mailbox: b,
-      });
-    }
-  }
-  const order: Record<string, number> = {
-    inbox: 0,
-    all: 1,
-    sent: 2,
-    drafts: 3,
-    archive: 4,
-    spam: 5,
-    trash: 6,
-    other: 100,
-  };
-  mailboxTree.value = tree.sort(
-    (a, b) => (order[a.mailbox.role] ?? 100) - (order[b.mailbox.role] ?? 100),
-  );
-  await loadInto();
-}
-
-async function loadInto() {
-  if (activeMailboxId.value === "unified") await loadUnified();
-  else if (activeMailboxId.value) await loadMessages(activeMailboxId.value);
-  else mailState.messages = [];
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.mailboxTree }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts }),
+  ]);
+  await messagesQuery.value.refetch();
 }
 
 async function syncNow() {
-  syncing.value = true;
   syncError.value = null;
-  // Optimistic: mark every account syncing so sidebar spinners appear
-  // instantly and the poller switches to 1s cadence for the whole run (the
-  // per-account spinners + "Syncing…" follow store state === 'running').
-  for (const a of accountsState.accounts) markAccountSyncing(a.id);
-  try {
-    const results = await Promise.all(
-      accountsState.accounts.map((a) =>
-        api.syncAccount(a.id).catch(() => ({ ok: false as const, message: undefined })),
-      ),
-    );
-    const failed = results.find((r) => !r.ok);
-    if (failed && failed.message) {
-      const msg = syncErrorLabel(failed.message);
-      syncError.value = msg;
-      toastError(msg);
-    }
-    await refresh();
-  } finally {
-    syncing.value = false;
-    // All sync requests resolved — the server has settled each account; drop
-    // fast mode so polling returns to the 60s idle cadence.
-    clearAccountSyncing();
+  // Marks every account running optimistically (instant spinners, 1s poll) and
+  // invalidates state/accounts/tree/messages on settle so the server's truth
+  // and any new mail show up.
+  const results = await syncAccounts((accountsQuery.data.value ?? []).map((a) => a.id));
+  const failed = results.find((r) => !r.ok);
+  if (failed && failed.message) {
+    const msg = syncErrorLabel(failed.message);
+    syncError.value = msg;
+    toastError(msg);
   }
+  await refresh();
 }
 
 /** Pull-to-refresh: same sync as the toolbar button, with the list spinner. */
@@ -185,33 +157,22 @@ async function pullRefresh() {
 
 async function syncAccountNow(id: string) {
   syncError.value = null;
-  // Optimistic: the sidebar spinner follows store state (running), set now so
-  // it appears instantly and the poller switches to 1s cadence.
-  markAccountSyncing(id);
-  try {
-    const res = await api.syncAccount(id);
-    if (!res.ok && res.message) {
-      const msg = syncErrorLabel(res.message);
-      syncError.value = msg;
-      toastError(msg);
-    }
-  } finally {
-    // Always drop fast mode — on success the server has settled the state and
-    // the next poll applies its truth; on failure the state never went
-    // 'running' server-side so fast polling must not persist (else 1s forever).
-    clearAccountSyncing();
+  const [result] = await syncAccounts([id]);
+  if (result && !result.ok && result.message) {
+    const msg = syncErrorLabel(result.message);
+    syncError.value = msg;
+    toastError(msg);
   }
   await refresh();
 }
 
 function selectMailbox(id: string) {
   activeMailboxId.value = id;
-  mailState.selectedIds = new Set();
-  hasOlder.value = true;
+  selectedIds.value = new Set();
   sidebarOpen.value = false; // close the mobile drawer after picking a folder
   // Clear any open message when switching folders.
   if (route.params.id) router.replace("/mail");
-  void loadInto();
+  // The messages query re-keys off activeMailboxId and fetches the new folder.
 }
 
 /** Open a message: desktop reads it in the rightmost pane via the route.
@@ -228,18 +189,18 @@ function openMessageRow(m: Message) {
 }
 
 function toggleSelect(id: string) {
-  const set = new Set(mailState.selectedIds);
+  const set = new Set(selectedIds.value);
   if (set.has(id)) set.delete(id);
   else set.add(id);
-  mailState.selectedIds = set;
+  selectedIds.value = set;
 }
 
-const selectedCount = computed(() => mailState.selectedIds.size);
+const selectedCount = computed(() => selectedIds.value.size);
 
-async function markSelectedRead() {
-  const ids = [...mailState.selectedIds];
-  await updateFlags(ids, { read: true });
-  mailState.selectedIds = new Set();
+function markSelectedRead() {
+  const ids = [...selectedIds.value];
+  updateFlags({ ids, flags: { read: true } });
+  selectedIds.value = new Set();
 }
 
 async function confirmDeleteSelected() {
@@ -254,31 +215,25 @@ function confirmDeleteOne(id: string) {
 }
 
 async function doDeleteSelected() {
-  deleting.value = true;
-  const ids = pendingDeleteId.value ? [pendingDeleteId.value] : [...mailState.selectedIds];
-  try {
-    await deleteMessages(ids);
-    if (pendingDeleteId.value) {
-      mailState.selected = null;
-      pendingDeleteId.value = null;
-      if (route.params.id) await router.replace("/mail");
-    } else {
-      mailState.selectedIds = new Set();
-    }
-    confirmDelete.value = false;
-  } finally {
-    deleting.value = false;
+  const ids = pendingDeleteId.value ? [pendingDeleteId.value] : [...selectedIds.value];
+  await deleteMessages(ids);
+  if (pendingDeleteId.value) {
+    pendingDeleteId.value = null;
+    if (route.params.id) await router.replace("/mail");
+  } else {
+    selectedIds.value = new Set();
   }
+  confirmDelete.value = false;
 }
 
 /** Mailboxes the move dialog offers (same account, minus the pending messages' own folders). */
 const moveExcludedMailboxIds = computed(() => {
   const ids = new Set<string>();
-  for (const m of mailState.messages) {
+  for (const m of messages.value) {
     if (pendingMoveIds.value.includes(m.id)) ids.add(m.mailboxId);
   }
-  if (mailState.selected && pendingMoveIds.value.includes(mailState.selected.id)) {
-    ids.add(mailState.selected.mailboxId);
+  if (selected.value && pendingMoveIds.value.includes(selected.value.id)) {
+    ids.add(selected.value.mailboxId);
   }
   return ids;
 });
@@ -292,8 +247,8 @@ const moveTargetMailboxes = computed(() =>
 
 /** Open the move dialog for the bulk selection (all messages must share one account). */
 function openMoveSelected() {
-  const ids = [...mailState.selectedIds];
-  const msgs = mailState.messages.filter((m) => ids.includes(m.id));
+  const ids = [...selectedIds.value];
+  const msgs = messages.value.filter((m) => ids.includes(m.id));
   const accounts = new Set(msgs.map((m) => m.accountId));
   if (accounts.size !== 1) {
     toastError(t("message.moveMixedAccounts"));
@@ -306,7 +261,7 @@ function openMoveSelected() {
 
 /** Open the move dialog for a single message (from the reading pane). */
 function openMoveMessage(id: string) {
-  const m = mailState.selected;
+  const m = selected.value;
   if (!m) return;
   pendingMoveIds.value = [id];
   moveAccountId.value = m.accountId;
@@ -316,27 +271,20 @@ function openMoveMessage(id: string) {
 /** Move the pending messages into the picked mailbox. */
 async function doMove(targetMailboxId: string) {
   if (moving.value || pendingMoveIds.value.length === 0) return;
-  moving.value = true;
-  try {
-    await moveMessages(pendingMoveIds.value, targetMailboxId);
-    toastSuccess(t("message.movedMessages"));
-    // If the open reading message was moved, close the reader.
-    if (mailState.selected && pendingMoveIds.value.includes(mailState.selected.id)) {
-      mailState.selected = null;
-      reading.value = false;
-      if (route.params.id) await router.replace("/mail");
-    }
-    mailState.selectedIds = new Set();
-    confirmMove.value = false;
-  } finally {
-    moving.value = false;
+  await moveMessages({ ids: pendingMoveIds.value, targetMailboxId });
+  toastSuccess(t("message.movedMessages"));
+  // If the open reading message was moved, close the reader.
+  if (selected.value && pendingMoveIds.value.includes(selected.value.id)) {
+    if (route.params.id) await router.replace("/mail");
   }
+  selectedIds.value = new Set();
+  confirmMove.value = false;
 }
 
 /** Messages after applying the "only unread" filter. */
 const visibleMessages = computed(() => {
-  if (!onlyUnread.value) return mailState.messages;
-  return mailState.messages.filter((m) => !m.isRead);
+  if (!onlyUnread.value) return messages.value;
+  return messages.value.filter((m) => !m.isRead);
 });
 
 /** Sidebar badge: derived from loaded messages when available, else server aggregate. */
@@ -346,31 +294,10 @@ function unreadBadge(item: { mailbox: Mailbox }): number {
   return item.mailbox.unseenMessages ?? 0;
 }
 
-/** Load an older page (offset paging) into the current list. */
+/** Fetch the next older page into the current list (infinite scroll). */
 async function loadOlder() {
   if (loadingOlder.value || !hasOlder.value) return;
-  loadingOlder.value = true;
-  try {
-    const offset = mailState.messages.length;
-    // Oldest remote UID in the currently loaded set = the "before" cursor so
-    // the route can fetch even older messages from the provider when the local
-    // DB page is exhausted.
-    const remoteUids = mailState.messages.map((m) => m.remoteUid).filter((x): x is number => !!x);
-    const beforeUid = remoteUids.length ? Math.min(...remoteUids) : 0;
-    const incoming =
-      activeMailboxId.value === "unified"
-        ? await api.unified(pageSize, offset)
-        : await api.messages(activeMailboxId.value!, pageSize, offset, beforeUid);
-    const seen = new Set(mailState.messages.map((m) => m.id));
-    const fresh = incoming.messages.filter((m) => !seen.has(m.id));
-    hasOlder.value = incoming.messages.length === pageSize;
-    // When the local DB page is short but the server says the provider still
-    // has older mail (it imported some), allow another scroll to import more.
-    if (incoming.messages.length < pageSize && incoming.hasMore) hasOlder.value = true;
-    mailState.messages = [...mailState.messages, ...fresh];
-  } finally {
-    loadingOlder.value = false;
-  }
+  await messagesQuery.value.fetchNextPage();
 }
 
 /** Infinite-scroll trigger: when scrolled near the bottom. */
@@ -380,7 +307,7 @@ function onListScroll(e: Event) {
 }
 
 function replyTo() {
-  const m = mailState.selected;
+  const m = selected.value;
   if (!m) return;
   router.push({
     name: "compose",
@@ -395,23 +322,21 @@ function replyTo() {
  * flag update is in flight.
  */
 async function toggleReadFromReader() {
-  const m = mailState.selected;
+  const m = selected.value;
   if (!m) return;
   togglingRead.value = true;
   try {
     // Toggle: the new desired read flag.
     const newRead = !m.isRead;
-    await updateFlags([m.id], { read: newRead });
+    await updateFlags({ ids: [m.id], flags: { read: newRead } });
     // If the message *became unread*, close the reader so the changed entry
     // is only visible in the list (bolded, unread count bumped). If it became
     // read, keep it open as usual.
     if (!newRead) {
       // Navigate FIRST so the route watch clears the selection cleanly and
       // never re-opens the (now unread) message with a stale id — that would
-      // re-run openMessage which auto-marks it read again.
+      // re-run the auto-read and mark it read again.
       if (route.params.id) await router.replace("/mail");
-      mailState.selected = null;
-      reading.value = false;
     }
   } finally {
     togglingRead.value = false;
@@ -421,48 +346,46 @@ async function toggleReadFromReader() {
 /** Toggle star/unstar on the open reading message. Shows a spinner on the
  *  reader's star button (and in the compact "…" menu) while in flight. */
 async function toggleStar() {
-  const m = mailState.selected;
+  const m = selected.value;
   if (!m) return;
   togglingStar.value = true;
   try {
-    await updateFlags([m.id], { starred: !m.isStarred });
+    await updateFlags({ ids: [m.id], flags: { starred: !m.isStarred } });
   } finally {
     togglingStar.value = false;
   }
 }
 
 // ---- route-driven reading pane ----
+// Toggle the mobile reader on/off as the route enters/leaves a message. The
+// detail itself is loaded by messageQuery above (keyed off the route id).
 watch(
   () => route.params.id,
-  async (id) => {
-    if (typeof id === "string" && id) {
-      reading.value = true;
-      loadingMessage.value = true;
-      try {
-        // Resolve the message against the currently viewed folder so a message
-        // living in several mailboxes (e.g. Gmail All Mail + Inbox) shows the
-        // right location's flags/provider handle.
-        const mailboxId =
-          activeMailboxId.value && activeMailboxId.value !== "unified"
-            ? activeMailboxId.value
-            : undefined;
-        await openMessage(id, mailboxId);
-      } catch {
-        mailState.selected = null;
-      } finally {
-        loadingMessage.value = false;
-      }
-    } else {
-      mailState.selected = null;
-      reading.value = false;
-      loadingMessage.value = false;
-    }
+  (id) => {
+    reading.value = typeof id === "string" && !!id;
   },
   { immediate: true },
 );
 
-onMounted(refresh);
-watch(activeMailboxId, () => loadInto());
+// Auto-mark a message read when it is opened via the route. Tracked per
+// message id so it fires once per open (not on every cache refetch), and reset
+// when leaving a message so reopening an unread one re-marks it.
+const autoReadHandledId = ref<string | null>(null);
+watch(
+  () => route.params.id,
+  (id) => {
+    if (typeof id !== "string") autoReadHandledId.value = null;
+  },
+);
+watch(messageQuery.data, (m) => {
+  if (!m) return;
+  if (autoReadHandledId.value === m.id) return;
+  if (typeof route.params.id !== "string" || route.params.id !== m.id) return;
+  if (m.isRead) return;
+  autoReadHandledId.value = m.id;
+  updateFlags({ ids: [m.id], flags: { read: true } });
+});
+
 // Support ?mailbox=<id> deep links (e.g. land on the Sent folder after send).
 watch(
   () => route.query.mailbox,
@@ -470,9 +393,7 @@ watch(
     const id = typeof q === "string" ? q : "";
     if (id && id !== activeMailboxId.value) {
       activeMailboxId.value = id;
-      mailState.selectedIds = new Set();
-      hasOlder.value = true;
-      void loadInto();
+      selectedIds.value = new Set();
     }
   },
 );
@@ -507,12 +428,12 @@ const listTitle = computed(() => {
       :only-unread="onlyUnread"
       :sync-error="syncError"
       :messages="visibleMessages"
-      :loading="mailState.loading"
+      :loading="listLoading"
       :loading-older="loadingOlder"
       :has-older="hasOlder"
       :refreshing="refreshing"
-      :selected-id="mailState.selected?.id ?? null"
-      :selected-ids="mailState.selectedIds"
+      :selected-id="selected?.id ?? null"
+      :selected-ids="selectedIds"
       :selected-count="selectedCount"
       @toggle-unread="onlyUnread = !onlyUnread"
       @mark-read="markSelectedRead"
@@ -526,6 +447,7 @@ const listTitle = computed(() => {
     />
 
     <MessageReaderPane
+      :message="selected"
       :loading="loadingMessage"
       :toggling-read="togglingRead"
       :toggling-star="togglingStar"
@@ -533,8 +455,8 @@ const listTitle = computed(() => {
       @reply="replyTo"
       @toggle-star="toggleStar"
       @toggle-read="toggleReadFromReader"
-      @move-message="openMoveMessage(mailState.selected!.id)"
-      @confirm-delete="confirmDeleteOne(mailState.selected!.id)"
+      @move-message="openMoveMessage(selected!.id)"
+      @confirm-delete="confirmDeleteOne(selected!.id)"
     />
 
     <!-- Mobile top bar (when no message open) -->

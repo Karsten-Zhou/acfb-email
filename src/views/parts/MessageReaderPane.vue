@@ -5,8 +5,8 @@
 // (decided by the pane's measured width, not the viewport, since the sidebar
 // + list can squeeze it on any screen size); a roomy pane shows them inline.
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { mailState } from "../../stores/mail";
 import { sanitizeHtml } from "../../lib/sanitize";
+import type { MessageDetail } from "@shared/types";
 import { t, formatDateTime } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { formatAttachmentSize } from "../../lib/utils";
@@ -26,6 +26,8 @@ import {
 } from "@lucide/vue";
 
 const props = defineProps<{
+  /** The currently open message detail (null = nothing open). */
+  message: MessageDetail | null;
   loading: boolean;
   /** True while the mark-read/mark-unread toggle request is in flight — shows
    *  a spinner inside the toggle button instead of blanking the whole pane. */
@@ -170,7 +172,7 @@ watch(
 
 /** Attachments the user can download (inline images stay embedded in the body). */
 const downloadableAttachments = computed(() =>
-  (mailState.selected?.attachments ?? []).filter((a) => !a.isInline),
+  (props.message?.attachments ?? []).filter((a) => !a.isInline),
 );
 </script>
 
@@ -178,7 +180,7 @@ const downloadableAttachments = computed(() =>
   <section
     ref="paneEl"
     class="min-w-0 flex-1 flex-col bg-background"
-    :class="mailState.selected || loading ? 'flex' : 'hidden lg:flex'"
+    :class="message || loading ? 'flex' : 'hidden lg:flex'"
   >
     <!-- Loading takes priority: on the first click the route triggers and
          `selected` isn't set yet, so the spinner must show immediately
@@ -190,7 +192,7 @@ const downloadableAttachments = computed(() =>
       <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("common.loading") }}
     </div>
     <div
-      v-else-if="!mailState.selected"
+      v-else-if="!message"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
       {{ t("mailbox.selectToRead") }}
@@ -204,16 +206,16 @@ const downloadableAttachments = computed(() =>
         </AppTooltip>
         <div class="min-w-0 flex-1">
           <h1 class="truncate text-base font-semibold leading-tight">
-            {{ mailState.selected.subject || "(no subject)" }}
+            {{ message.subject || "(no subject)" }}
           </h1>
           <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
             <span class="font-medium text-foreground">{{
-              mailState.selected.from?.name || mailState.selected.from?.address
+              message.from?.name || message.from?.address
             }}</span>
-            <span v-if="mailState.selected.from?.address" class="text-xs"
-              >&lt;{{ mailState.selected.from.address }}&gt;</span
+            <span v-if="message.from?.address" class="text-xs"
+              >&lt;{{ message.from.address }}&gt;</span
             >
-            <span class="text-xs">{{ formatDateTime(mailState.selected.receivedAt) }}</span>
+            <span class="text-xs">{{ formatDateTime(message.receivedAt) }}</span>
           </div>
         </div>
         <!-- Roomier pane: actions inline. -->
@@ -235,13 +237,11 @@ const downloadableAttachments = computed(() =>
               <Star
                 v-else
                 class="h-4 w-4"
-                :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
+                :class="message.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
               />
             </Button>
           </AppTooltip>
-          <AppTooltip
-            :label="mailState.selected.isRead ? t('message.markUnread') : t('message.markRead')"
-          >
+          <AppTooltip :label="message.isRead ? t('message.markUnread') : t('message.markRead')">
             <Button
               variant="ghost"
               size="icon"
@@ -318,9 +318,9 @@ const downloadableAttachments = computed(() =>
                   <Star
                     v-else
                     class="h-4 w-4"
-                    :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
+                    :class="message.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
                   />
-                  {{ mailState.selected.isStarred ? t("message.unstar") : t("message.star") }}
+                  {{ message.isStarred ? t("message.unstar") : t("message.star") }}
                 </button>
                 <button
                   role="menuitem"
@@ -330,7 +330,7 @@ const downloadableAttachments = computed(() =>
                 >
                   <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
                   <MailIcon v-else class="h-4 w-4" />
-                  {{ mailState.selected.isRead ? t("message.markUnread") : t("message.markRead") }}
+                  {{ message.isRead ? t("message.markUnread") : t("message.markRead") }}
                 </button>
                 <button
                   role="menuitem"
@@ -354,13 +354,12 @@ const downloadableAttachments = computed(() =>
       </header>
 
       <div
-        v-if="mailState.selected.to.length"
+        v-if="message.to.length"
         class="border-b border-border px-5 py-1.5 text-xs text-muted-foreground"
       >
         To:
-        <span v-for="(recip, i) in mailState.selected.to" :key="i"
-          >{{ recip.name || recip.address
-          }}<span v-if="i < mailState.selected.to.length - 1">, </span></span
+        <span v-for="(recip, i) in message.to" :key="i"
+          >{{ recip.name || recip.address }}<span v-if="i < message.to.length - 1">, </span></span
         >
       </div>
       <div
@@ -370,7 +369,7 @@ const downloadableAttachments = computed(() =>
         <a
           v-for="a in downloadableAttachments"
           :key="a.id"
-          :href="api.attachmentUrl(mailState.selected.id, a.id)"
+          :href="api.attachmentUrl(message.id, a.id)"
           :download="a.filename || 'attachment'"
           class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs transition-colors hover:bg-accent"
         >
@@ -386,9 +385,9 @@ const downloadableAttachments = computed(() =>
         <div
           class="email-body text-[15px]"
           v-html="
-            sanitizeHtml(mailState.selected.html || mailState.selected.text || '', {
-              messageId: mailState.selected.id,
-              attachments: mailState.selected.attachments,
+            sanitizeHtml(message.html || message.text || '', {
+              messageId: message.id,
+              attachments: message.attachments,
             })
           "
         />

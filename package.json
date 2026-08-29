@@ -21,6 +21,7 @@
     "@formatjs/intl-localematcher": "^0.8.13",
     "@lucide/vue": "^1.37.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/vue-query": "^5.102.8",
     "@tiptap/extension-placeholder": "^3.30.5",
     "@tiptap/extension-text-style": "^3.30.5",
     "@tiptap/pm": "^3.30.5",

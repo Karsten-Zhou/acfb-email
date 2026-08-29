@@ -1,41 +1,47 @@
 <script setup lang="ts">
 // Message detail view (primarily for mobile; desktop renders in MailboxView).
-import { onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { openMessage, updateFlags, deleteMessages } from "../stores/mail";
+import { useMessage, useUpdateFlags, useDeleteMessages } from "../stores/mail";
 import { sanitizeHtml } from "../lib/sanitize";
 import { t, formatDateTime } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
 import UiDialog from "../components/UiDialog.vue";
 import { Star, Trash2, Reply, ChevronLeft, Paperclip, MailOpen, Loader2 } from "@lucide/vue";
-import type { MessageDetail } from "@shared/types";
 
 const route = useRoute();
 const router = useRouter();
-const msg = ref<MessageDetail | null>(null);
-const loading = ref(true);
-const error = ref<string | null>(null);
+const messageQuery = useMessage(
+  computed(() => (typeof route.params.id === "string" ? route.params.id : undefined)),
+);
+const msg = computed(() => messageQuery.data.value ?? null);
+const loading = computed(() => messageQuery.isLoading.value);
+const error = computed(() =>
+  messageQuery.isError.value
+    ? (messageQuery.error.value?.message ?? "Failed to load message")
+    : null,
+);
 const confirmDelete = ref(false);
-const deleting = ref(false);
 
-onMounted(async () => {
-  try {
-    msg.value = await openMessage(route.params.id as string);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load message";
-  } finally {
-    loading.value = false;
-  }
+const { mutate: updateFlags } = useUpdateFlags();
+const { mutateAsync: deleteMessages, isPending: deleting } = useDeleteMessages();
+
+// Auto-mark read on open (once per message id).
+const autoReadHandledId = ref<string | null>(null);
+watch(messageQuery.data, (m) => {
+  if (!m || autoReadHandledId.value === m.id || m.isRead) return;
+  autoReadHandledId.value = m.id;
+  updateFlags({ ids: [m.id], flags: { read: true } });
 });
 
-async function toggleRead() {
+function toggleRead() {
   if (!msg.value) return;
-  await updateFlags([msg.value.id], { read: !msg.value.isRead });
+  updateFlags({ ids: [msg.value.id], flags: { read: !msg.value.isRead } });
 }
-async function toggleStar() {
+function toggleStar() {
   if (!msg.value) return;
-  await updateFlags([msg.value.id], { starred: !msg.value.isStarred });
+  updateFlags({ ids: [msg.value.id], flags: { starred: !msg.value.isStarred } });
 }
 
 function askDelete() {
@@ -44,13 +50,8 @@ function askDelete() {
 
 async function remove() {
   if (!msg.value) return;
-  deleting.value = true;
-  try {
-    await deleteMessages([msg.value.id]);
-    router.back();
-  } finally {
-    deleting.value = false;
-  }
+  await deleteMessages([msg.value.id]);
+  router.back();
 }
 
 function reply() {

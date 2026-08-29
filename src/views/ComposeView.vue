@@ -2,14 +2,9 @@
 // Compose view: send email, save drafts, reply prefill via query params.
 // The body is a rich-text (HTML) editor; the From selector and CC/BCC toggles
 // sit in the header/to-row to match the rest of the app's density.
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import {
-  accountsState,
-  loadAccounts,
-  markAccountSyncing,
-  clearAccountSyncing,
-} from "../stores/accounts";
+import { useAccounts, useSyncAccounts } from "../stores/accounts";
 import { api, ApiError } from "../lib/api";
 import { t } from "../lib/i18n";
 import { toastSuccess } from "../stores/toast";
@@ -44,6 +39,10 @@ const attachments = ref<{ name: string; mimeType: string; size: number; base64: 
 const addingFiles = ref(false);
 /** The editor, exposing getText() for the text/plain MIME part. */
 const editorRef = ref<{ getText: () => string } | null>(null);
+
+// ---- server state ----
+const { data: accounts } = useAccounts();
+const { mutate: syncAccounts } = useSyncAccounts();
 
 function pickFiles() {
   fileInput.value?.click();
@@ -89,10 +88,13 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 onMounted(async () => {
-  await loadAccounts();
-  if (accountsState.accounts.length > 0) {
-    accountId.value = accountsState.accounts[0].id;
-  }
+  // Default the From account once the account list loads (query fetches on
+  // mount; this watcher fires when it resolves).
+  watch(accounts, (list) => {
+    if (accountId.value === "" && list && list.length > 0) {
+      accountId.value = list[0].id;
+    }
+  });
   // Prefill from query (reply).
   if (route.query.to) to.value = route.query.to as string;
   if (route.query.subject) subject.value = route.query.subject as string;
@@ -128,7 +130,7 @@ const canSend = computed(() => to.value.trim().length > 0 && accountId.value.len
 
 /** Accounts as { value, label } options for the From dropdown. */
 const accountOptions = computed(() =>
-  accountsState.accounts.map((a) => ({ value: a.id, label: `${a.name} <${a.email}>` })),
+  (accounts.value ?? []).map((a) => ({ value: a.id, label: `${a.name} <${a.email}>` })),
 );
 
 /** Split a comma-separated recipient string into trimmed, non-empty entries. */
@@ -171,11 +173,9 @@ async function send() {
     // Auto-sync the account so the just-sent mail is pulled into its Sent
     // folder. The sync runs server-side and is not awaited — the account
     // state poller shows progress — so we land on the Sent folder to see it.
-    markAccountSyncing(accountId.value);
-    void api
-      .syncAccount(accountId.value)
-      .catch(() => undefined)
-      .finally(() => clearAccountSyncing());
+    // Sync the account so the just-sent mail lands in its Sent folder; the
+    // sync mutation marks it running + refreshes lists on settle.
+    syncAccounts([accountId.value]);
     const sentId = await findSentMailbox(accountId.value);
     await router.push({ name: "mailbox", query: sentId ? { mailbox: sentId } : {} });
   } catch (err) {
@@ -200,13 +200,8 @@ async function saveDraft() {
     });
     toastSuccess(t("compose.draftSaved"));
     // The draft now lives in the provider's Drafts folder; sync the account so
-    // it appears there. Runs server-side in the background — the account-state
-    // poller shows progress.
-    markAccountSyncing(accountId.value);
-    void api
-      .syncAccount(accountId.value)
-      .catch(() => undefined)
-      .finally(() => clearAccountSyncing());
+    // it appears there (the sync mutation marks it running + refreshes).
+    syncAccounts([accountId.value]);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to save draft";
   } finally {

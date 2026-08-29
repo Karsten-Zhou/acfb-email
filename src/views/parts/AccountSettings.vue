@@ -4,15 +4,12 @@
 // per-account sync/remove, and the delete-confirmation dialog.
 import { ref } from "vue";
 import {
-  accountsState,
-  loadAccounts,
-  removeAccount,
-  moveAccount,
-  updateAccount,
-  syncAccount,
-  markAccountSyncing,
-  clearAccountSyncing,
-  kickAccountStatePoll,
+  useAccountSummaries,
+  useAddAccount,
+  useDeleteAccount,
+  useUpdateAccount,
+  useReorderAccounts,
+  useSyncAccounts,
 } from "../../stores/accounts";
 import { api, type HealthPayload } from "../../lib/api";
 import { t, formatDate, syncErrorLabel } from "../../lib/i18n";
@@ -50,7 +47,15 @@ const formMessage = ref<{ ok: boolean; message: string } | null>(null);
 const confirmDeleteId = ref<string | null>(null);
 /** Whether the confirm dialog is open (so the row can be deleted via modal). */
 const deleteDialogOpen = ref(false);
-const deleting = ref(false);
+
+// ---- server state (TanStack Query) ----
+/** Accounts merged with live sync state — drives row spinners + status text. */
+const { data: accounts } = useAccountSummaries();
+const { mutateAsync: addAccountMutation } = useAddAccount();
+const { mutateAsync: removeAccount, isPending: deleting } = useDeleteAccount();
+const { mutateAsync: updateAccount, isPending: savingEdit } = useUpdateAccount();
+const { mutate: reorderAccounts } = useReorderAccounts();
+const { mutate: syncAccount } = useSyncAccounts();
 
 // --- edit account (label + display name) ---
 /** The account being edited (null = dialog closed). */
@@ -58,7 +63,6 @@ const editAccount = ref<{ id: string; name: string; displayName: string | null }
 const editDialogOpen = ref(false);
 const editName = ref("");
 const editDisplayName = ref("");
-const savingEdit = ref(false);
 const editError = ref<string | null>(null);
 
 function openEdit(a: { id: string; name: string; displayName: string | null }) {
@@ -71,40 +75,40 @@ function openEdit(a: { id: string; name: string; displayName: string | null }) {
 
 async function saveEdit() {
   if (!editAccount.value) return;
-  savingEdit.value = true;
-  editError.value = null;
+  const name = editName.value.trim();
+  if (!name) {
+    editError.value = "Label is required";
+    return;
+  }
   try {
-    const name = editName.value.trim();
-    if (!name) {
-      editError.value = "Label is required";
-      return;
-    }
     // Label identifies the account in the sidebar; display name is the
     // from-name recipients see on sent mail. They're deliberately separate
     // (e.g. label "Work", display name "John Doe <john@example.com>").
-    await updateAccount(editAccount.value.id, {
-      name,
-      displayName: editDisplayName.value.trim() || null,
+    await updateAccount({
+      id: editAccount.value.id,
+      patch: { name, displayName: editDisplayName.value.trim() || null },
     });
     editDialogOpen.value = false;
     editAccount.value = null;
-    await loadAccounts();
   } catch (err) {
     editError.value = err instanceof Error ? err.message : "Failed to update account";
-  } finally {
-    savingEdit.value = false;
   }
 }
 
 function accountIndex(id: string): number {
-  return accountsState.accounts.findIndex((a) => a.id === id);
+  return (accounts.value ?? []).findIndex((a) => a.id === id);
 }
 
-async function reorder(id: string, dir: -1 | 1) {
-  const idx = accountIndex(id);
+function reorder(id: string, dir: -1 | 1) {
+  const arr = accounts.value ?? [];
+  const idx = arr.findIndex((a) => a.id === id);
   const target = idx + dir;
-  if (idx < 0 || target < 0 || target >= accountsState.accounts.length) return;
-  await moveAccount(id, dir);
+  if (idx < 0 || target < 0 || target >= arr.length) return;
+  const ordered = [...arr];
+  [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+  // Persist the new order; the mutation optimistically reorders the list and
+  // reverts on failure.
+  reorderAccounts(ordered.map((a) => a.id));
 }
 
 // IMAP host suggestions (common providers) — the form itself starts empty.
@@ -202,15 +206,12 @@ async function addAccount() {
   adding.value = true;
   formMessage.value = null;
   try {
-    await api.addAccount({ provider: "imap", ...form.value });
+    await addAccountMutation({ provider: "imap", ...form.value });
     showAdd.value = false;
     form.value.password = "";
-    await loadAccounts();
     // The new account's initial state is 'running' (a sync is enqueued
-    // server-side); kick the poller so it observes that and switches to the
-    // 1s cadence, picking up the settled state promptly instead of waiting
-    // for the next idle poll (up to a minute).
-    kickAccountStatePoll();
+    // server-side); the add mutation invalidates account state so the poller
+    // observes it and switches to the 1s cadence promptly.
   } catch (err) {
     formMessage.value = {
       ok: false,
@@ -228,30 +229,16 @@ function askRemoveAccount(id: string) {
 
 async function confirmRemove() {
   if (!confirmDeleteId.value) return;
-  deleting.value = true;
-  try {
-    await removeAccount(confirmDeleteId.value);
-    confirmDeleteId.value = null;
-    deleteDialogOpen.value = false;
-  } finally {
-    deleting.value = false;
-  }
+  await removeAccount(confirmDeleteId.value);
+  confirmDeleteId.value = null;
+  deleteDialogOpen.value = false;
 }
 
-async function syncOne(id: string) {
-  // Optimistic: mark running immediately so the row spinner + "Syncing…"
-  // appear right away and the poller switches to 1s cadence. Sync failures
-  // surface via the account's own state (state_message) once the poll applies
-  // it, so there's no separate error line here.
-  markAccountSyncing(id);
-  try {
-    await syncAccount(id);
-  } finally {
-    // Always drop fast mode — on success the server has settled the state and
-    // the next poll applies its truth; on failure the state never went
-    // 'running' server-side so fast polling must not persist (else 1s forever).
-    clearAccountSyncing();
-  }
+function syncOne(id: string) {
+  // Marks the account running optimistically (instant spinner + 1s poll) and
+  // refreshes state/accounts/tree on settle. Sync failures surface via the
+  // account's own state (state_message) once the poll applies it.
+  syncAccount([id]);
 }
 </script>
 
@@ -535,7 +522,7 @@ async function syncOne(id: string) {
 
     <!-- Account list: empty state (guides the user to add the first account) -->
     <div
-      v-if="accountsState.accounts.length === 0 && !showAdd"
+      v-if="accounts.length === 0 && !showAdd"
       class="rounded-lg border border-dashed border-border p-8 text-center"
     >
       <p class="text-sm font-medium text-foreground/80">{{ t("mailbox.noAccountsTitle") }}</p>
@@ -546,11 +533,7 @@ async function syncOne(id: string) {
         <Plus class="h-4 w-4" /> {{ t("accounts.addAccount") }}
       </UiButton>
     </div>
-    <div
-      v-for="a in accountsState.accounts"
-      :key="a.id"
-      class="card-surface mb-2 flex items-center gap-3 p-3"
-    >
+    <div v-for="a in accounts" :key="a.id" class="card-surface mb-2 flex items-center gap-3 p-3">
       <div
         class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary"
       >
@@ -611,7 +594,7 @@ async function syncOne(id: string) {
             variant="ghost"
             size="icon"
             class="h-6 w-6"
-            :disabled="accountIndex(a.id) === accountsState.accounts.length - 1"
+            :disabled="accountIndex(a.id) === accounts.length - 1"
             @click="reorder(a.id, 1)"
           >
             <ArrowDown class="h-3.5 w-3.5" />
