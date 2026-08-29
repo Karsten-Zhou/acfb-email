@@ -126,7 +126,7 @@ export function startAccountStatePolling() {
   void run();
 }
 
-/** Stop polling (e.g. on logout / route teardown). */
+/** Stop adaptive state polling and clear any pending timer. */
 export function stopAccountStatePolling() {
   active = false;
   if (pollTimer) {
