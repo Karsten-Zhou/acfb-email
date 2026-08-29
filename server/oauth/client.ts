@@ -47,9 +47,6 @@ export function buildAuthorizeUrl(cfg: OAuthProviderConfig, state: string): stri
   return `${cfg.authorizeUrl}?${qs.toString()}`;
 }
 
-/**
- * Exchange an authorization code for tokens.
- */
 export async function exchangeCode(
   cfg: OAuthProviderConfig,
   code: string,
@@ -83,9 +80,6 @@ export async function exchangeCode(
   return normalizeToken(data);
 }
 
-/**
- * Refresh an expired access token using the refresh token.
- */
 export async function refreshToken(
   cfg: OAuthProviderConfig,
   refreshTokenValue: string,
