@@ -213,3 +213,23 @@ export async function smtpSend(
     await client.quit();
   }
 }
+
+/**
+ * Verify SMTP connectivity + auth without sending mail. Walks the same path
+ * as {@link smtpSend} (connect → EHLO → STARTTLS on 587 → auth) so the
+ * "test connection" button validates outbound submission, not just IMAP.
+ */
+export async function smtpTestConnection(cfg: SmtpConfig): Promise<void> {
+  const client = new SmtpClientCore(cfg);
+  try {
+    await client.connect();
+    await client.ehlo();
+    if (cfg.port === 587 && !cfg.secure) {
+      // STARTTLS on 587
+      await client.startTls();
+    }
+    await client.auth();
+  } finally {
+    await client.quit();
+  }
+}

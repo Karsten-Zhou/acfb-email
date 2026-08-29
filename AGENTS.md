@@ -175,4 +175,7 @@ Some tooling details that matter:
 - imapflow decodes modified UTF-7 mailbox names to Unicode; provider mailbox
   `name`/`path` are already decoded, so no manual UTF-7 handling is needed.
 - Test-connection flow returns `{ ok, message }` so the UI can surface the real
-  IMAP server rejection reason (e.g. "Basic authentication is disabled").
+  server rejection reason (e.g. "Basic authentication is disabled"). It verifies
+  both IMAP (read) and SMTP (auth/submission) — `ImapProvider.testConnection()`
+  runs the IMAP connect/logout then an SMTP connect→EHLO→STARTTLS→auth via
+  `smtpTestConnection()` in `server/email/smtp.ts`.

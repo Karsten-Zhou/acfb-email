@@ -3,7 +3,7 @@
 // Outlook connect through the same adapter using OAuth2 (XOAUTH2).
 
 import { ImapFlow } from "imapflow";
-import { smtpSend } from "./smtp";
+import { smtpSend, smtpTestConnection } from "./smtp";
 import { roleFromImapName } from "./role-map";
 import type {
   IEmailProvider,
@@ -81,11 +81,11 @@ export class ImapProvider implements IEmailProvider {
   }
 
   async testConnection(): Promise<{ ok: true }> {
+    // IMAP first — verify reading works.
     const client = this.createClient();
     try {
       await client.connect();
       await client.logout();
-      return { ok: true };
     } catch (err) {
       // Surface the server's rejection reason (e.g. "Basic authentication is
       // disabled", app-password required) to the test-connection UI.
@@ -93,6 +93,17 @@ export class ImapProvider implements IEmailProvider {
     } finally {
       client.close();
     }
+    // Then SMTP — verify outbound submission/auth works too.
+    await smtpTestConnection({
+      host: this.transport.smtpHost,
+      port: this.transport.smtpPort,
+      secure: this.transport.smtpSecure,
+      username: this.creds.username,
+      password: this.creds.password,
+      accessToken: this.creds.accessToken,
+      from: this.fromAddress,
+    });
+    return { ok: true };
   }
 
   async listMailboxes(): Promise<ProviderMailbox[]> {
