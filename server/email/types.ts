@@ -56,7 +56,6 @@ export interface ProviderBody {
     size: number;
     isInline: boolean;
     contentId: string | null;
-    contentBase64: string | null; // base64 content (small attachments)
     /** Provider-side handle for the attachment part (IMAP part number). */
     partNumber: string | null;
     disposition: "attachment" | "inline" | null;

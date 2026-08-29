@@ -323,7 +323,6 @@ export class ImapProvider implements IEmailProvider {
       size: a.content ? byteLength(a.content) : 0,
       isInline: a.disposition === "inline" || !!a.contentId || !!a.related,
       contentId: a.contentId ?? null,
-      contentBase64: a.content ? toBase64(a.content) : null,
       // The deterministic index within the parsed attachment list; used to
       // re-fetch this part directly from the provider on download.
       partNumber: String(i),
@@ -364,18 +363,6 @@ function toTestError(err: unknown): Error {
     return new Error(detail);
   }
   return err instanceof Error ? err : new Error(String(err));
-}
-
-function toBase64(content: Uint8Array | ArrayBuffer | string): string {
-  if (typeof content === "string") return btoa(content);
-  return bytesToBase64(content);
-}
-
-function bytesToBase64(bytes: Uint8Array | ArrayBuffer): string {
-  const u = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  let bin = "";
-  for (let i = 0; i < u.length; i++) bin += String.fromCharCode(u[i]);
-  return btoa(bin);
 }
 
 /** Raw bytes of a plain ASCII/UTF-8 string (for textual attachment parts). */
