@@ -19,7 +19,7 @@ function languageLabel(lang: LocaleSetting): string {
   if (lang !== "auto") {
     return new Intl.DisplayNames([lang], { type: "language" }).of(lang) ?? lang;
   }
-  return t("languageAuto", {
+  return t("settings.languageAuto", {
     0:
       new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language) ??
       navigator.language,
@@ -38,12 +38,16 @@ const localeOptions = computed(() => [
     <div class="grid gap-4 sm:grid-cols-2">
       <div class="space-y-2">
         <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Languages class="h-3.5 w-3.5" /> {{ t("language") }}
+          <Languages class="h-3.5 w-3.5" /> {{ t("settings.language") }}
         </label>
-        <UiSelect v-model="localeValue" :options="localeOptions" :aria-label="t('language')" />
+        <UiSelect
+          v-model="localeValue"
+          :options="localeOptions"
+          :aria-label="t('settings.language')"
+        />
       </div>
       <div class="space-y-2">
-        <label class="text-xs font-medium text-muted-foreground">{{ t("theme") }}</label>
+        <label class="text-xs font-medium text-muted-foreground">{{ t("settings.theme") }}</label>
         <div class="flex gap-1.5">
           <button
             class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
@@ -54,7 +58,7 @@ const localeOptions = computed(() => [
             "
             @click="themeValue = 'auto'"
           >
-            <Monitor class="h-3.5 w-3.5" /> {{ t("themeAuto") }}
+            <Monitor class="h-3.5 w-3.5" /> {{ t("settings.themeAuto") }}
           </button>
           <button
             class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
@@ -65,7 +69,7 @@ const localeOptions = computed(() => [
             "
             @click="themeValue = 'light'"
           >
-            <Sun class="h-3.5 w-3.5" /> {{ t("themeLight") }}
+            <Sun class="h-3.5 w-3.5" /> {{ t("settings.themeLight") }}
           </button>
           <button
             class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs"
@@ -76,7 +80,7 @@ const localeOptions = computed(() => [
             "
             @click="themeValue = 'dark'"
           >
-            <Moon class="h-3.5 w-3.5" /> {{ t("themeDark") }}
+            <Moon class="h-3.5 w-3.5" /> {{ t("settings.themeDark") }}
           </button>
         </div>
       </div>

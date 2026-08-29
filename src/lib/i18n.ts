@@ -26,7 +26,17 @@ export const dict = {
   zh,
 } as const;
 
-export type MessageKey = keyof typeof en;
+// Recursive dotted-path type over the (nested) en locale: yields strings like
+// "common.settings" / "accounts.testConnection" that t() resolves via deepGet.
+type Paths<T, P extends string = ""> = {
+  [K in keyof T]: T[K] extends string
+    ? P extends ""
+      ? `${K & string}`
+      : `${P}.${K & string}`
+    : Paths<T[K], P extends "" ? `${K & string}` : `${P}.${K & string}`>;
+}[keyof T];
+
+export type MessageKey = Paths<typeof en>;
 
 const state = reactive<{
   setting: LocaleSetting;
@@ -52,15 +62,21 @@ export function initLocale() {
 
 export const localeState = computed(() => state);
 
-type Dict = { [K in MessageKey]: string };
-
-function getDict(): Dict {
-  return (dict[state.locale] ?? dict.en) as unknown as Dict;
+/** Look up a (possibly dotted) path in a nested dictionary object. */
+function deepGet<O>(obj: O, path: string): unknown {
+  return path.split(".").reduce<unknown>((o, k) => {
+    if (o && typeof o === "object") return (o as Record<string, unknown>)[k];
+    return undefined;
+  }, obj);
 }
 
 /** Translate a key with optional interpolation ({name}). */
 export function t(key: MessageKey, params?: Record<string, string>): string {
-  let s: string = getDict()[key] ?? dict.en[key] ?? key;
+  const current = dict[state.locale] ?? dict.en;
+  let s =
+    (deepGet(current, key) as string | undefined) ??
+    (deepGet(dict.en, key) as string | undefined) ??
+    key;
   if (params) {
     for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, v);
   }
@@ -73,11 +89,11 @@ export function t(key: MessageKey, params?: Record<string, string>): string {
 // through unchanged).
 // ---------------------------------------------------------------
 const SYNC_ERROR_KEYS = new Set<MessageKey>([
-  "errOauthRequired",
-  "errAuth",
-  "errNetwork",
-  "errTimeout",
-  "errSyncFailed",
+  "accounts.errOauthRequired",
+  "accounts.errAuth",
+  "accounts.errNetwork",
+  "accounts.errTimeout",
+  "accounts.errSyncFailed",
 ]);
 
 /** Translate a server-stored sync error code; pass through raw detail. */

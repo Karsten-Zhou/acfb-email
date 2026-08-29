@@ -101,10 +101,10 @@ function onTouchEnd() {
         <button
           class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
           :class="onlyUnread ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'"
-          :title="t('showOnlyUnread')"
+          :title="t('mailbox.showOnlyUnread')"
           @click="emit('toggleUnread')"
         >
-          <MailOpen class="h-3.5 w-3.5" /> {{ t("showOnlyUnread") }}
+          <MailOpen class="h-3.5 w-3.5" /> {{ t("mailbox.showOnlyUnread") }}
         </button>
         <BulkActions
           :selected-count="selectedCount"
@@ -132,7 +132,7 @@ function onTouchEnd() {
       v-if="loading"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
-      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("loading") }}
+      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("common.loading") }}
     </div>
     <div
       v-else-if="messages.length === 0"
@@ -140,7 +140,7 @@ function onTouchEnd() {
     >
       <div>
         <MailIcon class="mx-auto mb-2 h-8 w-8 opacity-40" />
-        {{ t("noMessages") }}
+        {{ t("mailbox.noMessages") }}
       </div>
     </div>
     <div v-else class="flex min-h-0 flex-1 flex-col">
@@ -164,7 +164,7 @@ function onTouchEnd() {
             class="h-4 w-4"
             :class="pullDistance >= PULL_THRESHOLD ? 'rotate-180' : ''"
           />
-          <span>{{ refreshing ? t("syncing") : t("refreshPull") }}</span>
+          <span>{{ refreshing ? t("common.syncing") : t("mailbox.refreshPull") }}</span>
         </div>
       </div>
 
@@ -230,14 +230,14 @@ function onTouchEnd() {
         <div class="flex items-center justify-center border-border bg-background/80 px-4 py-2">
           <div v-if="loadingOlder" class="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 class="h-3.5 w-3.5 animate-spin" />
-            {{ t("loadingOlder") }}
+            {{ t("mailbox.loadingOlder") }}
           </div>
           <span v-else-if="!hasOlder" class="text-xs text-muted-foreground/70">
-            {{ t("noMoreMessages") }}
+            {{ t("mailbox.noMoreMessages") }}
           </span>
           <!-- a placeholder to avoid UI flash -->
           <span v-else class="text-xs text-muted-foreground/70 invisible">
-            {{ t("noMoreMessages") }}
+            {{ t("mailbox.noMoreMessages") }}
           </span>
         </div>
       </div>

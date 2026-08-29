@@ -296,7 +296,7 @@ function openMoveSelected() {
   const msgs = mailState.messages.filter((m) => ids.includes(m.id));
   const accounts = new Set(msgs.map((m) => m.accountId));
   if (accounts.size !== 1) {
-    toastError(t("moveMixedAccounts"));
+    toastError(t("message.moveMixedAccounts"));
     return;
   }
   pendingMoveIds.value = ids;
@@ -319,7 +319,7 @@ async function doMove(targetMailboxId: string) {
   moving.value = true;
   try {
     await moveMessages(pendingMoveIds.value, targetMailboxId);
-    toastSuccess(t("movedMessages"));
+    toastSuccess(t("message.movedMessages"));
     // If the open reading message was moved, close the reader.
     if (mailState.selected && pendingMoveIds.value.includes(mailState.selected.id)) {
       mailState.selected = null;
@@ -478,7 +478,7 @@ watch(
 );
 
 const listTitle = computed(() => {
-  if (activeMailboxId.value === "unified") return t("unifiedInbox");
+  if (activeMailboxId.value === "unified") return t("mailbox.unifiedInbox");
   const item = mailboxTree.value.find((t) => t.mailbox.id === activeMailboxId.value);
   return roleLabel(item?.mailbox.role) ?? item?.mailbox.name ?? "Mailbox";
 });
@@ -547,12 +547,12 @@ const listTitle = computed(() => {
           variant="ghost"
           size="icon"
           class="h-8 w-8"
-          :aria-label="t('emailAccounts')"
+          :aria-label="t('accounts.emailAccounts')"
           @click="sidebarOpen = true"
           ><Menu class="h-4 w-4"
         /></Button>
         <span v-if="selectedCount > 0" class="text-sm font-semibold">
-          {{ selectedCount }} {{ t("selected") }}
+          {{ selectedCount }} {{ t("common.selected") }}
         </span>
         <span v-else class="text-sm font-semibold">Mail</span>
       </div>
@@ -571,7 +571,7 @@ const listTitle = computed(() => {
             size="icon"
             class="h-8 w-8"
             :class="onlyUnread ? 'bg-accent text-accent-foreground' : ''"
-            :aria-label="t('showOnlyUnread')"
+            :aria-label="t('mailbox.showOnlyUnread')"
             @click="onlyUnread = !onlyUnread"
             ><MailOpen class="h-4 w-4"
           /></Button>
@@ -593,7 +593,7 @@ const listTitle = computed(() => {
     <button
       v-if="!reading"
       class="fixed bottom-4 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 md:hidden"
-      :aria-label="t('compose')"
+      :aria-label="t('common.compose')"
       @click="router.push({ name: 'compose' })"
     >
       <Plus class="h-6 w-6" />
@@ -602,17 +602,17 @@ const listTitle = computed(() => {
     <!-- Modal delete confirmation -->
     <UiDialog
       :open="confirmDelete"
-      :title="t('confirmDeleteMessages')"
+      :title="t('message.confirmDeleteMessages')"
       :busy="deleting"
       @close="confirmDelete = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteMessages") }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("message.confirmDeleteMessages") }}</p>
       <template #footer>
         <Button variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{
-          t("cancelAction")
+          t("common.cancelAction")
         }}</Button>
         <Button variant="destructive" size="sm" :disabled="deleting" @click="doDeleteSelected">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("common.ok") }}
         </Button>
       </template>
     </UiDialog>
@@ -620,14 +620,14 @@ const listTitle = computed(() => {
     <!-- Modal: move to folder -->
     <UiDialog
       :open="confirmMove"
-      :title="t('moveTo')"
+      :title="t('message.moveTo')"
       :busy="moving"
       max-width-class="max-w-md"
       @close="confirmMove = false"
     >
-      <p class="mb-2 text-sm text-muted-foreground">{{ t("moveToHint") }}</p>
+      <p class="mb-2 text-sm text-muted-foreground">{{ t("message.moveToHint") }}</p>
       <div v-if="moving" class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 class="h-4 w-4 animate-spin" /> {{ t("moving") }}
+        <Loader2 class="h-4 w-4 animate-spin" /> {{ t("message.moving") }}
       </div>
       <div class="max-h-64 space-y-0.5 overflow-y-auto">
         <button
@@ -648,7 +648,7 @@ const listTitle = computed(() => {
       </div>
       <template #footer>
         <Button variant="ghost" size="sm" :disabled="moving" @click="confirmMove = false">{{
-          t("cancelAction")
+          t("common.cancelAction")
         }}</Button>
       </template>
     </UiDialog>

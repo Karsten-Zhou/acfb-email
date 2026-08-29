@@ -158,6 +158,10 @@ Some tooling details that matter:
   multi-word component rule; components are `Ui*` prefixed).
 - Design system: custom Tailwind + semantic `oklch` tokens in
   `src/styles/main.css`, `cn()` in `src/lib/cn.ts`.
+- i18n keys are nested in `src/locales/*.json` (`common`, `mailbox`,
+  `compose`, `message`, `accounts`, `settings`, `app`) and addressed by dotted
+  path — e.g. `t("accounts.testConnection")`. `MessageKey` in
+  `src/lib/i18n.ts` is a recursive path type, so keys are compile-time checked.
 - Lint is expected to be warning-free.
 - Reference official docs for third-party libs and frameworks; avoid relying on
   reading `node_modules` source where documentation is available.

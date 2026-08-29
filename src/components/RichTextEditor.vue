@@ -80,7 +80,7 @@ defineExpose({
     <div class="flex flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-border px-2 py-1">
       <slot name="toolbar" />
       <span class="mx-1 h-4 w-px shrink-0 bg-border" />
-      <AppTooltip :label="t('bold')">
+      <AppTooltip :label="t('compose.bold')">
         <Button
           variant="ghost"
           size="icon"
@@ -92,7 +92,7 @@ defineExpose({
           <Bold class="h-4 w-4" />
         </Button>
       </AppTooltip>
-      <AppTooltip :label="t('italic')">
+      <AppTooltip :label="t('compose.italic')">
         <Button
           variant="ghost"
           size="icon"
@@ -104,7 +104,7 @@ defineExpose({
           <Italic class="h-4 w-4" />
         </Button>
       </AppTooltip>
-      <AppTooltip :label="t('underline')">
+      <AppTooltip :label="t('compose.underline')">
         <Button
           variant="ghost"
           size="icon"
@@ -117,7 +117,7 @@ defineExpose({
         </Button>
       </AppTooltip>
       <span class="mx-1 h-4 w-px shrink-0 bg-border" />
-      <AppTooltip :label="t('unorderedList')">
+      <AppTooltip :label="t('compose.unorderedList')">
         <Button
           variant="ghost"
           size="icon"
@@ -129,7 +129,7 @@ defineExpose({
           <List class="h-4 w-4" />
         </Button>
       </AppTooltip>
-      <AppTooltip :label="t('orderedList')">
+      <AppTooltip :label="t('compose.orderedList')">
         <Button
           variant="ghost"
           size="icon"
@@ -142,7 +142,7 @@ defineExpose({
         </Button>
       </AppTooltip>
       <span class="mx-1 h-4 w-px shrink-0 bg-border" />
-      <AppTooltip :label="t('textColor')">
+      <AppTooltip :label="t('compose.textColor')">
         <span
           class="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md hover:bg-accent"
         >
@@ -155,13 +155,13 @@ defineExpose({
             type="color"
             class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             :value="textColor"
-            :aria-label="t('textColor')"
+            :aria-label="t('compose.textColor')"
             @input="setTextColor"
           />
         </span>
       </AppTooltip>
       <span class="mx-1 h-4 w-px shrink-0 bg-border" />
-      <AppTooltip :label="t('undo')">
+      <AppTooltip :label="t('compose.undo')">
         <Button
           variant="ghost"
           size="icon"
@@ -173,7 +173,7 @@ defineExpose({
           <Undo2 class="h-4 w-4" />
         </Button>
       </AppTooltip>
-      <AppTooltip :label="t('redo')">
+      <AppTooltip :label="t('compose.redo')">
         <Button
           variant="ghost"
           size="icon"

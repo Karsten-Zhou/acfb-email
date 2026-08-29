@@ -187,17 +187,17 @@ const downloadableAttachments = computed(() =>
       v-if="loading"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
-      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("loading") }}
+      <RefreshCw class="mr-2 h-4 w-4 animate-spin" /> {{ t("common.loading") }}
     </div>
     <div
       v-else-if="!mailState.selected"
       class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
     >
-      {{ t("selectToRead") }}
+      {{ t("mailbox.selectToRead") }}
     </div>
     <template v-else>
       <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-        <AppTooltip :label="t('content')" side="bottom">
+        <AppTooltip :label="t('common.content')" side="bottom">
           <Button variant="ghost" size="icon" class="h-8 w-8 lg:hidden" @click="emit('back')">
             <ChevronLeft class="h-4 w-4" />
           </Button>
@@ -218,12 +218,12 @@ const downloadableAttachments = computed(() =>
         </div>
         <!-- Roomier pane: actions inline. -->
         <div v-if="!compactHeader" class="flex items-center gap-1">
-          <AppTooltip :label="t('reply')">
+          <AppTooltip :label="t('message.reply')">
             <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('reply')">
               <Reply class="h-4 w-4" />
             </Button>
           </AppTooltip>
-          <AppTooltip :label="t('star')">
+          <AppTooltip :label="t('message.star')">
             <Button
               variant="ghost"
               size="icon"
@@ -239,7 +239,9 @@ const downloadableAttachments = computed(() =>
               />
             </Button>
           </AppTooltip>
-          <AppTooltip :label="mailState.selected.isRead ? t('markUnread') : t('markRead')">
+          <AppTooltip
+            :label="mailState.selected.isRead ? t('message.markUnread') : t('message.markRead')"
+          >
             <Button
               variant="ghost"
               size="icon"
@@ -251,12 +253,12 @@ const downloadableAttachments = computed(() =>
               <MailIcon v-else class="h-4 w-4" />
             </Button>
           </AppTooltip>
-          <AppTooltip :label="t('moveTo')">
+          <AppTooltip :label="t('message.moveTo')">
             <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('move-message')">
               <FolderInput class="h-4 w-4" />
             </Button>
           </AppTooltip>
-          <AppTooltip :label="t('delete')">
+          <AppTooltip :label="t('common.delete')">
             <Button
               variant="ghost"
               size="icon"
@@ -271,7 +273,7 @@ const downloadableAttachments = computed(() =>
         <!-- Narrow pane: collapse the icon group behind a "…" menu so the
              header doesn't crowd. -->
         <div v-if="compactHeader" ref="moreBtnEl" class="relative">
-          <AppTooltip :label="t('moreActions')">
+          <AppTooltip :label="t('common.moreActions')">
             <Button
               variant="ghost"
               size="icon"
@@ -304,7 +306,7 @@ const downloadableAttachments = computed(() =>
                   class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                   @click="runAction('reply')"
                 >
-                  <Reply class="h-4 w-4" /> {{ t("reply") }}
+                  <Reply class="h-4 w-4" /> {{ t("message.reply") }}
                 </button>
                 <button
                   role="menuitem"
@@ -318,7 +320,7 @@ const downloadableAttachments = computed(() =>
                     class="h-4 w-4"
                     :class="mailState.selected.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
                   />
-                  {{ mailState.selected.isStarred ? t("unstar") : t("star") }}
+                  {{ mailState.selected.isStarred ? t("message.unstar") : t("message.star") }}
                 </button>
                 <button
                   role="menuitem"
@@ -328,14 +330,14 @@ const downloadableAttachments = computed(() =>
                 >
                   <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
                   <MailIcon v-else class="h-4 w-4" />
-                  {{ mailState.selected.isRead ? t("markUnread") : t("markRead") }}
+                  {{ mailState.selected.isRead ? t("message.markUnread") : t("message.markRead") }}
                 </button>
                 <button
                   role="menuitem"
                   class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                   @click="runAction('move-message')"
                 >
-                  <FolderInput class="h-4 w-4" /> {{ t("moveTo") }}
+                  <FolderInput class="h-4 w-4" /> {{ t("message.moveTo") }}
                 </button>
                 <div class="my-1 h-px bg-border" />
                 <button
@@ -343,7 +345,7 @@ const downloadableAttachments = computed(() =>
                   class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive hover:text-white"
                   @click="runAction('confirm-delete')"
                 >
-                  <Trash2 class="h-4 w-4" /> {{ t("delete") }}
+                  <Trash2 class="h-4 w-4" /> {{ t("common.delete") }}
                 </button>
               </div>
             </Transition>

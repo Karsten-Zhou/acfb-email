@@ -22,15 +22,15 @@ const emit = defineEmits<{
 <template>
   <template v-if="selectedCount > 0">
     <Button variant="ghost" size="sm" @click="emit('mark-read')">
-      {{ t("markRead") }}
+      {{ t("message.markRead") }}
     </Button>
-    <AppTooltip :label="t('moveTo')">
+    <AppTooltip :label="t('message.moveTo')">
       <Button variant="ghost" size="sm" @click="emit('move')">
-        <FolderInput class="h-4 w-4" /> {{ t("move") }}
+        <FolderInput class="h-4 w-4" /> {{ t("message.move") }}
       </Button>
     </AppTooltip>
     <Button variant="ghost" size="sm" class="text-destructive" @click="emit('delete')">
-      <Trash2 class="h-4 w-4" /> {{ t("delete") }} ({{ selectedCount }})
+      <Trash2 class="h-4 w-4" /> {{ t("common.delete") }} ({{ selectedCount }})
     </Button>
   </template>
 </template>

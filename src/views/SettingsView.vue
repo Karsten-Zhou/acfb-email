@@ -40,7 +40,7 @@ onMounted(async () => {
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
-      <UiToolTip :label="t('settings')">
+      <UiToolTip :label="t('common.settings')">
         <UiButton
           variant="ghost"
           size="icon"
@@ -50,7 +50,7 @@ onMounted(async () => {
           <ChevronLeft class="h-4 w-4" />
         </UiButton>
       </UiToolTip>
-      <h1 class="text-sm font-semibold">{{ t("settings") }}</h1>
+      <h1 class="text-sm font-semibold">{{ t("common.settings") }}</h1>
       <div class="flex-1" />
     </header>
 

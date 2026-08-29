@@ -70,7 +70,7 @@ const roleIcon: Record<string, typeof Inbox> = {
     <div class="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
       <span class="text-sm font-semibold tracking-tight">Mail</span>
       <div class="flex items-center gap-1">
-        <AppTooltip :label="t('syncNow')">
+        <AppTooltip :label="t('common.syncNow')">
           <Button
             variant="ghost"
             size="icon"
@@ -81,7 +81,7 @@ const roleIcon: Record<string, typeof Inbox> = {
             <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }" />
           </Button>
         </AppTooltip>
-        <AppTooltip :label="t('settings')">
+        <AppTooltip :label="t('common.settings')">
           <Button
             variant="ghost"
             size="icon"
@@ -109,7 +109,7 @@ const roleIcon: Record<string, typeof Inbox> = {
         @click="emit('select', 'unified')"
       >
         <MailIcon class="h-4 w-4 shrink-0" />
-        <span class="grow text-left">{{ t("unifiedInbox") }}</span>
+        <span class="grow text-left">{{ t("mailbox.unifiedInbox") }}</span>
       </button>
 
       <!-- Empty state: guide the user to add an account in Settings. Only show
@@ -118,15 +118,17 @@ const roleIcon: Record<string, typeof Inbox> = {
         v-if="!accountsState.loading && accountsState.accounts.length === 0"
         class="mt-3 space-y-3 rounded-lg border border-dashed border-border p-4 text-center"
       >
-        <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
-        <p class="text-xs leading-relaxed text-muted-foreground">{{ t("noAccountsHint") }}</p>
+        <p class="text-sm font-medium text-foreground/80">{{ t("mailbox.noAccountsTitle") }}</p>
+        <p class="text-xs leading-relaxed text-muted-foreground">
+          {{ t("mailbox.noAccountsHint") }}
+        </p>
         <Button
           variant="outline"
           size="sm"
           class="w-full"
           @click="router.push({ name: 'settings' })"
         >
-          <Settings class="h-4 w-4" /> {{ t("settings") }}
+          <Settings class="h-4 w-4" /> {{ t("common.settings") }}
         </Button>
       </div>
 
@@ -135,7 +137,7 @@ const roleIcon: Record<string, typeof Inbox> = {
           class="mt-4 mb-0.5 flex items-center justify-between px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           {{ acct.name }}
-          <AppTooltip :label="acct.state === 'running' ? t('syncing') : t('syncNow')">
+          <AppTooltip :label="acct.state === 'running' ? t('common.syncing') : t('common.syncNow')">
             <button
               class="rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               :disabled="acct.state === 'running'"

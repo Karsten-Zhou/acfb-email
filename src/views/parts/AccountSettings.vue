@@ -189,10 +189,10 @@ async function testConnection() {
   try {
     const res = await api.testAccount({ provider: "imap", ...form.value });
     formMessage.value = res.ok
-      ? { ok: true, message: t("connectionSuccess") }
-      : { ok: false, message: res.message || t("connectionFailed") };
+      ? { ok: true, message: t("accounts.connectionSuccess") }
+      : { ok: false, message: res.message || t("accounts.connectionFailed") };
   } catch {
-    formMessage.value = { ok: false, message: t("connectionFailed") };
+    formMessage.value = { ok: false, message: t("accounts.connectionFailed") };
   } finally {
     testing.value = false;
   }
@@ -258,9 +258,9 @@ async function syncOne(id: string) {
 <template>
   <div>
     <div class="mb-3 flex items-center justify-between">
-      <h2 class="text-sm font-semibold">{{ t("emailAccounts") }}</h2>
+      <h2 class="text-sm font-semibold">{{ t("accounts.emailAccounts") }}</h2>
       <UiButton variant="default" size="sm" @click="showAdd = !showAdd">
-        <Plus class="h-4 w-4" /> {{ t("addAccount") }}
+        <Plus class="h-4 w-4" /> {{ t("accounts.addAccount") }}
       </UiButton>
     </div>
 
@@ -268,19 +268,19 @@ async function syncOne(id: string) {
     <div class="card-surface mb-4 grid gap-3 p-4 sm:grid-cols-2">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="text-sm font-medium">{{ t("connectGmail") }}</div>
+          <div class="text-sm font-medium">{{ t("accounts.connectGmail") }}</div>
           <div v-if="meta?.config.gmailOauth" class="text-xs text-muted-foreground">
-            {{ t("connectGmailHint") }}
+            {{ t("accounts.connectGmailHint") }}
           </div>
           <div v-else class="text-xs text-muted-foreground">
-            {{ t("oauthNotConfigured", { name: "Google" }) }}
+            {{ t("accounts.oauthNotConfigured", { name: "Google" }) }}
           </div>
         </div>
         <UiToolTip
           :label="
             meta?.config.gmailOauth
-              ? t('connectGmailHint')
-              : t('oauthNotConfigured', { name: 'Google' })
+              ? t('accounts.connectGmailHint')
+              : t('accounts.oauthNotConfigured', { name: 'Google' })
           "
         >
           <UiButton
@@ -288,25 +288,25 @@ async function syncOne(id: string) {
             size="sm"
             :disabled="!meta?.config.gmailOauth"
             @click="connectOAuth('google')"
-            >{{ t("connect") }}</UiButton
+            >{{ t("accounts.connect") }}</UiButton
           >
         </UiToolTip>
       </div>
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="text-sm font-medium">{{ t("connectOutlook") }}</div>
+          <div class="text-sm font-medium">{{ t("accounts.connectOutlook") }}</div>
           <div v-if="meta?.config.outlookOauth" class="text-xs text-muted-foreground">
-            {{ t("connectOutlookHint") }}
+            {{ t("accounts.connectOutlookHint") }}
           </div>
           <div v-else class="text-xs text-muted-foreground">
-            {{ t("oauthNotConfigured", { name: "Microsoft" }) }}
+            {{ t("accounts.oauthNotConfigured", { name: "Microsoft" }) }}
           </div>
         </div>
         <UiToolTip
           :label="
             meta?.config.outlookOauth
-              ? t('connectOutlookHint')
-              : t('oauthNotConfigured', { name: 'Microsoft' })
+              ? t('accounts.connectOutlookHint')
+              : t('accounts.oauthNotConfigured', { name: 'Microsoft' })
           "
         >
           <UiButton
@@ -314,7 +314,7 @@ async function syncOne(id: string) {
             size="sm"
             :disabled="!meta?.config.outlookOauth"
             @click="connectOAuth('microsoft')"
-            >{{ t("connect") }}</UiButton
+            >{{ t("accounts.connect") }}</UiButton
           >
         </UiToolTip>
       </div>
@@ -324,7 +324,7 @@ async function syncOne(id: string) {
     <div v-if="showAdd" class="card-surface mb-4 space-y-4 p-4">
       <div>
         <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {{ t("imapSection") }}
+          {{ t("accounts.imapSection") }}
         </div>
         <div class="mb-2 flex flex-wrap gap-1.5">
           <button
@@ -340,12 +340,16 @@ async function syncOne(id: string) {
         <!-- Account basics -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{
+              t("accounts.label")
+            }}</label>
             <UiInput v-model="form.name" class="w-full" placeholder="e.g. Work" />
-            <p class="text-xs text-muted-foreground/70">{{ t("labelHint") }}</p>
+            <p class="text-xs text-muted-foreground/70">{{ t("accounts.labelHint") }}</p>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t("email") }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{
+              t("accounts.email")
+            }}</label>
             <UiInput
               v-model="form.email"
               type="email"
@@ -354,16 +358,22 @@ async function syncOne(id: string) {
             />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{
+              t("accounts.displayName")
+            }}</label>
             <UiInput v-model="form.displayName" class="w-full" />
-            <p class="text-xs text-muted-foreground/70">{{ t("displayNameHint") }}</p>
+            <p class="text-xs text-muted-foreground/70">{{ t("accounts.displayNameHint") }}</p>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t("username") }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{
+              t("accounts.username")
+            }}</label>
             <UiInput v-model="form.username" class="w-full" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground">{{ t("password") }}</label>
+            <label class="text-xs font-medium text-muted-foreground">{{
+              t("accounts.password")
+            }}</label>
             <div class="relative">
               <UiInput
                 v-model="form.password"
@@ -374,7 +384,7 @@ async function syncOne(id: string) {
               <button
                 type="button"
                 class="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                :aria-label="showPassword ? t('hidePassword') : t('showPassword')"
+                :aria-label="showPassword ? t('accounts.hidePassword') : t('accounts.showPassword')"
                 @click="showPassword = !showPassword"
               >
                 <EyeOff v-if="showPassword" class="h-4 w-4" />
@@ -389,11 +399,13 @@ async function syncOne(id: string) {
           <div
             class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
           >
-            <Inbox class="h-3.5 w-3.5" /> {{ t("imapGroup") }}
+            <Inbox class="h-3.5 w-3.5" /> {{ t("accounts.imapGroup") }}
           </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="space-y-1 sm:col-span-2">
-              <label class="text-xs font-medium text-muted-foreground">{{ t("imapHost") }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{
+                t("accounts.imapHost")
+              }}</label>
               <div class="relative">
                 <Search
                   class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -425,12 +437,14 @@ async function syncOne(id: string) {
               </div>
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground">{{ t("port") }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{
+                t("accounts.port")
+              }}</label>
               <UiInput v-model.number="form.imapPort" type="number" class="w-full" />
             </div>
             <div class="flex items-end gap-2 pb-1">
               <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{
-                t("secure")
+                t("accounts.secure")
               }}</label>
               <UiSwitch v-model="form.imapSecure" />
             </div>
@@ -442,11 +456,13 @@ async function syncOne(id: string) {
           <div
             class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
           >
-            <Send class="h-3.5 w-3.5" /> {{ t("smtpGroup") }}
+            <Send class="h-3.5 w-3.5" /> {{ t("accounts.smtpGroup") }}
           </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="space-y-1 sm:col-span-2">
-              <label class="text-xs font-medium text-muted-foreground">{{ t("smtpHost") }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{
+                t("accounts.smtpHost")
+              }}</label>
               <div class="relative">
                 <Search
                   class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -478,12 +494,14 @@ async function syncOne(id: string) {
               </div>
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground">{{ t("port") }}</label>
+              <label class="text-xs font-medium text-muted-foreground">{{
+                t("accounts.port")
+              }}</label>
               <UiInput v-model.number="form.smtpPort" type="number" class="w-full" />
             </div>
             <div class="flex items-end gap-2 pb-1">
               <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{{
-                t("secure")
+                t("accounts.secure")
               }}</label>
               <UiSwitch v-model="form.smtpSecure" />
             </div>
@@ -503,12 +521,14 @@ async function syncOne(id: string) {
         <div class="mt-3 flex gap-2">
           <UiButton variant="outline" size="sm" :disabled="testing" @click="testConnection">
             <Loader2 v-if="testing" class="h-4 w-4 animate-spin" />
-            {{ testing ? t("testing") : t("testConnection") }}
+            {{ testing ? t("accounts.testing") : t("accounts.testConnection") }}
           </UiButton>
           <UiButton variant="default" size="sm" :disabled="adding" @click="addAccount">
-            <Loader2 v-if="adding" class="h-4 w-4 animate-spin" /> {{ t("addAccount") }}
+            <Loader2 v-if="adding" class="h-4 w-4 animate-spin" /> {{ t("accounts.addAccount") }}
           </UiButton>
-          <UiButton variant="ghost" size="sm" @click="showAdd = false">{{ t("cancel") }}</UiButton>
+          <UiButton variant="ghost" size="sm" @click="showAdd = false">{{
+            t("common.cancel")
+          }}</UiButton>
         </div>
       </div>
     </div>
@@ -518,10 +538,12 @@ async function syncOne(id: string) {
       v-if="accountsState.accounts.length === 0 && !showAdd"
       class="rounded-lg border border-dashed border-border p-8 text-center"
     >
-      <p class="text-sm font-medium text-foreground/80">{{ t("noAccountsTitle") }}</p>
-      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{{ t("noAccountsHint") }}</p>
+      <p class="text-sm font-medium text-foreground/80">{{ t("mailbox.noAccountsTitle") }}</p>
+      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {{ t("mailbox.noAccountsHint") }}
+      </p>
       <UiButton variant="default" size="sm" class="mt-4" @click="showAdd = true">
-        <Plus class="h-4 w-4" /> {{ t("addAccount") }}
+        <Plus class="h-4 w-4" /> {{ t("accounts.addAccount") }}
       </UiButton>
     </div>
     <div
@@ -539,26 +561,28 @@ async function syncOne(id: string) {
           {{ a.name }} <span class="text-muted-foreground">&lt;{{ a.email }}&gt;</span>
         </div>
         <div class="text-xs text-muted-foreground">
-          <span v-if="a.state === 'healthy'" class="text-emerald-600">{{ t("healthy") }}</span>
+          <span v-if="a.state === 'healthy'" class="text-emerald-600">{{
+            t("accounts.healthy")
+          }}</span>
           <span
             v-else-if="a.state === 'running'"
             class="inline-flex items-center gap-1 text-sky-600"
           >
-            <Loader2 class="h-3 w-3 animate-spin" /> {{ t("syncing") }}
+            <Loader2 class="h-3 w-3 animate-spin" /> {{ t("common.syncing") }}
           </span>
           <span v-else-if="a.state === 'unavailable'" class="text-amber-600">{{
-            syncErrorLabel(a.stateMessage ?? "") || t("unavailable")
+            syncErrorLabel(a.stateMessage ?? "") || t("accounts.unavailable")
           }}</span>
           <span v-else-if="a.state === 'auth_required'" class="text-destructive">{{
-            t("authRequired")
+            t("accounts.authRequired")
           }}</span>
           <span v-else>{{ a.state }}</span>
           <span v-if="a.lastSyncedAt" class="ml-2"
-            >{{ t("syncedOn") }} {{ formatDate(a.lastSyncedAt) }}</span
+            >{{ t("accounts.syncedOn") }} {{ formatDate(a.lastSyncedAt) }}</span
           >
         </div>
       </div>
-      <UiToolTip :label="a.state === 'running' ? t('syncing') : t('syncNow')">
+      <UiToolTip :label="a.state === 'running' ? t('common.syncing') : t('common.syncNow')">
         <UiButton
           variant="ghost"
           size="icon"
@@ -571,7 +595,7 @@ async function syncOne(id: string) {
         </UiButton>
       </UiToolTip>
       <div class="flex flex-col">
-        <UiToolTip :label="t('moveUp')">
+        <UiToolTip :label="t('accounts.moveUp')">
           <UiButton
             variant="ghost"
             size="icon"
@@ -582,7 +606,7 @@ async function syncOne(id: string) {
             <ArrowUp class="h-3.5 w-3.5" />
           </UiButton>
         </UiToolTip>
-        <UiToolTip :label="t('moveDown')">
+        <UiToolTip :label="t('accounts.moveDown')">
           <UiButton
             variant="ghost"
             size="icon"
@@ -594,12 +618,12 @@ async function syncOne(id: string) {
           </UiButton>
         </UiToolTip>
       </div>
-      <UiToolTip :label="t('editAccount')">
+      <UiToolTip :label="t('accounts.editAccount')">
         <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="openEdit(a)">
           <Pencil class="h-4 w-4" />
         </UiButton>
       </UiToolTip>
-      <UiToolTip :label="t('removeAccount')">
+      <UiToolTip :label="t('accounts.removeAccount')">
         <UiButton
           variant="ghost"
           size="icon"
@@ -614,21 +638,21 @@ async function syncOne(id: string) {
     <!-- Modal delete confirmation -->
     <UiDialog
       :open="deleteDialogOpen"
-      :title="t('confirmDeleteAccount')"
+      :title="t('accounts.confirmDeleteAccount')"
       :busy="deleting"
       @close="deleteDialogOpen = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteAccount") }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("accounts.confirmDeleteAccount") }}</p>
       <template #footer>
         <UiButton
           variant="ghost"
           size="sm"
           :disabled="deleting"
           @click="deleteDialogOpen = false"
-          >{{ t("cancelAction") }}</UiButton
+          >{{ t("common.cancelAction") }}</UiButton
         >
         <UiButton variant="destructive" size="sm" :disabled="deleting" @click="confirmRemove">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("common.ok") }}
         </UiButton>
       </template>
     </UiDialog>
@@ -636,20 +660,22 @@ async function syncOne(id: string) {
     <!-- Modal edit account (label + display name) -->
     <UiDialog
       :open="editDialogOpen"
-      :title="t('editAccount')"
+      :title="t('accounts.editAccount')"
       :busy="savingEdit"
       @close="editDialogOpen = false"
     >
       <div class="space-y-3">
         <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground">{{ t("label") }}</label>
+          <label class="text-xs font-medium text-muted-foreground">{{ t("accounts.label") }}</label>
           <UiInput v-model="editName" class="w-full" maxlength="100" />
-          <p class="text-xs text-muted-foreground/70">{{ t("labelHint") }}</p>
+          <p class="text-xs text-muted-foreground/70">{{ t("accounts.labelHint") }}</p>
         </div>
         <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground">{{ t("displayName") }}</label>
+          <label class="text-xs font-medium text-muted-foreground">{{
+            t("accounts.displayName")
+          }}</label>
           <UiInput v-model="editDisplayName" class="w-full" maxlength="100" />
-          <p class="text-xs text-muted-foreground/70">{{ t("displayNameHint") }}</p>
+          <p class="text-xs text-muted-foreground/70">{{ t("accounts.displayNameHint") }}</p>
         </div>
         <div v-if="editError" class="text-xs text-destructive">{{ editError }}</div>
       </div>
@@ -659,10 +685,10 @@ async function syncOne(id: string) {
           size="sm"
           :disabled="savingEdit"
           @click="editDialogOpen = false"
-          >{{ t("cancelAction") }}</UiButton
+          >{{ t("common.cancelAction") }}</UiButton
         >
         <UiButton variant="default" size="sm" :disabled="savingEdit" @click="saveEdit">
-          <Loader2 v-if="savingEdit" class="h-4 w-4 animate-spin" /> {{ t("save") }}
+          <Loader2 v-if="savingEdit" class="h-4 w-4 animate-spin" /> {{ t("common.save") }}
         </UiButton>
       </template>
     </UiDialog>

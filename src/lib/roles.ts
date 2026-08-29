@@ -7,13 +7,13 @@ import type { MailboxRole } from "@shared/constants";
 import { t, type MessageKey } from "./i18n";
 
 const ROLE_LABEL_KEY: Partial<Record<MailboxRole, MessageKey>> = {
-  inbox: "roleInbox",
-  all: "roleAllMail",
-  sent: "roleSent",
-  drafts: "roleDrafts",
-  archive: "roleArchive",
-  spam: "roleSpam",
-  trash: "roleTrash",
+  inbox: "mailbox.roleInbox",
+  all: "mailbox.roleAllMail",
+  sent: "mailbox.roleSent",
+  drafts: "mailbox.roleDrafts",
+  archive: "mailbox.roleArchive",
+  spam: "mailbox.roleSpam",
+  trash: "mailbox.roleTrash",
 };
 
 /** Localized label for a known folder role, or null for unrecognized roles. */

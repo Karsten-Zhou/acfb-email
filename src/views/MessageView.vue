@@ -68,28 +68,28 @@ function reply() {
 <template>
   <div class="flex h-full flex-col bg-background">
     <header class="flex items-center gap-1 border-b border-border bg-card px-2 py-2">
-      <UiToolTip :label="t('back')">
+      <UiToolTip :label="t('common.back')">
         <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
           <ChevronLeft class="h-5 w-5" />
         </UiButton>
       </UiToolTip>
       <div class="flex-1" />
-      <UiToolTip :label="t('reply')">
+      <UiToolTip :label="t('message.reply')">
         <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="reply">
           <Reply class="h-5 w-5" />
         </UiButton>
       </UiToolTip>
-      <UiToolTip :label="t('star')">
+      <UiToolTip :label="t('message.star')">
         <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="toggleStar">
           <Star class="h-5 w-5" :class="msg?.isStarred ? 'fill-yellow-400 text-yellow-400' : ''" />
         </UiButton>
       </UiToolTip>
-      <UiToolTip :label="msg?.isRead ? t('markUnread') : t('markRead')">
+      <UiToolTip :label="msg?.isRead ? t('message.markUnread') : t('message.markRead')">
         <UiButton variant="ghost" size="icon" class="h-8 w-8" @click="toggleRead">
           <MailOpen class="h-5 w-5" />
         </UiButton>
       </UiToolTip>
-      <UiToolTip :label="t('delete')">
+      <UiToolTip :label="t('common.delete')">
         <UiButton
           variant="ghost"
           size="icon"
@@ -103,7 +103,7 @@ function reply() {
 
     <main class="flex-1 overflow-y-auto p-4">
       <div v-if="loading" class="py-10 text-center text-sm text-muted-foreground">
-        {{ t("content") }}…
+        {{ t("common.content") }}…
       </div>
       <div v-else-if="error" class="py-10 text-center text-sm text-destructive">{{ error }}</div>
       <template v-else-if="msg">
@@ -156,17 +156,17 @@ function reply() {
     <!-- Modal delete confirmation -->
     <UiDialog
       :open="confirmDelete"
-      :title="t('confirmDeleteMessages')"
+      :title="t('message.confirmDeleteMessages')"
       :busy="deleting"
       @close="confirmDelete = false"
     >
-      <p class="text-sm text-muted-foreground">{{ t("confirmDeleteMessages") }}</p>
+      <p class="text-sm text-muted-foreground">{{ t("message.confirmDeleteMessages") }}</p>
       <template #footer>
         <UiButton variant="ghost" size="sm" :disabled="deleting" @click="confirmDelete = false">{{
-          t("cancelAction")
+          t("common.cancelAction")
         }}</UiButton>
         <UiButton variant="destructive" size="sm" :disabled="deleting" @click="remove">
-          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("ok") }}
+          <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" /> {{ t("common.ok") }}
         </UiButton>
       </template>
     </UiDialog>

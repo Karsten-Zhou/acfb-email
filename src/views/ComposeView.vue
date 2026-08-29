@@ -167,7 +167,7 @@ async function send() {
       newAttachments: attachments.value,
     });
     if (draftId.value) await api.delete([draftId.value]);
-    toastSuccess(t("sendSuccess"));
+    toastSuccess(t("compose.sendSuccess"));
     // Auto-sync the account so the just-sent mail is pulled into its Sent
     // folder. The sync runs server-side and is not awaited — the account
     // state poller shows progress — so we land on the Sent folder to see it.
@@ -198,7 +198,7 @@ async function saveDraft() {
       html: body.value,
       text: editorRef.value?.getText() ?? "",
     });
-    toastSuccess(t("draftSaved"));
+    toastSuccess(t("compose.draftSaved"));
     // The draft now lives in the provider's Drafts folder; sync the account so
     // it appears there. Runs server-side in the background — the account-state
     // poller shows progress.
@@ -225,24 +225,24 @@ function discard() {
   <div class="flex h-full flex-col bg-background">
     <header class="border-b border-border bg-card">
       <div class="flex items-center gap-2 px-3 py-1.5">
-        <AppTooltip :label="t('back')">
+        <AppTooltip :label="t('common.back')">
           <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.back()">
             <ChevronLeft class="h-4 w-4" />
           </Button>
         </AppTooltip>
-        <h1 class="text-sm font-semibold">{{ t("newMessage") }}</h1>
+        <h1 class="text-sm font-semibold">{{ t("compose.newMessage") }}</h1>
       </div>
       <div class="flex items-center gap-2 px-3 pb-2">
         <Button variant="default" size="sm" :disabled="!canSend || sending" @click="send">
           <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
-          <Send v-else class="h-4 w-4" /> {{ sending ? t("sending") : t("send") }}
+          <Send v-else class="h-4 w-4" /> {{ sending ? t("compose.sending") : t("compose.send") }}
         </Button>
 
         <UiSelect
           v-model="accountId"
           :options="accountOptions"
-          :prefix="t('fromLabel')"
-          :aria-label="t('from')"
+          :prefix="t('compose.fromLabel')"
+          :aria-label="t('compose.from')"
         />
 
         <div class="flex-1" />
@@ -250,10 +250,10 @@ function discard() {
         <Button variant="ghost" size="sm" :disabled="savingDraft" @click="saveDraft">
           <Loader2 v-if="savingDraft" class="h-4 w-4 animate-spin" />
           <FilePlus2 v-else class="h-4 w-4" />
-          <span class="hidden sm:inline">{{ t("saveDraft") }}</span>
+          <span class="hidden sm:inline">{{ t("compose.saveDraft") }}</span>
         </Button>
 
-        <AppTooltip :label="t('discard')">
+        <AppTooltip :label="t('compose.discard')">
           <Button variant="ghost-destructive" size="icon" class="h-8 w-8" @click="discard">
             <Trash2 class="h-4 w-4" />
           </Button>
@@ -271,7 +271,9 @@ function discard() {
 
       <div class="space-y-3">
         <div class="flex items-center gap-2 text-sm">
-          <label for="compose-to" class="w-14 shrink-0 text-muted-foreground">{{ t("to") }}</label>
+          <label for="compose-to" class="w-14 shrink-0 text-muted-foreground">{{
+            t("compose.to")
+          }}</label>
           <input
             id="compose-to"
             v-model="to"
@@ -284,7 +286,7 @@ function discard() {
             :class="cn(showCc && 'bg-accent text-accent-foreground')"
             @click="showCc = !showCc"
           >
-            {{ t("cc") }}
+            {{ t("compose.cc") }}
           </Button>
           <Button
             variant="ghost"
@@ -292,12 +294,14 @@ function discard() {
             :class="cn(showBcc && 'bg-accent text-accent-foreground')"
             @click="showBcc = !showBcc"
           >
-            {{ t("bcc") }}
+            {{ t("compose.bcc") }}
           </Button>
         </div>
 
         <div v-if="showCc" class="flex items-center gap-2 text-sm">
-          <label for="compose-cc" class="w-14 shrink-0 text-muted-foreground">{{ t("cc") }}</label>
+          <label for="compose-cc" class="w-14 shrink-0 text-muted-foreground">{{
+            t("compose.cc")
+          }}</label>
           <input
             id="compose-cc"
             v-model="cc"
@@ -308,7 +312,7 @@ function discard() {
 
         <div v-if="showBcc" class="flex items-center gap-2 text-sm">
           <label for="compose-bcc" class="w-14 shrink-0 text-muted-foreground">{{
-            t("bcc")
+            t("compose.bcc")
           }}</label>
           <input
             id="compose-bcc"
@@ -320,21 +324,21 @@ function discard() {
 
         <div class="flex items-center gap-2 text-sm">
           <label for="compose-subject" class="w-14 shrink-0 text-muted-foreground">{{
-            t("subject")
+            t("compose.subject")
           }}</label>
           <input
             id="compose-subject"
             v-model="subject"
             class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
-            :placeholder="t('subject')"
+            :placeholder="t('compose.subject')"
           />
         </div>
 
         <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
 
-        <RichTextEditor ref="editorRef" v-model="body" :placeholder="t('content')">
+        <RichTextEditor ref="editorRef" v-model="body" :placeholder="t('common.content')">
           <template #toolbar>
-            <AppTooltip :label="t('attach')">
+            <AppTooltip :label="t('compose.attach')">
               <Button
                 variant="ghost"
                 size="icon"
@@ -362,7 +366,7 @@ function discard() {
             </span>
             <button
               class="ml-1 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              :aria-label="t('removeAttachment')"
+              :aria-label="t('compose.removeAttachment')"
               @click="removeAttachment(i)"
             >
               <X class="h-3.5 w-3.5" />
