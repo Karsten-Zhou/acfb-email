@@ -2,21 +2,18 @@
 // MessageListPane — the middle column: header (folder + unread filter + bulk
 // actions), sync-error banner, message rows, infinite scroll, pull-to-refresh,
 // and an end-of-list footer (loading spinner / "no more messages" line).
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { t, formatRelativeDate } from "../../lib/i18n";
-import Button from "../../components/UiButton.vue";
-import AppTooltip from "../../components/UiToolTip.vue";
+import BulkActions from "../../components/BulkActions.vue";
 import {
   AlertTriangle,
   MailOpen,
   RefreshCw,
   ArrowDownToLine,
-  Trash2,
   Mail as MailIcon,
   Star,
   Loader2,
   Paperclip,
-  FolderInput,
 } from "lucide-vue-next";
 import type { Message } from "@shared/types";
 
@@ -46,9 +43,6 @@ const emit = defineEmits<{
   dismissError: [];
   "pull-refresh": [];
 }>();
-
-// Action buttons only make sense when there are selected messages.
-const actionsVisible = computed(() => props.selectedCount > 0);
 
 // ---- pull-to-refresh (touch) ----
 // Drag-down while at the top reveals a pull indicator; releasing past the
@@ -112,23 +106,12 @@ function onTouchEnd() {
         >
           <MailOpen class="h-3.5 w-3.5" /> {{ t("showOnlyUnread") }}
         </button>
-        <Button v-if="actionsVisible" variant="ghost" size="sm" @click="emit('mark-read')">
-          {{ t("markRead") }}
-        </Button>
-        <AppTooltip v-if="actionsVisible" :label="t('moveTo')">
-          <Button variant="ghost" size="sm" @click="emit('move-selected')">
-            <FolderInput class="h-4 w-4" /> {{ t("move") }}
-          </Button>
-        </AppTooltip>
-        <Button
-          v-if="actionsVisible"
-          variant="ghost"
-          size="sm"
-          class="text-destructive"
-          @click="emit('confirm-delete')"
-        >
-          <Trash2 class="h-4 w-4" /> {{ t("delete") }} ({{ selectedCount }})
-        </Button>
+        <BulkActions
+          :selected-count="selectedCount"
+          @mark-read="emit('mark-read')"
+          @move="emit('move-selected')"
+          @delete="emit('confirm-delete')"
+        />
       </div>
     </header>
 

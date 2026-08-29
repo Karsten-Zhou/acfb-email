@@ -19,6 +19,7 @@
   "noAccountsHint": "添加你的第一个邮箱账户，即可在此看到邮件文件夹。你可以连接 Gmail 或 Outlook，也可以添加任意 IMAP/SMTP 账户。",
   "selectToRead": "选择一封邮件来阅读",
   "markRead": "标记已读",
+  "selected": "已选",
   "delete": "删除",
   "newMessage": "新邮件",
   "saveDraft": "保存草稿",

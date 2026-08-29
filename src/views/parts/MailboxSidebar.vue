@@ -67,7 +67,7 @@ const roleIcon: Record<string, typeof Inbox> = {
     class="flex w-64 shrink-0 flex-col border-r border-border bg-card fixed inset-y-0 left-0 z-40 shadow-2xl transition-[translate,visibility] duration-300 ease-out md:static md:flex md:translate-x-0 md:visible md:shadow-none"
     :class="open ? 'translate-x-0 visible' : '-translate-x-full invisible'"
   >
-    <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
+    <div class="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
       <span class="text-sm font-semibold tracking-tight">Mail</span>
       <div class="flex items-center gap-1">
         <AppTooltip :label="t('syncNow')">

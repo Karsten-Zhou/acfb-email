@@ -19,6 +19,7 @@
   "noAccountsHint": "Add your first email account to see your mailboxes here. You can connect Gmail or Outlook, or add any IMAP/SMTP account.",
   "selectToRead": "Select a message to read it",
   "markRead": "Mark read",
+  "selected": "selected",
   "delete": "Delete",
   "newMessage": "New message",
   "saveDraft": "Save draft",

@@ -19,6 +19,7 @@
   "noAccountsHint": "Füge dein erstes E-Mail-Konto hinzu, um deine Ordner hier zu sehen. Du kannst Gmail oder Outlook verbinden oder ein beliebiges IMAP/SMTP-Konto hinzufügen.",
   "selectToRead": "Wähle eine Nachricht zum Lesen aus",
   "markRead": "Als gelesen markieren",
+  "selected": "ausgewählt",
   "delete": "Löschen",
   "newMessage": "Neue Nachricht",
   "saveDraft": "Entwurf speichern",
