@@ -139,7 +139,13 @@ export function useSyncAccounts() {
       );
       return results;
     },
-    onMutate: (ids) => setAccountsRunning(ids),
+    onMutate: async (ids) => {
+      // Cancel any in-flight /states poll so a stale (pre-sync) response can't
+      // clobber the optimistic 'running' below — the documented TanStack
+      // optimistic-update pattern.
+      await qc.cancelQueries({ queryKey: queryKeys.accountStates });
+      setAccountsRunning(ids);
+    },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accountStates });
       qc.invalidateQueries({ queryKey: queryKeys.accounts });
