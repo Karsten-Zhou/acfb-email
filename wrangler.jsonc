@@ -38,12 +38,13 @@
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
   },
-  // "access": {
-  //   // Local dev: simulates a signed-in user via ctx.access so the API gate
-  //   // passes. Remove this block to simulate Access not being enabled (403).
-  //   "dev": {
-  //     "aud": "email-client",
-  //     "identity": { "email": "owner@example.com" }
-  //   }
-  // },
+  "access": {
+    // Local dev: simulates a signed-in user via ctx.access so the API gate
+    // passes. Comment this block to simulate Access not being enabled (403).
+    // Fully restarting the dev server is required for changes to take effect.
+    "dev": {
+      "aud": "email-client",
+      "identity": { "email": "owner@example.com" },
+    },
+  },
 }
