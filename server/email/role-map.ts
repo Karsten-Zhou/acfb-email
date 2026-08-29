@@ -1,25 +1,12 @@
 import type { MailboxRole } from "@shared/constants";
 
 /**
- * Map an IMAP mailbox name (+ delimiter + flags) to our canonical role.
- * Order matters: more specific checks first.
+ * Map an IMAP mailbox to our canonical role using the server-declared
+ * SPECIAL-USE attributes (RFC 6154). Folders without a SPECIAL-USE attribute
+ * map to "other". INBOX is the one reserved mailbox name (RFC 3501), so it
+ * maps by name.
  */
 export function roleFromImapName(name: string, flags: string[]): MailboxRole {
-  const upper = name.toUpperCase();
-  const path = upper;
-
-  if (path === "INBOX") return "inbox";
-  if (/\bSPAM\b/.test(path) || /\bJUNK\b/.test(path)) return "spam";
-  if (/\bTRASH\b/.test(path) || /\bDELETED\b/.test(path) || /\bBIN\b/.test(path)) return "trash";
-  if (/\bDRAFTS?\b/.test(path)) return "drafts";
-  if (/\bSENT\b/.test(path) || /\bOUTBOX\b/.test(path) || /\bSENT MAIL\b/.test(path)) return "sent";
-  // "All Mail" (Gmail virtual folder) behaves like an "all" view, not an
-  // archive. Check before generic ARCHIVE.
-  if (/(^|\/)ALL MAIL$/i.test(path) || path === "[GMAIL]/ALL MAIL") return "all";
-  if (/\bARCHIVE\b/.test(path)) return "archive";
-  if (path === "[GMAIL]/ALL MAIL") return "all";
-
-  // Provider-specific
   if (flags.includes("\\All")) return "all";
   if (flags.includes("\\Sent")) return "sent";
   if (flags.includes("\\Drafts")) return "drafts";
@@ -27,6 +14,9 @@ export function roleFromImapName(name: string, flags: string[]): MailboxRole {
   if (flags.includes("\\Junk")) return "spam";
   if (flags.includes("\\Archive")) return "archive";
   if (flags.includes("\\Inbox")) return "inbox";
+
+  // INBOX is the reserved mailbox name (RFC 3501).
+  if (name.toUpperCase() === "INBOX") return "inbox";
 
   return "other";
 }

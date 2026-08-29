@@ -8,9 +8,9 @@ export interface ProviderMailbox {
   name: string; // display/path name
   delimiter: string | null;
   flags: string[];
-  /** Canonical role when the provider can identify it reliably (IMAP
-   *  SPECIAL-USE flags, well-known folder names) — independent of the
-   *  folder's display name/locale. */
+  /** Canonical role when the provider can identify it reliably via the IMAP
+   *  SPECIAL-USE attributes (and the reserved INBOX name) — independent of
+   *  the folder's display name/locale. */
   role?: MailboxRole;
 }
 

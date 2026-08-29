@@ -296,9 +296,8 @@ async function upsertMailbox(
     .first<{ id: string; role: string }>();
 
   if (existing) {
-    // Re-derive the role so improvements to role detection (SPECIAL-USE flags,
-    // well-known folders) apply to already-synced mailboxes too — e.g. a
-    // non-English provider whose name heuristic earlier fell back to "other".
+    // Re-derive the role so SPECIAL-USE-based detection applies to
+    // already-synced mailboxes too.
     const role = mb.role ?? roleFromImapName(mb.name, mb.flags);
     if (existing.role !== role) {
       await env.DB.prepare(`UPDATE mailboxes SET role = ?, sort_order = ? WHERE id = ?`)
@@ -311,9 +310,8 @@ async function upsertMailbox(
   const id = randomUUID();
   // Provider paths are already Unicode (imapflow decodes modified UTF-7).
   const displayName = mb.name;
-  // Prefer the provider's detected role (SPECIAL-USE flags / well-known
-  // folder) so it's correct even when the folder name is localized; fall back
-  // to name heuristics.
+  // The provider's detected role comes from the SPECIAL-USE attributes, so it
+  // stays correct regardless of the folder's localized name.
   const role = mb.role ?? roleFromImapName(displayName, mb.flags);
   const sortOrder = roleSortOrder(role);
   await env.DB.prepare(
