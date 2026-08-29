@@ -176,16 +176,7 @@ strict SPF, mail sent via this app may fail SPF alignment. Options:
 
 ## OAuth providers (Gmail / Outlook)
 
-Connecting Gmail or Outlook uses OAuth 2.0 instead of a password. The flow:
-**Settings → Connect** redirects to the provider, you authorize, and the app
-stores the encrypted **refresh token** in D1 (`account_credentials`). The
-access token is then used to authenticate to the provider's **IMAP/SMTP
-endpoints via XOAUTH2**; sync, flags, attachments, and send all go over
-IMAP/SMTP.
-
-The provider buttons are hidden/disabled until you configure the secrets
-(`/api/health` exposes `config.gmailOauth` / `config.outlookOauth`, which the
-UI reads). First set the secrets:
+Set the secrets:
 
 ```bash
 bunx wrangler secret put GOOGLE_CLIENT_ID
@@ -194,12 +185,12 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-Then create the app registration and set the redirect URI:
+Then create the app registrations and set their redirect URIs:
 
-| Provider | Console | Redirect URI template | Suggested OAuth scopes |
-| --- | --- | --- | --- |
-| **Google** | <https://console.cloud.google.com/apis/credentials> | `https://<your-worker>.workers.dev/api/oauth/google/callback` | `https://mail.google.com/` (full mail access over IMAP/SMTP), plus `openid`, `email`, `profile` |
-| **Microsoft (Entra)** | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps> | `https://<your-worker>.workers.dev/api/oauth/microsoft/callback` | `openid`, `profile`, `email`, `https://outlook.office.com/IMAP.AccessAsUser.All`, `https://outlook.office.com/SMTP.Send`, `offline_access` |
+| Provider | Console | Redirect URI template |
+| --- | --- | --- |
+| **Google** | <https://console.cloud.google.com/apis/credentials> | `https://<your-worker>.workers.dev/api/oauth/google/callback` |
+| **Microsoft (Entra)** | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps> | `https://<your-worker>.workers.dev/api/oauth/microsoft/callback` |
 
 For local development use `http://localhost:5173/api/oauth/<provider>/callback`
 (the same placeholder used for local dev).
@@ -207,20 +198,10 @@ For local development use `http://localhost:5173/api/oauth/<provider>/callback`
 ### Microsoft Entra app (Outlook)
 
 1. **App registrations → New registration**.
-2. **Supported account types**: choose **"Personal Microsoft accounts only"** for
-   a consumer Outlook.com account (this app is verified against that setup).
-   The app uses the `consumers` tenant endpoint.
+2. **Supported account types**: choose **"Personal Microsoft accounts only"**
+   (this app is verified against that setup).
 3. **Redirect URI**: the Microsoft callback above (Web platform).
-4. **API permissions → Add a permission → Microsoft Graph → Delegated** and add
-   **both**:
-   - `https://outlook.office.com/IMAP.AccessAsUser.All` — read, modify, move,
-     and delete mail over IMAP.
-   - `https://outlook.office.com/SMTP.Send` — **required to send mail** over
-     SMTP. Sending is a separate scope and is not covered by the IMAP scope.
-   - `offline_access` is requested automatically for refresh tokens; the
-     `openid`/`profile`/`email` OIDC scopes are handled by the app for the
-     ID token and don't need pre-registering here.
-5. Grant admin consent if your tenant requires it (not needed for personal MSA).
+4. Grant admin consent if your tenant requires it (not needed for personal MSA).
 
 ### Google Cloud app (Gmail)
 
@@ -228,9 +209,7 @@ For local development use `http://localhost:5173/api/oauth/<provider>/callback`
    account as a test user.
 2. **Credentials → Create credentials → OAuth client ID** (Web), set the
    Gmail redirect URI above.
-3. In the consent screen, add the scope
-   `https://mail.google.com/` (full mail access). This is the scope Google
-   requires for OAuth-based IMAP/SMTP access (XOAUTH2).
+3. In the consent screen, add the scope `https://mail.google.com/`.
 
 ---
 
