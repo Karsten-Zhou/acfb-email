@@ -1,0 +1,8 @@
+{
+  // i18n-ally (lokalise.i18n-ally)
+  // The project uses vue-i18n, which i18n-ally detects out of the box.
+  "i18n-ally.localesPaths": ["src/locales"],
+  "i18n-ally.sourceLanguage": "en",
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.enabledFrameworks": ["vue"]
+}

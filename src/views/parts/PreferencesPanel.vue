@@ -19,11 +19,10 @@ function languageLabel(lang: LocaleSetting): string {
   if (lang !== "auto") {
     return new Intl.DisplayNames([lang], { type: "language" }).of(lang) ?? lang;
   }
-  return t("settings.languageAuto", {
-    0:
-      new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language) ??
-      navigator.language,
-  });
+  const label =
+    new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language) ??
+    navigator.language;
+  return t("settings.languageAuto", [label]);
 }
 
 const localeOptions = computed(() => [

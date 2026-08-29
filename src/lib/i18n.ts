@@ -1,11 +1,14 @@
-// Minimal i18n for the client (en / de / zh) with an 'auto' (browser) option.
+// i18n for the client (en / de / zh) with an 'auto' (browser) option.
 // Exported as a reactive singleton so views can switch live.
 //
-// Translation content lives in JSON files (src/locales/*.json); this module
-// only wires them up. Adding a new locale = add a JSON file + extend the
-// types below (the union lists are compile-time checked by t()).
+// Backed by vue-i18n (Composition API). `en` is the master message schema and
+// `MessageKey` is a recursive dotted-path type over it, so t() keys are
+// compile-time checked (a mistyped key fails typecheck). Key consistency across
+// locale files and unused keys are enforced by @intlify/eslint-plugin-vue-i18n
+// in `bun run lint`. Adding a new locale = add a JSON file + extend the types.
 
 import { match } from "@formatjs/intl-localematcher";
+import { createI18n } from "vue-i18n";
 import { reactive, computed } from "vue";
 import en from "../locales/en.json";
 import de from "../locales/de.json";
@@ -20,14 +23,8 @@ function resolveAutoLocale(): Locale {
   return match(navigator.languages, supportedLocales, "en") as Locale;
 }
 
-export const dict = {
-  en,
-  de,
-  zh,
-} as const;
-
 // Recursive dotted-path type over the (nested) en locale: yields strings like
-// "common.settings" / "accounts.testConnection" that t() resolves via deepGet.
+// "common.settings" / "accounts.testConnection".
 type Paths<T, P extends string = ""> = {
   [K in keyof T]: T[K] extends string
     ? P extends ""
@@ -38,6 +35,18 @@ type Paths<T, P extends string = ""> = {
 
 export type MessageKey = Paths<typeof en>;
 
+// vue-i18n instance (Composition API). missing/fallback warnings are off: a
+// missing key falls back to `en`, then to the raw key (matching the previous
+// hand-rolled behaviour); correctness is enforced by typecheck + lint instead.
+const i18n = createI18n({
+  legacy: false,
+  locale: resolveAutoLocale(),
+  fallbackLocale: "en",
+  messages: { en, de, zh },
+  missingWarn: false,
+  fallbackWarn: false,
+});
+
 const state = reactive<{
   setting: LocaleSetting;
   locale: Locale;
@@ -46,10 +55,13 @@ const state = reactive<{
   locale: resolveAutoLocale(),
 });
 
+export const localeState = computed(() => state);
+
 /** Set the locale preference ("auto" resolves by browser). */
 export function setLocale(setting: LocaleSetting) {
   state.setting = setting;
   state.locale = setting === "auto" ? resolveAutoLocale() : setting;
+  i18n.global.locale.value = state.locale;
   localStorage.setItem("ec_locale", setting);
   document.documentElement.lang = state.locale;
 }
@@ -60,27 +72,17 @@ export function initLocale() {
   setLocale(saved);
 }
 
-export const localeState = computed(() => state);
-
-/** Look up a (possibly dotted) path in a nested dictionary object. */
-function deepGet<O>(obj: O, path: string): unknown {
-  return path.split(".").reduce<unknown>((o, k) => {
-    if (o && typeof o === "object") return (o as Record<string, unknown>)[k];
-    return undefined;
-  }, obj);
-}
-
-/** Translate a key with optional interpolation ({name}). */
-export function t(key: MessageKey, params?: Record<string, string>): string {
-  const current = dict[state.locale] ?? dict.en;
-  let s =
-    (deepGet(current, key) as string | undefined) ??
-    (deepGet(dict.en, key) as string | undefined) ??
-    key;
-  if (params) {
-    for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, v);
-  }
-  return s;
+/**
+ * Translate a (compile-time checked) key. Params may be named (Record, for
+ * {name} placeholders) or a list (Array, for positional {0}/{1} placeholders).
+ */
+export function t(
+  key: MessageKey,
+  params?: Record<string, string | number> | Array<string | number>,
+): string {
+  return (
+    Array.isArray(params) ? i18n.global.t(key, params) : i18n.global.t(key, params ?? {})
+  ) as string;
 }
 
 // ---------------------------------------------------------------

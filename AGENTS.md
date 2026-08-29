@@ -158,10 +158,15 @@ Some tooling details that matter:
   multi-word component rule; components are `Ui*` prefixed).
 - Design system: custom Tailwind + semantic `oklch` tokens in
   `src/styles/main.css`, `cn()` in `src/lib/cn.ts`.
-- i18n keys are nested in `src/locales/*.json` (`common`, `mailbox`,
-  `compose`, `message`, `accounts`, `settings`, `app`) and addressed by dotted
-  path — e.g. `t("accounts.testConnection")`. `MessageKey` in
-  `src/lib/i18n.ts` is a recursive path type, so keys are compile-time checked.
+- i18n is backed by **vue-i18n** (Composition API) in `src/lib/i18n.ts`; keys
+  are nested in `src/locales/*.json` (`common`, `mailbox`, `compose`,
+  `message`, `accounts`, `settings`, `app`) and addressed by dotted path — e.g.
+  `t("accounts.testConnection")`. `MessageKey` in `src/lib/i18n.ts` is a
+  recursive path type over `en`, so keys are compile-time checked (typecheck),
+  and `@intlify/eslint-plugin-vue-i18n` in `eslint.config.js` enforces key
+  consistency across locales + no unused keys (lint). Keys reached only via
+  dynamic lookup (`SYNC_ERROR_KEYS`, `ROLE_LABEL_KEY`) are ignored there.
+  `en` is the fallback locale; a missing key falls back to `en`, then the raw key.
 - Lint is expected to be warning-free.
 - Reference official docs for third-party libs and frameworks; avoid relying on
   reading `node_modules` source where documentation is available.
