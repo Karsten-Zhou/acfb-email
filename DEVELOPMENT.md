@@ -63,6 +63,8 @@ bunx wrangler d1 execute cloudflare-email-client --local --file=./migrations/000
 ```text
 src/                  Vue 3 SPA
   views/              Mailbox (3-pane), Message, Compose, Settings
+    parts/            view-specific sub-components (panes, AccountSettings parts, …)
+  composables/        reusable logic (useMessageActions, useMailboxSync, …)
   stores/             reactive singletons: accounts, mail, toast
   router/             web-history router
   lib/api.ts          typed fetch client

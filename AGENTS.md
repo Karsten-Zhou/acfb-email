@@ -67,18 +67,14 @@ Some tooling details that matter:
   fallback handles deep links. `/mail/message/:id` maps to `MailboxView`, which
   reads the route param and renders it in the rightmost reading pane on wide
   screens.
-- **IMAP via `imapflow`** (patched — `patches/imapflow@1.7.6.patch`). Workerd
-  supports `node:net`/`node:tls`/`node:stream`, but fires the stream
-  `'readable'` event earlier than Node — while imapflow's reader reentrancy
-  guard is still held — so a tagged response is dropped and commands hang. The
-  patch makes `socketReadable` remember the missed event and re-run the reader.
-  Keep it in sync when bumping imapflow. SMTP is implemented over sockets in
-  `server/email/smtp.ts`.
+- **IMAP via `imapflow`**, patched for a workerd stream-timing quirk
+  (`patches/imapflow@1.7.6.patch` — keep it in sync when bumping). SMTP is
+  implemented over sockets in `server/email/smtp.ts`.
   - Don't pass `tls.rejectUnauthorized` to imapflow (workerd throws
     `ERR_OPTION_NOT_IMPLEMENTED`); pass an explicit `servername`.
   - **`COMPRESS=DEFLATE` must stay disabled** (`disableCompression: true` in
-    `ImapProvider`): workerd's compressed stream chain drops large responses
-    (e.g. a big `UID SEARCH` result), hanging the command. Verified live 2026-08-27.
+    `ImapProvider`) — workerd's compressed stream chain drops large responses,
+    hanging the command.
   - Workers blocks outbound port 25 (SMTP); use 465/587.
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has
   `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its
@@ -129,9 +125,6 @@ Some tooling details that matter:
   provider ISO dates otherwise sort lexically wrong, e.g. `7-Mar-…` vs ISO).
 - Account list ordering is user-controlled via `accounts.sort_order`
   (`PUT /api/accounts/order`).
-- Record failures/races discovered in production here (see repo memory for the
-  live-sync polling race history) — the pattern is to reproduce live, then fix
-  the polling/state machine so there is always a single poll chain.
 
 ## Security & sanitization
 
@@ -153,9 +146,9 @@ Some tooling details that matter:
 - **Comment hygiene**: code comments describe only the *current* implementation.
   Never mention abandoned/legacy/experimental approaches in code comments.
   Historical decision notes belong in this file or repo memory, not the code.
-- Flat component naming: `src/components/UiButton.vue`, `UiInput.vue`,
-  `UiToolTip.vue`, `UiSwitch.vue`, `UiDialog.vue`, `ToastHost.vue` (Vue
-  multi-word component rule; components are `Ui*` prefixed).
+- Component naming: reusable components are `Ui*`-prefixed (Vue multi-word
+  component rule).
+- **Composables**: reusable, domain-focused logic lives in `src/composables/`.
 - Design system: custom Tailwind + semantic `oklch` tokens in
   `src/styles/main.css`, `cn()` in `src/lib/cn.ts`.
 - i18n is backed by **vue-i18n** (Composition API) in `src/lib/i18n.ts`; keys
@@ -173,14 +166,9 @@ Some tooling details that matter:
 
 ## Live-behavior gotchas worth remembering
 
-- **"Possible EventEmitter memory leak detected. 11 timeout listeners"** (per IMAP connection) is a
-  benign workerd `node:net` bug, NOT our code/imapflow. workerd's `Socket._unrefTimer()` calls
-  `socket.setTimeout(ms, cb)` on every read/write chunk, and its `setTimeout` adds a `once('timeout')`
-  listener each call (real Node uses `timers.enroll/active`, no leak). A single sync adds 300+ listeners
-  on one socket; all freed when the socket closes, so it's non-fatal. Can't be disabled via imapflow
-  (`socketTimeout: 0` falls back to the 5-min default) and can't be intercepted via `process.on('warning')`
-  (workerd doesn't route MaxListenersExceededWarning there). Accepted as-is.
-- **SMTP**: Cloudflare Workers can't do port 25 — always 465/587.
+- **"Possible EventEmitter memory leak detected"** (per IMAP connection) is a
+  benign workerd `node:net` bug, NOT our code/imapflow — ignore it; all
+  listeners are freed when the socket closes, and it can't be disabled.
 - **Gmail/Outlook OAuth scopes** (XOAUTH2 for IMAP/SMTP):
   Gmail needs `https://mail.google.com/`; Outlook needs
   `https://outlook.office.com/IMAP.AccessAsUser.All` + `SMTP.Send` (send is a
