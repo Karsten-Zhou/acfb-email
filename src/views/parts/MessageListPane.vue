@@ -241,10 +241,9 @@ function onTouchEnd() {
           </div>
         </button>
 
-        <!-- End-of-list footer: only present when there's something to say —
-           a spinner while fetching older, or an explicit "no more messages"
-           line once everything is exhausted. Nothing is shown while more
-           pages exist but none are being loaded (e.g. at the top of the list). -->
+        <!-- End-of-list footer: a spinner while loading older, an explicit
+             "no more messages" line once exhausted, and otherwise an invisible
+             placeholder that keeps the list height stable (no layout flash). -->
         <div class="flex items-center justify-center border-border bg-background/80 px-4 py-2">
           <div v-if="loadingOlder" class="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 class="h-3.5 w-3.5 animate-spin" />
