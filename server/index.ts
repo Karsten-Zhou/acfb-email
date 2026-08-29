@@ -4,7 +4,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env, SyncMessage } from "./env";
-import { syncAccount } from "./sync/sync-service";
+import { syncAccount, syncMailbox, markAccountSyncSucceeded } from "./sync/sync-service";
 import { HttpError } from "./http-error";
 import { accountRoutes } from "./routes/accounts";
 import { oauthRoutes } from "./routes/oauth";
@@ -99,17 +99,23 @@ app.onError((err, c) => {
   return c.json({ error: message }, 500);
 });
 
-// Queue consumer: runs full account syncs in the background. A queue batch gets
-// 15 minutes of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox
-// IMAP sync needs. syncAccount persists the account state; errors are acked
-// (no infinite retries) and surfaced through the account's state_message.
+// Queue consumer: runs syncs in the background. A queue batch gets 15 minutes
+// of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox IMAP sync
+// needs. A bare accountId syncs every mailbox; a mailboxId retries that single
+// mailbox. Errors are acked (no infinite retries) and surfaced through the
+// account's state_message / the mailbox's sync_state.
 async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
-    const { accountId } = msg.body;
+    const { accountId, mailboxId } = msg.body;
     try {
-      await syncAccount(env, accountId);
+      if (mailboxId) {
+        await syncMailbox(env, accountId, mailboxId);
+        await markAccountSyncSucceeded(env, accountId);
+      } else {
+        await syncAccount(env, accountId);
+      }
     } catch (err) {
-      console.error("[queue] sync failed for account", accountId, err);
+      console.error("[queue] sync failed for account", accountId, mailboxId ?? "", err);
     }
   }
 }

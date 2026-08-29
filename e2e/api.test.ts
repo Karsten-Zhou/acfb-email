@@ -49,19 +49,31 @@ describe("api routes", () => {
        VALUES ('box1', 'acct1', 'INBOX', 'inbox', 'INBOX', 0, NULL, NULL)`,
     ).run();
     const now = new Date().toISOString();
-    for (const id of ["msg1", "msg2"]) {
+    const seed = [
+      ["msg1", 10],
+      ["msg2", 20],
+    ] as const;
+    for (const [id, uid] of seed) {
       await env.DB.prepare(
-        `INSERT INTO messages (id, account_id, mailbox_id, subject, received_at, is_read, is_starred)
-         VALUES (?, 'acct1', 'box1', ?, ?, 0, 0)`,
+        `INSERT INTO messages (id, account_id, subject, received_at)
+         VALUES (?, 'acct1', ?, ?)`,
       )
         .bind(id, `Subj ${id}`, now)
+        .run();
+      await env.DB.prepare(
+        `INSERT INTO message_locations (id, message_id, mailbox_id, uid, uid_validity, is_read, is_starred)
+         VALUES (?, ?, 'box1', ?, 1, 0, 0)`,
+      )
+        .bind(`${id}-loc`, id, uid)
         .run();
     }
 
     // Emulate the route's post-flag-update recompute (repo.refreshUnseen).
-    await env.DB.prepare(`UPDATE messages SET is_read = 1 WHERE id = 'msg1'`).run();
+    await env.DB.prepare(
+      `UPDATE message_locations SET is_read = 1 WHERE message_id = 'msg1'`,
+    ).run();
     const n = await env.DB.prepare(
-      `SELECT COUNT(*) as n FROM messages WHERE mailbox_id = 'box1' AND is_read = 0`,
+      `SELECT COUNT(*) as n FROM message_locations WHERE mailbox_id = 'box1' AND is_read = 0`,
     ).first<{ n: number }>();
     await env.DB.prepare(`UPDATE mailboxes SET unseen_messages = ? WHERE id = 'box1'`)
       .bind(n?.n ?? 0)

@@ -74,7 +74,6 @@ export const MessageDetailSchema = MessageSchema.extend({
   text: z.string().nullable(),
   attachments: z.array(AttachmentMetaSchema),
   remoteUid: z.number().int().nullable(),
-  remoteMessageId: z.string().nullable(),
 });
 
 export const AccountSummarySchema = z.object({
@@ -98,13 +97,6 @@ export const AccountDetailSchema = AccountSummarySchema.extend({
   smtpPort: z.number().int().nullable(),
   useTls: z.boolean().nullable(),
   syncEnabled: z.boolean(),
-});
-
-export const SyncStatusSchema = z.object({
-  state: z.enum(["idle", "running", "error"]),
-  message: z.string().nullable(),
-  lastSyncedAt: z.string().nullable(),
-  lastError: z.string().nullable(),
 });
 
 // --- Input schemas (client -> server) ---

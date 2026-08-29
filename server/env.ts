@@ -1,6 +1,9 @@
-// Payload for account-sync jobs enqueued to the SYNC_QUEUE.
+// Payload for account-sync jobs enqueued to the SYNC_QUEUE. A job without a
+// mailboxId syncs every mailbox in the account; with one, it retries that
+// single mailbox.
 export interface SyncMessage {
   accountId: string;
+  mailboxId?: string;
 }
 
 // Worker environment bindings and vars.

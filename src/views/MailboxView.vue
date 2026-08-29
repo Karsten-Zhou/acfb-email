@@ -438,7 +438,14 @@ watch(
       reading.value = true;
       loadingMessage.value = true;
       try {
-        await openMessage(id);
+        // Resolve the message against the currently viewed folder so a message
+        // living in several mailboxes (e.g. Gmail All Mail + Inbox) shows the
+        // right location's flags/provider handle.
+        const mailboxId =
+          activeMailboxId.value && activeMailboxId.value !== "unified"
+            ? activeMailboxId.value
+            : undefined;
+        await openMessage(id, mailboxId);
       } catch {
         mailState.selected = null;
       } finally {

@@ -121,10 +121,24 @@ export interface IEmailProvider {
   /**
    * Incrementally sync a single mailbox folder. Returns new/changed messages.
    */
-  syncMailbox(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderFetchResult>;
+  syncMailbox(
+    mailboxPath: string,
+    options: ProviderSyncOptions,
+    signal?: AbortSignal,
+  ): Promise<ProviderFetchResult>;
 
   /** Fetch an older page of messages (below `beforeUid`). */
   fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult>;
+
+  /**
+   * Resolve a message's current UID in a mailbox from its Message-ID header.
+   * Used to attach a freshly-moved message to its new location immediately.
+   * Returns null when no match is found.
+   */
+  findByMessageId(
+    mailboxPath: string,
+    messageId: string,
+  ): Promise<{ uid: number; uidValidity: number } | null>;
 
   /** Fetch the full body & attachments of a message. */
   fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;

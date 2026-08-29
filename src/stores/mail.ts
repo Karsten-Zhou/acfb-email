@@ -45,8 +45,8 @@ export async function loadUnified() {
   }
 }
 
-export async function openMessage(id: string): Promise<MessageDetail> {
-  const { message } = await api.message(id);
+export async function openMessage(id: string, mailboxId?: string): Promise<MessageDetail> {
+  const { message } = await api.message(id, mailboxId);
   mailState.selected = message;
   if (!message.isRead) {
     await api.flags([id], { read: true });

@@ -94,16 +94,29 @@ Some tooling details that matter:
   `email-sync` Queue; the `queue()` consumer in `server/index.ts` runs it
   (15-min wall-time budget vs waitUntil's 30 s). A manual `POST
   /api/accounts/:id/sync` trigger also exists. `server/sync/sync-service.ts`
-  orchestrates mailbox/message fetching and upsert.
+  is the orchestrator: `syncMailbox` is the durable unit, `syncAccount`
+  discovers mailboxes and syncs each. The queue also accepts `{accountId,
+  mailboxId}` to retry a single mailbox.
 - **Attachments are metadata-only on Cloudflare** — binary content is never
   stored in Worker infra. The download route re-fetches the part live from the
   provider on demand (`GET /api/messages/:id/attachments/:attachId`).
 
 ## Data model notes
 
-- `messages`/`mailboxes`/`attachments` live in D1 (`migrations/0001_initial.sql`).
-  Message upsert is keyed by `(mailbox_id, remote_message_id)`;
-  `received_at` is stored via a normalized `isoDate()` (IMAP INTERNALDATE and
+- `messages` (logical emails) + `message_locations` (mailbox membership +
+  per-location IMAP UID/UIDVALIDITY + read/starred flags) live in D1
+  (`migrations/0001_initial.sql`). A UID is a location identity, never the
+  logical message: locations are keyed `UNIQUE(mailbox_id, uid_validity, uid)`.
+  The logical message id is a deterministic hash of `(account_id, Message-ID)`
+  when a header exists, else of the location — sync is idempotent (safe to run
+  repeatedly) and a self-sent mail shares one row across Inbox + Sent.
+- Sync invariants: a provider cursor only advances after every change it covers
+  is durably applied (changes + cursor update land in one `env.DB.batch()`);
+  on UIDVALIDITY reset the mailbox's locations are purged and re-imported.
+  Reconciliation (full UID SEARCH + stale-location delete + orphan prune) runs
+  each mailbox sync; IMAP has no incremental delete events, and the search is
+  cheap relative to the envelope fetches it gates.
+- `received_at` is stored via a normalized `isoDate()` (IMAP INTERNALDATE and
   provider ISO dates otherwise sort lexically wrong, e.g. `7-Mar-…` vs ISO).
 - Account list ordering is user-controlled via `accounts.sort_order`
   (`PUT /api/accounts/order`).

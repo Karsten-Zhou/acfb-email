@@ -4,7 +4,7 @@ import { HttpError } from "../http-error";
 import type { Env } from "../env";
 import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
-import { importOlderPage } from "../sync/sync-service";
+import { importOlderPage, pruneOrphanMessages } from "../sync/sync-service";
 import { readJson } from "../utils/http";
 import {
   UpdateFlagsInputSchema,
@@ -90,11 +90,13 @@ messageRoutes.get("/unified", async (c) => {
       const account = await repo.accountById(c.env, box.account_id);
       if (!account) continue;
       const cursor = await c.env.DB.prepare(
-        `SELECT remote_uid FROM messages WHERE mailbox_id = ? ORDER BY received_at ASC LIMIT 1`,
+        `SELECT ml.uid FROM message_locations ml
+         JOIN messages m ON m.id = ml.message_id
+         WHERE ml.mailbox_id = ? ORDER BY m.received_at ASC LIMIT 1`,
       )
         .bind(boxRow.id)
-        .first<{ remote_uid: number | null }>();
-      const beforeUid = cursor?.remote_uid ?? 0;
+        .first<{ uid: number | null }>();
+      const beforeUid = cursor?.uid ?? 0;
       if (beforeUid <= 0) continue;
       const res = await importOlderPage(
         c.env,
@@ -118,10 +120,11 @@ messageRoutes.get("/unified", async (c) => {
   return c.json({ messages, hasMore });
 });
 
-// GET /api/messages/:id
+// GET /api/messages/:id?mailboxId=...
 messageRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const row = await repo.messageById(c.env, id);
+  const mailboxId = c.req.query("mailboxId") || undefined;
+  const row = await repo.messageById(c.env, id, mailboxId);
   if (!row) throw new HttpError(404, "Message not found");
 
   let html = row.html_preview;
@@ -137,10 +140,11 @@ messageRoutes.get("/:id", async (c) => {
       body = await provider.fetchBody(row.provider_path, providerId);
     } catch (err) {
       // The provider no longer has this message (e.g. a draft deleted
-      // upstream). Prune the stale row so it drops out of the list, and tell
-      // the client it's gone instead of surfacing a 500.
+      // upstream). Prune the stale location so it drops out of the list, and
+      // tell the client it's gone instead of surfacing a 500.
       if (isMessageGone(err)) {
-        await repo.deleteMessage(c.env, row.id);
+        await repo.deleteLocation(c.env, row.location_id);
+        await pruneOrphanMessages(c.env);
         throw new HttpError(410, "This message is no longer available", "message_gone");
       }
       throw err;
@@ -177,7 +181,8 @@ messageRoutes.get("/:id", async (c) => {
 messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
   const id = c.req.param("id");
   const attachmentId = c.req.param("attachmentId");
-  const row = await repo.messageById(c.env, id);
+  const mailboxId = c.req.query("mailboxId") || undefined;
+  const row = await repo.messageById(c.env, id, mailboxId);
   if (!row) throw new HttpError(404, "Message not found");
   const att = await repo.attachmentById(c.env, attachmentId);
   if (!att || att.message_id !== row.id) throw new HttpError(404, "Attachment not found");
@@ -236,7 +241,7 @@ messageRoutes.patch("/flags", async (c) => {
     if (input.read !== undefined) flags.read = input.read;
     if (input.starred !== undefined) flags.starred = input.starred;
     await provider.setFlags(box.provider_path, pids, flags);
-    for (const m of msgs) await repo.updateFlags(c.env, m.id, flags);
+    for (const m of msgs) await repo.updateFlags(c.env, m.location_id, flags);
     await repo.refreshUnseen(c.env, mailboxId);
   }
   return c.json({ ok: true });
@@ -265,7 +270,35 @@ messageRoutes.post("/move", async (c) => {
     const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
     const pids = msgs.map((m) => providerIdFor(m)).filter(Boolean);
     await provider.move(source.provider_path, pids, target.provider_path);
-    for (const m of msgs) await repo.moveMessage(c.env, m.id, target.id);
+    // IMAP MOVE assigns a new UID in the target folder. Re-link each moved
+    // message to its new location (via its Message-ID) so it appears in the
+    // target immediately with its flags and body intact; messages without a
+    // resolvable Message-ID are picked up by the next target-mailbox sync.
+    for (const m of msgs) {
+      let reLinked = false;
+      if (m.maybe_thread_id) {
+        try {
+          const found = await provider.findByMessageId(target.provider_path, m.maybe_thread_id);
+          if (found) {
+            await repo.moveMessage(c.env, {
+              messageId: m.id,
+              sourceLocationId: m.location_id,
+              targetMailboxId: target.id,
+              uid: found.uid,
+              uidValidity: found.uidValidity,
+              isRead: m.is_read,
+              isStarred: m.is_starred,
+            });
+            reLinked = true;
+          }
+        } catch {
+          // Provider lookup failed; fall back to dropping the source location
+          // (the target sync will import the message).
+        }
+      }
+      if (!reLinked) await repo.deleteLocation(c.env, m.location_id);
+    }
+    await pruneOrphanMessages(c.env);
     await repo.refreshUnseen(c.env, mailboxId);
     await repo.refreshUnseen(c.env, target.id);
   }
@@ -295,11 +328,12 @@ messageRoutes.post("/delete", async (c) => {
     try {
       await provider.delete(box.provider_path, pids);
     } catch (err) {
-      // The object is already gone upstream — still prune the local rows so
-      // a stale entry doesn't linger and 404 later.
+      // The object is already gone upstream — still prune the local locations
+      // so a stale entry doesn't linger and 404 later.
       if (!isMessageGone(err)) throw err;
     }
-    for (const m of msgs) await repo.deleteMessage(c.env, m.id);
+    for (const m of msgs) await repo.deleteLocation(c.env, m.location_id);
+    await pruneOrphanMessages(c.env);
     await repo.refreshUnseen(c.env, mailboxId);
   }
   return c.json({ ok: true });
@@ -382,7 +416,6 @@ async function rowToDetail(
       disposition: a.disposition,
     })),
     remoteUid: row.remote_uid,
-    remoteMessageId: row.remote_message_id,
   });
 }
 

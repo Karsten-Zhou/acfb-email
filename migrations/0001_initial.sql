@@ -58,14 +58,15 @@ CREATE TABLE IF NOT EXISTS mailboxes (
 CREATE INDEX IF NOT EXISTS idx_mailboxes_account ON mailboxes(account_id);
 
 -- ------------------------------------------------------------------
--- messages: mailbox message metadata (+ sanitized/quoted content later)
+-- messages: the logical email. A message may appear in several mailboxes
+-- at once (e.g. a self-sent mail lives in Inbox AND Sent); its presence in
+-- a specific mailbox is modelled by message_locations, which also carries
+-- the per-mailbox provider identity (IMAP UID + UIDVALIDITY) and the
+-- per-location read/starred flags.
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS messages (
-  id              TEXT PRIMARY KEY,          -- uuid (internal stable id)
+  id              TEXT PRIMARY KEY,          -- internal stable id
   account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  mailbox_id      TEXT NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
-  remote_uid      INTEGER,                   -- IMAP UID (per mailbox)
-  remote_message_id TEXT,                    -- Message-ID header
   subject         TEXT,
   snippet         TEXT,
   -- denormalized sender for fast listing
@@ -73,23 +74,39 @@ CREATE TABLE IF NOT EXISTS messages (
   from_address    TEXT,
   date            TEXT,                      -- server Date
   received_at     TEXT NOT NULL,
-  is_read         INTEGER NOT NULL DEFAULT 0,
-  is_starred      INTEGER NOT NULL DEFAULT 0,
+  maybe_thread_id TEXT,                      -- Message-ID header (threading hint)
   has_attachments INTEGER NOT NULL DEFAULT 0,
-  maybe_thread_id TEXT,
   -- sanitized/quoted plain & HTML previews (small); full body fetched on demand
   text_preview    TEXT,
   html_preview    TEXT,
   body_fetched    INTEGER NOT NULL DEFAULT 0,
   raw_size        INTEGER,                   -- approximate bytes
-  sync_hash       TEXT,                      -- fingerprint to detect change
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE INDEX IF NOT EXISTS idx_messages_mailbox ON messages(mailbox_id, received_at);
 CREATE INDEX IF NOT EXISTS idx_messages_account ON messages(account_id);
-CREATE INDEX IF NOT EXISTS idx_messages_remote ON messages(mailbox_id, remote_uid);
+CREATE INDEX IF NOT EXISTS idx_messages_received ON messages(received_at);
 CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(maybe_thread_id);
-CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(mailbox_id, is_read);
+
+-- ------------------------------------------------------------------
+-- message_locations: a message's presence in a mailbox, plus its provider
+-- identity there. IMAP UIDs are only meaningful within (mailbox, UIDVALIDITY),
+-- so a UID identifies a location, never the logical message itself.
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS message_locations (
+  id           TEXT PRIMARY KEY,             -- uuid
+  message_id   TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  mailbox_id   TEXT NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
+  uid          INTEGER NOT NULL,             -- IMAP UID (per mailbox)
+  uid_validity INTEGER NOT NULL DEFAULT 0,   -- IMAP UIDVALIDITY
+  is_read      INTEGER NOT NULL DEFAULT 0,
+  is_starred   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (mailbox_id, uid_validity, uid)
+);
+CREATE INDEX IF NOT EXISTS idx_locations_message ON message_locations(message_id);
+CREATE INDEX IF NOT EXISTS idx_locations_mailbox ON message_locations(mailbox_id, is_read);
 
 -- ------------------------------------------------------------------
 -- message_recipients: to/cc/bcc of each message
@@ -120,19 +137,22 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
 
 -- ------------------------------------------------------------------
--- sync_state: per-mailbox synchronization bookkeeping.
--- UIDs are per-mailbox in IMAP, so the cursor is keyed by (account, mailbox).
+-- sync_state: per-mailbox synchronization cursor. Keyed by
+-- (account, mailbox) because IMAP UIDs are per-mailbox. The cursor
+-- (uid_validity + last_uid) only ever advances after every change it covers
+-- has been durably applied.
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sync_state (
   account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   mailbox_id      TEXT NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
   uid_validity    INTEGER,                   -- IMAP UIDVALIDITY
-  last_uid        INTEGER,                   -- highest seen UID in this mailbox
-  last_sync_at    TEXT,
-  next_sync_at    TEXT,
-  state           TEXT NOT NULL DEFAULT 'idle',   -- idle|running|error
+  last_uid        INTEGER,                   -- highest UID durably synced in this mailbox
+  last_total      INTEGER,                   -- last known EXISTS count (reconcile hint)
+  state           TEXT NOT NULL DEFAULT 'idle',   -- idle|syncing|error
   last_error      TEXT,
   error_count     INTEGER NOT NULL DEFAULT 0,
+  last_sync_at    TEXT,
+  last_success_at TEXT,
   PRIMARY KEY (account_id, mailbox_id)
 );
 

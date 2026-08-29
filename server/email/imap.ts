@@ -36,6 +36,14 @@ export interface ImapTransport {
   smtpSecure: boolean;
 }
 
+/** Thrown inside the adapter when a sync is aborted (time budget exhausted). */
+export class AbortError extends Error {
+  constructor() {
+    super("sync_aborted");
+    this.name = "AbortError";
+  }
+}
+
 export class ImapProvider implements IEmailProvider {
   readonly type = "imap" as const;
 
@@ -102,15 +110,19 @@ export class ImapProvider implements IEmailProvider {
   async syncMailbox(
     mailboxPath: string,
     options: ProviderSyncOptions,
+    signal?: AbortSignal,
   ): Promise<ProviderFetchResult> {
     return this.withClient(async (client) => {
       const lock = await client.getMailboxLock(mailboxPath);
       try {
+        if (signal?.aborted) throw new AbortError();
         // One authoritative search for the folder's current UID set. It both
         // selects which messages to fetch (the new ones) and lets the sync
-        // layer reconcile local rows — a message that moved or was deleted
-        // leaves no stale row behind because its UID is simply absent here.
+        // layer reconcile local locations — a message that moved or was
+        // deleted leaves no stale location behind because its UID is simply
+        // absent here.
         const all = (await client.search({ uid: "1:*" }, { uid: true })) || [];
+        if (signal?.aborted) throw new AbortError();
         const sinceUid = options.sinceUid ?? 0;
         const limit = options.fetchLimit ?? 200;
         // Incremental: everything above the cursor. First sync: newest page.
@@ -125,6 +137,26 @@ export class ImapProvider implements IEmailProvider {
             mailbox && typeof mailbox.uidValidity === "bigint" ? Number(mailbox.uidValidity) : null,
           total: mailbox ? mailbox.exists : null,
         };
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async findByMessageId(
+    mailboxPath: string,
+    messageId: string,
+  ): Promise<{ uid: number; uidValidity: number } | null> {
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        const found =
+          (await client.search({ header: { "message-id": messageId } }, { uid: true })) || [];
+        if (found.length === 0) return null;
+        const mailbox = client.mailbox;
+        const uidValidity =
+          mailbox && typeof mailbox.uidValidity === "bigint" ? Number(mailbox.uidValidity) : 0;
+        return { uid: found[0], uidValidity };
       } finally {
         lock.release();
       }

@@ -114,28 +114,44 @@ accounts(id, provider, name, email, display_name,
 account_credentials(account_id PK FK, credential=encrypted blob, updated_at)
 mailboxes(id, account_id FK, name, role, provider_path, delimiter,
           total_messages, unseen_messages, sort_order)
-messages(id, account_id FK, mailbox_id FK, remote_uid, remote_message_id,
-         subject, snippet, from_name, from_address, date, received_at,
-         is_read, is_starred, has_attachments, maybe_thread_id,
-         text_preview, html_preview, body_fetched, raw_size, sync_hash)
+messages(id, account_id FK, subject, snippet, from_name, from_address, date,
+         received_at, maybe_thread_id, has_attachments,
+         text_preview, html_preview, body_fetched, raw_size)
+message_locations(id, message_id FK, mailbox_id FK, uid, uid_validity,
+                  is_read, is_starred, UNIQUE(mailbox_id, uid_validity, uid))
 message_recipients(id, message_id FK, type, name, address)
 attachments(id, message_id FK, filename, mime_type, size, is_inline, content_id, disposition)
-sync_state(account_id FK, mailbox_id FK, uid_validity, last_uid, last_sync_at,
-           state, last_error, error_count, PRIMARY KEY(account_id, mailbox_id))
+sync_state(account_id FK, mailbox_id FK, uid_validity, last_uid, last_total,
+           state, last_error, error_count, last_sync_at, last_success_at,
+           PRIMARY KEY(account_id, mailbox_id))
 push_subscriptions(id, account_id FK, endpoint, p256dh, auth, enabled)
 app_settings(id PK, data JSON)   -- singleton
 ```
 
 **Design notes**
 
-- `messages.id` is our own UUID — remote UIDs and Message-IDs are **not** globally
-  unique across providers, so we never use them as the internal PK.
+- `messages` is the logical email (one row per email, shared across folders —
+  a self-sent mail lives in Inbox AND Sent as a single row). Its presence in a
+  mailbox is a `message_locations` row that carries the provider identity
+  (IMAP UID + UIDVALIDITY) and the per-location read/starred flags. A UID is
+  only meaningful within `(mailbox, UIDVALIDITY)`, so it is a location
+  identity, never a logical message identity.
+- `messages.id` is deterministic (a hash of `account_id` + the Message-ID
+  header, falling back to a per-location hash when absent), so sync is
+  idempotent: re-running it upserts the same rows.
 - `sync_state` is keyed **per mailbox** because IMAP UIDs are per-mailbox. The
-  cursor tracks `uid_validity` (detects mailbox resets) + `last_uid` (highest seen).
+  cursor (`uid_validity` + `last_uid`) only advances after every change it
+  covers is durably applied (changes + cursor update share one D1 batch) and
+  never regresses. A UIDVALIDITY change purges the mailbox's locations and
+  re-imports from scratch.
 - Credentials live in a separate table so a query that dumps account metadata never
   accidentally includes ciphertext, let alone plaintext.
 - We store only small text/html previews in `messages`. Full bodies are fetched
   from the provider on demand and cached as previews (max 64KB) after first read.
+- Sync runs per mailbox (`server/sync/sync-service.ts`): a provider sync uses a
+  cooperative AbortSignal (time budget) instead of racing a timeout, applies
+  changes in one `env.DB.batch()`, then reconciles stale locations against the
+  provider's current UID set and prunes orphaned messages.
 
 ---
 
@@ -143,26 +159,33 @@ app_settings(id PK, data JSON)   -- singleton
 
 **Sync is enqueued, not inline**: account add / OAuth connect push a job to the
 `email-sync` Queue (`wrangler.jsonc` producer binding `SYNC_QUEUE`); the
-`queue()` consumer in `server/index.ts` calls `syncAccount(env, accountId)`.
-A queue consumer gets 15 minutes of wall-time (vs `waitUntil`'s 30 s), which a
-slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls
+`queue()` consumer in `server/index.ts` runs it. A queue consumer gets 15
+minutes of wall-time (vs `waitUntil`'s 30 s), which a slow multi-mailbox IMAP
+sync needs. A manual "Sync now" button still calls
 `POST /api/accounts/:id/sync` synchronously.
 
-- `syncAccount(env, accountId)` is the single entry point.
+- `server/sync/sync-service.ts` — `syncMailbox(accountId, mailboxId)` is the
+  durable unit; `syncAccount` discovers mailboxes and runs one per folder. The
+  queue payload is `{accountId, mailboxId?}` so a single mailbox can be retried.
+- Sync runs within a hard time budget enforced by a cooperative `AbortSignal`
+  (checked between provider round-trips) rather than a racing timeout — a
+  cancelled sync never leaves a competing writer mutating the DB.
 - Cursors are incremental (UID-based), so repeated syncs are cheap and never
-  re-download the whole mailbox.
-- `SYNC_FETCH_LIMIT` bounds the number of messages processed per account per run
-  (default 100), protecting the Free tier.
+  re-download the whole mailbox. `SYNC_FETCH_LIMIT` bounds messages per mailbox
+  per run (default 100).
 
-### How UID sync works (IMAP)
+### How a mailbox sync works (IMAP)
 
 ```text
-1. SELECT "INBOX"
-2. Read UIDVALIDITY (server). If it changed vs last sync -> mailbox was reset,
-   clear cursors and do a full scan.
-3. UID SEARCH UID <last_uid+1>:*
-4. UID FETCH <uids> (ENVELOPE FLAGS RFC822.SIZE INTERNALDATE)
-5. Upsert each message; update last_uid to the max seen
+1. Load the mailbox cursor (uid_validity, last_uid) from sync_state.
+2. SELECT + UID SEARCH 1:* (authoritative current UID set).
+3. Fetch envelopes for UIDs > last_uid (or the newest page on first sync).
+4. Upsert each message into `messages` + `message_locations` — plus the cursor
+   advance — in ONE env.DB.batch() (all-or-nothing). last_uid never regresses.
+5. Reconcile: drop locations whose UID is no longer in the set, prune orphaned
+   logical messages.
+6. If UIDVALIDITY changed vs the stored cursor: purge the mailbox's locations,
+   reset the cursor, and re-import from scratch.
 ```
 
 ---
@@ -173,7 +196,8 @@ slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls
 
 - `testConnection()`
 - `listMailboxes()`
-- `syncMailbox(path, {sinceUid})`
+- `syncMailbox(path, {sinceUid}, signal?)`
+- `findByMessageId(path, messageId)` — resolves a message's new UID after a move
 - `fetchBody(path, uid)`
 - `setFlags / move / delete`
 - `send(opts)`

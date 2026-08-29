@@ -1,4 +1,7 @@
 // Repository layer: all D1 access for email entities, scoped by user ownership.
+// Messages are logical emails (messages); their presence in a mailbox is a
+// message_locations row carrying the IMAP UID/UIDVALIDITY and per-location
+// read/starred flags. All list/detail queries join through locations.
 import { randomUUID } from "crypto";
 import type { Env } from "../env";
 
@@ -31,8 +34,8 @@ export interface MessageRow {
   id: string;
   account_id: string;
   mailbox_id: string;
+  location_id: string;
   remote_uid: number | null;
-  remote_message_id: string | null;
   subject: string | null;
   snippet: string | null;
   from_name: string | null;
@@ -50,6 +53,23 @@ export interface MessageRow {
   account_email: string;
   account_name: string;
 }
+
+export interface OwnedMessageRow {
+  id: string;
+  location_id: string;
+  mailbox_id: string;
+  remote_uid: number | null;
+  maybe_thread_id: string | null;
+  is_read: number;
+  is_starred: number;
+}
+
+const MESSAGE_COLUMNS = `
+  m.id, ml.id AS location_id, m.account_id, ml.mailbox_id, ml.uid AS remote_uid,
+  m.subject, m.snippet, m.from_name, m.from_address, m.date, m.received_at,
+  ml.is_read, ml.is_starred, m.has_attachments, m.maybe_thread_id,
+  m.html_preview, m.text_preview, m.body_fetched,
+  mb.provider_path, a.email AS account_email, a.name AS account_name`;
 
 export const repo = {
   // --- accounts ---
@@ -88,14 +108,12 @@ export const repo = {
     offset: number,
   ): Promise<MessageRow[]> {
     const rows = await env.DB.prepare(
-      `SELECT m.id, m.account_id, m.mailbox_id, m.remote_uid, m.remote_message_id, m.subject,
-              m.snippet, m.from_name, m.from_address, m.date, m.received_at, m.is_read,
-              m.is_starred, m.has_attachments, m.maybe_thread_id, m.html_preview, m.text_preview,
-              m.body_fetched, mb.provider_path, a.email AS account_email, a.name AS account_name
-       FROM messages m
-       JOIN mailboxes mb ON mb.id = m.mailbox_id
+      `SELECT ${MESSAGE_COLUMNS}
+       FROM message_locations ml
+       JOIN messages m ON m.id = ml.message_id
+       JOIN mailboxes mb ON mb.id = ml.mailbox_id
        JOIN accounts a ON a.id = m.account_id
-       WHERE m.mailbox_id = ?
+       WHERE ml.mailbox_id = ?
        ORDER BY m.received_at DESC
        LIMIT ? OFFSET ?`,
     )
@@ -112,15 +130,16 @@ export const repo = {
   ): Promise<MessageRow[]> {
     if (mailboxIds.length === 0) return [];
     const ph = mailboxIds.map(() => "?").join(",");
+    // GROUP BY the logical message so a message in several unified mailboxes
+    // (e.g. Gmail Inbox + All Mail) is listed once.
     const rows = await env.DB.prepare(
-      `SELECT m.id, m.account_id, m.mailbox_id, m.remote_uid, m.remote_message_id, m.subject,
-              m.snippet, m.from_name, m.from_address, m.date, m.received_at, m.is_read,
-              m.is_starred, m.has_attachments, m.maybe_thread_id, m.html_preview, m.text_preview,
-              m.body_fetched, mb.provider_path, a.email AS account_email, a.name AS account_name
-       FROM messages m
-       JOIN mailboxes mb ON mb.id = m.mailbox_id
+      `SELECT ${MESSAGE_COLUMNS}
+       FROM message_locations ml
+       JOIN messages m ON m.id = ml.message_id
+       JOIN mailboxes mb ON mb.id = ml.mailbox_id
        JOIN accounts a ON a.id = m.account_id
-       WHERE m.mailbox_id IN (${ph})
+       WHERE ml.mailbox_id IN (${ph})
+       GROUP BY m.id
        ORDER BY m.received_at DESC
        LIMIT ? OFFSET ?`,
     )
@@ -129,46 +148,35 @@ export const repo = {
     return rows.results;
   },
 
-  async messageById(env: Env, messageId: string): Promise<MessageRow | null> {
-    return env.DB.prepare(
-      `SELECT m.id, m.account_id, m.mailbox_id, m.remote_uid, m.remote_message_id, m.subject,
-              m.snippet, m.from_name, m.from_address, m.date, m.received_at, m.is_read,
-              m.is_starred, m.has_attachments, m.maybe_thread_id, m.html_preview, m.text_preview,
-              m.body_fetched, mb.provider_path, a.email AS account_email, a.name AS account_name
-       FROM messages m
-       JOIN mailboxes mb ON mb.id = m.mailbox_id
+  async messageById(env: Env, messageId: string, mailboxId?: string): Promise<MessageRow | null> {
+    const where = mailboxId ? `AND ml.mailbox_id = ?` : "";
+    const stmt = env.DB.prepare(
+      `SELECT ${MESSAGE_COLUMNS}
+       FROM message_locations ml
+       JOIN messages m ON m.id = ml.message_id
+       JOIN mailboxes mb ON mb.id = ml.mailbox_id
        JOIN accounts a ON a.id = m.account_id
-       WHERE m.id = ?`,
-    )
-      .bind(messageId)
-      .first<MessageRow>();
+       WHERE m.id = ? ${where}
+       ORDER BY ml.created_at ASC
+       LIMIT 1`,
+    );
+    const bound = mailboxId ? stmt.bind(messageId, mailboxId) : stmt.bind(messageId);
+    return bound.first<MessageRow>();
   },
 
-  async ownedMessageIds(
-    env: Env,
-    ids: string[],
-  ): Promise<
-    {
-      id: string;
-      mailbox_id: string;
-      remote_message_id: string | null;
-      remote_uid: number | null;
-    }[]
-  > {
+  /** One row per (message, location) — used to resolve mutations per mailbox. */
+  async ownedMessageIds(env: Env, ids: string[]): Promise<OwnedMessageRow[]> {
     if (ids.length === 0) return [];
     const ph = ids.map(() => "?").join(",");
     const rows = await env.DB.prepare(
-      `SELECT m.id, m.mailbox_id, m.remote_message_id, m.remote_uid
+      `SELECT m.id, ml.id AS location_id, ml.mailbox_id, ml.uid AS remote_uid, m.maybe_thread_id,
+              ml.is_read, ml.is_starred
        FROM messages m
+       JOIN message_locations ml ON ml.message_id = m.id
        WHERE m.id IN (${ph})`,
     )
       .bind(...ids)
-      .all<{
-        id: string;
-        mailbox_id: string;
-        remote_message_id: string | null;
-        remote_uid: number | null;
-      }>();
+      .all<OwnedMessageRow>();
     return rows.results;
   },
 
@@ -282,9 +290,10 @@ export const repo = {
       .run();
   },
 
+  /** Update a location's read/starred flags. */
   async updateFlags(
     env: Env,
-    messageId: string,
+    locationId: string,
     flags: { read?: boolean; starred?: boolean },
   ): Promise<void> {
     const sets: string[] = [];
@@ -298,16 +307,18 @@ export const repo = {
       vals.push(flags.starred ? 1 : 0);
     }
     if (sets.length === 0) return;
-    vals.push(messageId);
-    await env.DB.prepare(`UPDATE messages SET ${sets.join(", ")} WHERE id = ?`)
+    sets.push("updated_at = ?");
+    vals.push(new Date().toISOString());
+    vals.push(locationId);
+    await env.DB.prepare(`UPDATE message_locations SET ${sets.join(", ")} WHERE id = ?`)
       .bind(...vals)
       .run();
   },
 
-  /** Recompute a mailbox's unseen count from its current messages. */
+  /** Recompute a mailbox's unseen count from its current locations. */
   async refreshUnseen(env: Env, mailboxId: string): Promise<void> {
     const r = await env.DB.prepare(
-      `SELECT COUNT(*) as n FROM messages WHERE mailbox_id = ? AND is_read = 0`,
+      `SELECT COUNT(*) as n FROM message_locations WHERE mailbox_id = ? AND is_read = 0`,
     )
       .bind(mailboxId)
       .first<{ n: number }>();
@@ -316,13 +327,49 @@ export const repo = {
       .run();
   },
 
-  async moveMessage(env: Env, messageId: string, mailboxId: string): Promise<void> {
-    await env.DB.prepare(`UPDATE messages SET mailbox_id = ? WHERE id = ?`)
-      .bind(mailboxId, messageId)
+  /**
+   * Move a message to another mailbox: drop the source location and attach the
+   * message to the target location (with the provider-assigned UID discovered
+   * after the move). The logical message — body, attachments, recipients — is
+   * untouched, and per-location flags carry over.
+   */
+  async moveMessage(
+    env: Env,
+    input: {
+      messageId: string;
+      sourceLocationId: string;
+      targetMailboxId: string;
+      uid: number;
+      uidValidity: number;
+      isRead: number;
+      isStarred: number;
+    },
+  ): Promise<void> {
+    await env.DB.prepare(`DELETE FROM message_locations WHERE id = ?`)
+      .bind(input.sourceLocationId)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO message_locations (id, message_id, mailbox_id, uid, uid_validity, is_read, is_starred)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(mailbox_id, uid_validity, uid) DO UPDATE SET
+         message_id = excluded.message_id,
+         is_read = excluded.is_read,
+         is_starred = excluded.is_starred`,
+    )
+      .bind(
+        randomUUID(),
+        input.messageId,
+        input.targetMailboxId,
+        input.uid,
+        input.uidValidity,
+        input.isRead,
+        input.isStarred,
+      )
       .run();
   },
 
-  async deleteMessage(env: Env, messageId: string): Promise<void> {
-    await env.DB.prepare(`DELETE FROM messages WHERE id = ?`).bind(messageId).run();
+  /** Delete a single location (e.g. the copy in the folder being viewed). */
+  async deleteLocation(env: Env, locationId: string): Promise<void> {
+    await env.DB.prepare(`DELETE FROM message_locations WHERE id = ?`).bind(locationId).run();
   },
 };

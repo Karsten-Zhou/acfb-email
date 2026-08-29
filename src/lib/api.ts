@@ -134,8 +134,10 @@ export const api = {
     request<{ messages: Message[]; hasMore?: boolean }>(
       `/messages/unified?limit=${limit}&offset=${offset}`,
     ),
-  message: (id: string) =>
-    request<{ message: MessageDetail }>(`/messages/${encodeURIComponent(id)}`),
+  message: (id: string, mailboxId?: string) =>
+    request<{ message: MessageDetail }>(
+      `/messages/${encodeURIComponent(id)}${mailboxId ? `?mailboxId=${encodeURIComponent(mailboxId)}` : ""}`,
+    ),
   flags: (ids: string[], flags: { read?: boolean; starred?: boolean }) =>
     request<{ ok: boolean }>("/messages/flags", {
       method: "PATCH",

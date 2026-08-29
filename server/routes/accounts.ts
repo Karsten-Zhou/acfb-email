@@ -275,6 +275,11 @@ accountRoutes.post("/:id/sync", async (c) => {
   const id = c.req.param("id");
   try {
     const result = await syncAccount(c.env, id);
+    if (result.timedOut) {
+      // The sync hit its time budget; report it as a failure so the UI can
+      // surface the reason (the account was left in a coherent partial state).
+      return c.json({ ok: false, message: "errTimeout" }, 200);
+    }
     return c.json({ ok: true, ...result });
   } catch (err) {
     // syncAccount() persists a detailed, classified message to the account's
