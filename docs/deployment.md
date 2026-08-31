@@ -1,58 +1,27 @@
 # Deployment
 
-Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier).
+Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier). Send this page to an AI if you are not sure how to do.
 
----
+> If you are an AI agent, consider asking the user providing a cloudflare token with proper permissions to automate the deployment process.
+
+## 0. Prerequisites
+
+- [Bun](https://bun.sh) (recommended) or [Node.js](https://nodejs.org) (If using Node.js, replace `bun`/`bunx` with `npm`/`npx` in the commands below)
+- A [Cloudflare account](https://dash.cloudflare.com)
 
 ## 1. Cloudflare account setup
 
 1. Create a Cloudflare account (free) at <https://dash.cloudflare.com>.
-2. Install Wrangler and log in:
+2. Install dependencies and log in:
 
    ```bash
-   bun add -d wrangler
+   bun install
    bunx wrangler login
    ```
 
-3. Verify identity:
+## 2. Create the D1 database
 
-   ```bash
-   bunx wrangler whoami
-   ```
-
-## 2. Cloudflare Access (production gatekeeper)
-
-Configure in the Cloudflare dashboard / API — **Wrangler cannot create Access applications**, so this must be done manually.
-
-1. If Zero Trust is not yet enabled, enable it once (<https://one.dash.cloudflare.com> → **Setup**).
-2. **Workers & Pages** → select your Worker → **Access** tab.
-3. Select **Protect this Worker behind Access**.
-4. **Traffic scope**: All traffic (production + previews).
-5. **Authentication policy**: **Cloudflare account** — only members of this account can sign in.
-6. Select **Apply Access**.
-
-### Cookie / CSRF settings
-
-**Zero Trust → Access controls → Applications → Configure → Advanced settings → Cookie settings**:
-
-- **SameSite**: **Lax**. Do not use `Strict` — Access will hit `ERR_TOO_MANY_REDIRECTS` with it.
-- **HttpOnly**: enabled (default).
-
-## 3. Create secrets
-
-```bash
-bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
-```
-
-`CREDENTIAL_ENCRYPTION_KEY` must be **64 hex characters** (32 bytes). Generate:
-
-```bash
-bun -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
-```
-
-> Never commit secrets to source control or the client bundle.
-
-## 4. Create the D1 database
+Create the database first so its ID can be added to your configuration:
 
 ```bash
 bunx wrangler d1 create acfb-email
@@ -68,54 +37,66 @@ The output shows a **database_id** UUID. Put it in `wrangler.jsonc`:
 }]
 ```
 
-Then apply migrations:
+Then apply the migrations:
 
 ```bash
-bunx wrangler d1 execute acfb-email --remote --file=./migrations/0001_initial.sql
+bunx wrangler d1 migrations apply acfb-email --remote
 ```
 
-## 5. Create the sync queue
+## 3. Create the sync queue
 
-The `email-sync` Queue must exist before deploy (it's referenced in `wrangler.jsonc`):
+The `email-sync` Queue must exist before deployment, as it is referenced in `wrangler.jsonc`:
 
 ```bash
 bunx wrangler queues create email-sync
 ```
 
-## 6. Deploy
+## 4. Create the core encryption secret
+
+Generate an encryption key:
 
 ```bash
-bun run deploy
+bun -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
 ```
 
-This runs `vite build` and `wrangler deploy`. First deployment asks you to confirm the Worker name and creates `https://acfb-email.<you>.workers.dev`.
+Save it securely to your Cloudflare Worker:
 
-## 7. Post-deploy verification
+```bash
+bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
+```
 
-1. Visit the URL → sign in with your Cloudflare account (worker-level Access).
-2. Add an IMAP/SMTP account (below), press "Sync now", and confirm messages appear.
+> Never commit secrets to source control or the client bundle.
 
----
+## 5. Configure OAuth providers (Gmail / Outlook)
 
-## Generic IMAP/SMTP accounts
+This step is optional. Follow this step only if you need to connect your Gmail or Outlook account.
 
-Connect accounts from **Settings → Add account**:
+Gmail and Outlook require OAuth. Create your own OAuth App (for free) is the only way to protect your privacy and avoid sharing credentials with a third party.
 
-| Field               | Typical values                                                                    |
-| ------------------- | --------------------------------------------------------------------------------- |
-| IMAP host           | `imap.gmail.com`, `outlook.office365.com`, `imap.mail.yahoo.com`, your provider's |
-| IMAP port           | `993` (implicit TLS) or `143` (STARTTLS)                                          |
-| SMTP host           | `smtp.gmail.com`, `smtp.office365.com`, etc.                                      |
-| SMTP port           | `465` (implicit TLS) or `587` (STARTTLS) — **not 25** (Workers block port 25)     |
-| Username / password | your login; for Gmail use an App Password                                         |
+### Google Cloud app (Gmail)
 
-**SPF caveat**: Workers send from Cloudflare's outbound IP range, so strict SPF domains may reject mail. Use an SMTP host you can reach on 465/587 and whose SPF you control, or accept the limitation for personal use.
+1. Go to <https://console.cloud.google.com/auth/overview>.
+2. Create a new project (or select an existing one).
+3. **Audience -> Test users**: Add your Google account (the one you will use to log in).
+4. **Clients → Create Client**
+   - **Application type**: Web application
+   - **Name**: ACFB Email Client (or whatever you like)
+   - **Authorized JavaScript origins**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev`
+   - **Authorized redirect URIs**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev/api/oauth/google/callback`
+5. You should now have a **Client ID** and **Client Secret**.
 
----
+### Microsoft Entra app (Outlook)
 
-## OAuth providers (Gmail / Outlook)
+1. Go to <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps>.
+2. **App registrations → New registration**
+   - **Name**: ACFB Email Client (or whatever you like)
+   - **Supported account types**: Select **"Personal Microsoft accounts only"**.
+   - **Redirect URI Platform**: Web
+   - **Redirect URI**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev/api/oauth/microsoft/callback`
 
-Set the secrets:
+### Set OAuth Secrets in Cloudflare
+
+Once you have generated the credentials from the steps above, upload them:
 
 ```bash
 bunx wrangler secret put GOOGLE_CLIENT_ID
@@ -124,34 +105,38 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-Then create the app registrations and set their redirect URIs:
+## 6. Deploy
 
-| Provider              | Console                                                          | Redirect URI template                                            |
-| --------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Google**            | <https://console.cloud.google.com/apis/credentials>              | `https://<your-worker>.workers.dev/api/oauth/google/callback`    |
-| **Microsoft (Entra)** | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps> | `https://<your-worker>.workers.dev/api/oauth/microsoft/callback` |
+With the database, queue, and secrets in place, you can safely deploy:
 
-For local development use `http://localhost:5173/api/oauth/<provider>/callback`.
+```bash
+bun run deploy
+```
 
-### Microsoft Entra app (Outlook)
+## 7. Cloudflare Access
 
-1. **App registrations → New registration**.
-2. **Supported account types**: **"Personal Microsoft accounts only"**.
-3. **Redirect URI**: the Microsoft callback above (Web platform).
-4. Grant admin consent if your tenant requires it (not needed for personal MSA).
+Now that the Worker is deployed, protect it in the Cloudflare dashboard.
 
-### Google Cloud app (Gmail)
+1. If Zero Trust is not yet enabled, enable it at <https://one.dash.cloudflare.com>.
+2. Go to **Workers & Pages** → select your Worker → **Access** tab.
+3. Click **Protect this Worker behind Access**.
+   - **Scope**: All traffic
+   - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
 
-1. **APIs & Services → OAuth consent screen** (External), add your Google account as a test user.
-2. **Credentials → Create credentials → OAuth client ID** (Web), set the Gmail redirect URI above.
-3. In the consent screen, add the scope `https://mail.google.com/`.
+### Cookie / CSRF settings
 
----
+1. Navigate to **Zero Trust → Access controls → Applications → Choose the application named something like `acfb-email - Cloudflare Workers` → Additional settings → Cookie settings**
+   - **Same Site Attribute**: Lax
+2. Click **Save**.
+
+## 8. Done!
+
+Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` and log in with your Cloudflare account. Enjoy!
 
 ## Rollback / recovery
 
 - **Code rollback**: `bunx wrangler rollback` reverts to the last deployed version.
-- **Data**: D1 is the authoritative store; deleting the Worker does not delete the D1 database (delete it explicitly).
-- **Lost encryption key**: stored credentials become undecryptable with no backdoor — rotate credentials before changing the key.
-- **Access sessions**: sign out via your Cloudflare account session or by clearing browser cookies.
-- **DB reset**: schema changes during early development may require recreating the database (`wrangler d1 delete` / re-create + re-apply migrations); connected accounts must then be re-added.
+- **Data**: D1 is the authoritative store; deleting the Worker does not delete the database (it must be deleted explicitly).
+- **Lost encryption key**: Stored credentials become undecryptable with no backdoor — rotate all connected email credentials before changing the key.
+- **Access sessions**: Sign out via your Cloudflare account session or by clearing browser cookies.
+- **DB reset**: Schema changes during early development may require recreating the database (`wrangler d1 delete` then recreate and migrate); connected email accounts must then be re-added.

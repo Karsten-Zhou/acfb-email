@@ -2,8 +2,6 @@
 
 This document explains how ACFB Email is put together and why. It is written for a technically capable reader who does not assume prior knowledge of Cloudflare/Workers internals.
 
----
-
 ## 1. Big picture
 
 A single Cloudflare Worker serves both the **frontend** (a Vue 3 SPA, served via Workers Assets) and the **backend** (a Hono API mounted under `/api/*`). The browser talks only to our API; it never connects to your mail server or impersonates you to a provider.
@@ -30,8 +28,6 @@ Cloudflare Worker
 - No separate API origin, no CORS surface, simpler secrets/bindings.
 - SPA fallback is free (assets are served by Cloudflare's edge, not the Worker).
 
----
-
 ## 2. Component breakdown
 
 | Component         | Path                        | Responsibility                                                                                                         |
@@ -48,8 +44,6 @@ Cloudflare Worker
 | Repo              | `server/db/repo.ts`         | D1 access, ownership-scoped queries                                                                                    |
 | Crypto            | `server/security/crypto.ts` | AES-GCM for stored credentials                                                                                         |
 | Shared            | `shared/`                   | Zod schemas + inferred types used by both ends                                                                         |
-
----
 
 ## 3. End-to-end flows
 
@@ -91,8 +85,6 @@ CSRF is handled by Cloudflare Access at the edge, not by the app: Access issues 
 
 Drafts are stored provider-side (IMAP APPEND to the Drafts folder); there is no local drafts table.
 
----
-
 ## 4. Data model (D1)
 
 ```text
@@ -125,8 +117,6 @@ app_settings(id PK, data JSON)   -- singleton
 - We store only small text/html previews in `messages`. Full bodies are fetched from the provider on demand and cached as previews (max 64KB) after first read.
 - Sync runs per mailbox (`server/sync/sync-service.ts`): a provider sync uses a cooperative AbortSignal (time budget) instead of racing a timeout, applies changes in one `env.DB.batch()`, then reconciles stale locations against the provider's current UID set and prunes orphaned messages.
 
----
-
 ## 5. Synchronization design
 
 **Sync is enqueued, not inline**: account add / OAuth connect push a job to the `email-sync` Queue (`wrangler.jsonc` producer binding `SYNC_QUEUE`); the `queue()` consumer in `server/index.ts` runs it. A queue consumer gets 15 minutes of wall-time (vs `waitUntil`'s 30 s), which a slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls `POST /api/accounts/:id/sync` synchronously.
@@ -156,8 +146,6 @@ app_settings(id PK, data JSON)   -- singleton
    the newest page; older mail is backfilled by load-older.
 ```
 
----
-
 ## 6. Provider adapter
 
 `ImapProvider` (`server/email/imap.ts`) is the mail adapter — an IMAP/SMTP implementation built on `imapflow`. Generic IMAP accounts authenticate with a password; Gmail and Outlook authenticate via OAuth2 (XOAUTH2) on their well-known IMAP/SMTP endpoints. `buildProvider` (`server/email/build-provider.ts`) constructs it from a persisted account, selecting the transport and auth method.
@@ -180,23 +168,20 @@ app_settings(id PK, data JSON)   -- singleton
 
 `imapflow` is the IMAP engine, running on workerd's `node:net`/`node:tls`/`node:stream` support. It needs one small patch (kept in `patches/imapflow@1.7.6.patch`): workerd fires the stream `'readable'` event earlier than Node — while imapflow's reader reentrancy guard is still held — so a tagged response is dropped and the command never settles. The patch makes `socketReadable` remember the missed event and re-run the reader (verified live against QQ Mail, 2026-08-27); keep it in sync when bumping imapflow. imapflow covers LIST, SELECT, SEARCH, FETCH, STORE flags, COPY, MOVE, DELETE, APPEND, STARTTLS/implicit TLS, plus SPECIAL-USE folder detection and modified UTF-7 mailbox-name decoding. `COMPRESS=DEFLATE` is disabled in the provider (`disableCompression: true`) because workerd's compressed stream chain drops large responses (verified live against QQ Mail, 2026-08-27).
 
----
-
 > **Status note (2026-08):** the IMAP/SMTP adapter is **tested live** (QQ Mail). Gmail and Outlook authenticate via **OAuth2 (XOAUTH2)** — they need Google Cloud / Entra app registrations with OAuth consent to be configured before they can be verified against real accounts.
 
 ## 7. Cloudflare resource usage
 
 | Resource             | Used? | Why                                                                 |
 | -------------------- | ----- | ------------------------------------------------------------------- |
-| Workers              | ✅    | Serves SPA + API (free-tier 100k req/day is far above personal use) |
+| Workers              | ✅    | Serves SPA + API (free-tier 100k req/day)                           |
 | D1                   | ✅    | Relational data (accounts, mailboxes, messages)                     |
 | Workers Assets       | ✅    | Serves the Vue SPA from edge (free)                                 |
-| `cloudflare:sockets` | ✅    | Outbound SMTP TCP (IMAP runs via workerd `node:net`/`node:tls`)     |
-| KV                   | ❌    | No need in v1; possible later for short-lived caches                |
-| R2                   | ❌    | Deferred — attachments are metadata-only in v1 (documented)         |
+| `cloudflare:sockets` | ✅    | Outbound SMTP TCP                                                   |
+| KV                   | ❌    | Not needed for now; possible later for short-lived caches           |
+| R2                   | ❌    | Not needed for now                                                  |
 | Queues               | ✅    | Background account syncs (`email-sync` consumer) — 15-min wall-time |
-| Cron                 | ❌    | Not needed; sync is enqueued on add/connect + manual trigger        |
-| WebSockets/SSE       | ❌    | Not needed for v1 (refresh + periodic sync model)                   |
+| Cron                 | ❌    | Not needed for now                                                  |
 | Browser Push         | ⏳    | Table reserved; Service Worker + push to be wired in a later phase  |
 
 ### Free-tier risks
@@ -206,13 +191,3 @@ app_settings(id PK, data JSON)   -- singleton
 - **6 simultaneous connections/request**: sync connects to one provider at a time (mailboxes sequentially); send uses one SMTP connection. Compliant.
 - **Subrequests (50/invocation)**: sync iterates mailboxes sequentially; each mailbox costs ~4-6 IMAP commands over one socket (not subrequests). Compliant.
 - **Worker memory 128MB**: literal FETCH of a single message body is bounded by request size limits; envelope fetches are chunked at 100 UIDs.
-
----
-
-## 8. Deviations from the spec & reasons
-
-1. **HTML sanitization is client-side (browser), not in the Worker.** Current DOMPurify requires a DOM, which the Worker doesn't have. The Worker still only returns small text/html previews, and the client always runs DOMPurify before rendering. This is standard practice for email clients.
-2. **Cron deferred; sync via Queue**: sync is enqueued on account add / OAuth connect and consumed by the `email-sync` Queue consumer (15-min wall-time, vs waitUntil's 30 s cap). `syncAccount` is the single entry point so a Cron trigger could be added later.
-3. **Attachments are metadata-only**: the `attachments` table tracks filename/type/size/part handle; binary bytes are never stored in Cloudflare infra and are re-fetched live from the provider on download via `fetchAttachment`. Forward-as-attachment re-fetches the full raw source on demand.
-4. **POP3 is not implemented**: POP3 has materially weaker semantics than IMAP and would not provide inbox-style UX. Deferred; the provider interface allows a read/import-oriented adapter later.
-5. **SMTP on port 25 is impossible from Workers** (verified in official docs); we use 587/465 submission. SPF implications are documented in [deployment](./deployment.md).

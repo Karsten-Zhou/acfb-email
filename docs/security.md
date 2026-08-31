@@ -2,8 +2,6 @@
 
 This document describes the threat model for ACFB Email, the controls we implement, and the boundary between provider/Cloudflare/application responsibilities.
 
----
-
 ## 1. Overview
 
 The application is a single-user personal mail client. Its most sensitive assets are:
@@ -25,8 +23,6 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 | HTML email sanitization                                          | App (DOMPurify in browser)                                      |
 | Abuse/DoS of endpoints                                           | Cloudflare (rate limiting optional) + app (input limits)        |
 
----
-
 ## 2. Threat model & what we protect against
 
 | Threat                                                      | Control                                                                                                                                |
@@ -47,8 +43,6 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 - **Provider-side compromise**: if your mail provider is compromised, all bets are off (the provider already holds your mail and can reset your account).
 - **Client machine compromise**: local malware can use the authenticated browser session (Cloudflare Access) or view the UI. We cannot prevent that.
 
----
-
 ## 3. Application access (Cloudflare Access)
 
 - The Worker is protected by worker-level Cloudflare Access (policy: account members only). Access authenticates at the edge before the Worker runs; requests that fail Access never reach the Worker.
@@ -67,7 +61,6 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 - **Untrusted input**: email HTML is treated as hostile.
 - Sanitization: `DOMPurify` (browser) on every render path; blocked tags/attrs (scripts, event handlers, `javascript:` URLs, `iframe`, etc.).
 - The list API returns only small previews; the detail API returns parsed text/html previews from PostalMime (which bounds nesting/headers).
-- Attachments are metadata-only in v1 (no inline execution possible).
 - External images are hidden by default (never/whitelist/always setting in Settings → Privacy, persisted client-side in localStorage). When hidden, a banner lets the user load them once, allow the sender, or always allow. Inline (`cid:`) images — the actual attachments, served same-origin via our endpoint — always render.
 
 ## 6. Secrets management
@@ -100,7 +93,7 @@ Configure both under **Zero Trust → Access controls → Applications → Confi
 - Server logs: method + path + error class; no request bodies, no cookies, no credential strings.
 - `HttpError` carries a status + public message; unknown errors become a generic 500 with the real error logged server-side only.
 
-## 10. Security checklist status (v1)
+## 10. Security checklist status
 
 - [x] Cloudflare Access (worker-level, account members only) — enforced at the edge
 - [x] CSRF: Cloudflare Access `CF_AppSession` cookie + `SameSite=Lax` on `CF_Authorization`

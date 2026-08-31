@@ -13,7 +13,9 @@ A Cloudflare based (ACFB) web email client that runs on **Cloudflare Workers (Fr
 
 ## Quick start
 
-See [docs/development.md](./docs/development.md) for setup and day-to-day commands.
+If you want to have your own email client, see [docs/deployment.md](./docs/deployment.md).
+
+If you want to develop or contribute, see [docs/contributing.md](./docs/contributing.md) and [docs/development.md](./docs/development.md).
 
 ## Documentation
 

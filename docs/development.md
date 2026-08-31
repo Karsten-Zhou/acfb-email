@@ -1,14 +1,9 @@
 # Development
 
-Everything you need to work on ACFB Email day to day.
-
----
-
 ## Prerequisites
 
-- **Bun** >= 1.3 (package manager + runtime for scripts)
-- Node 22+ (for some tooling internals)
-- A Cloudflare account (only for deploy/preview; local dev works offline)
+- [Bun](https://bun.sh) or [Node.js](https://nodejs.org)
+- A [Cloudflare account](https://dash.cloudflare.com) (only for deploy/preview; local dev works offline)
 
 ## First-time setup
 
