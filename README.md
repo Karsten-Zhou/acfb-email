@@ -1,13 +1,8 @@
-# Cloudflare Email Client
+# ACFB Email Client
 
-A personal, polished web email client that runs on **Cloudflare Workers (Free tier)**.
-Connect multiple email accounts (IMAP/SMTP — Gmail and Microsoft/Outlook via OAuth,
-generic accounts via password) and read, send, and organize mail through one unified
-interface.
+A Cloudflare based (ACFB) web email client that runs on **Cloudflare Workers (Free tier)**. Connect multiple email accounts (IMAP/SMTP — Gmail and Microsoft/Outlook via OAuth, generic accounts via password) and read, send, and organize mail through one unified interface.
 
-> This is a **personal, single-user** application. Access is gated by Cloudflare
-> Access at the edge (only members of your Cloudflare account can sign in). It is
-> not designed for multi-user hosting.
+> This is a **personal, single-user** application. Access is gated by Cloudflare Access at the edge (only members of your Cloudflare account can sign in). It is not designed for multi-user hosting.
 
 ---
 
@@ -37,8 +32,7 @@ bun run lint                # eslint
 bun run dev                 # local dev (Vite + Cloudflare plugin)
 ```
 
-Open <http://localhost:5173>. There is no app-level login: Cloudflare Access
-gates the app at the edge in production, and local dev is always "authenticated".
+Open <http://localhost:5173>. There is no app-level login: Cloudflare Access gates the app at the edge in production, and local dev is always "authenticated".
 
 ---
 
@@ -57,30 +51,30 @@ migrations/ D1 schema migrations
 e2e/        integration tests (Vitest + Cloudflare plugin)
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design, [SECURITY.md](./SECURITY.md)
-for the threat model, [DEVELOPMENT.md](./DEVELOPMENT.md) for daily workflow, and
-[DEPLOYMENT.md](./DEPLOYMENT.md) for shipping to Cloudflare.
+The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/architecture.md) for the design, [security](./docs/security.md) for the threat model, [development](./docs/development.md) for the daily workflow, and [deployment](./docs/deployment.md) for shipping to Cloudflare.
+
+Run the docs locally with `bun run docs:dev`.
 
 ---
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `bun run dev` | Start local dev server (Vite + Workers runtime) |
-| `bun run build` | Production build (client + worker) |
-| `bun run preview` | Serve the production build locally |
-| `bun run typecheck` | `vue-tsc` (app) + `tsc` (worker) |
-| `bun run test` | Vitest (runs in Workers runtime via `@cloudflare/vitest-plugin`) |
-| `bun run lint` | ESLint |
-| `bun run deploy` | Build + `wrangler deploy` |
+| Command              | What it does                                                     |
+| -------------------- | ---------------------------------------------------------------- |
+| `bun run dev`        | Start local dev server (Vite + Workers runtime)                  |
+| `bun run build`      | Production build (client + worker)                               |
+| `bun run preview`    | Serve the production build locally                               |
+| `bun run typecheck`  | `vue-tsc` (app) + `tsc` (worker)                                 |
+| `bun run test`       | Vitest (runs in Workers runtime via `@cloudflare/vitest-plugin`) |
+| `bun run lint`       | ESLint                                                           |
+| `bun run docs:dev`   | VitePress docs dev server                                        |
+| `bun run docs:build` | Build the VitePress docs site                                    |
+| `bun run deploy`     | Build + `wrangler deploy`                                        |
 
 ---
 
 ## Status & known limitations
 
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
-- Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain
-  must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).
-- **Forward** is not wired (only reply/reply-all); attachments go on new or replied
-  messages, not forwarded ones.
+- Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).
+- **Forward** is not wired (only reply/reply-all); attachments go on new or replied messages, not forwarded ones.

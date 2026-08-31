@@ -17,9 +17,9 @@ pre-commit:
   parallel: false
   commands:
     format:
-      # Only code/JSON — don't reformat docs/specs (specs.md etc).
+      # Code, JSON, and markdown (docs included).
       # Re-add the (re)written files so the commit picks up the formatted output.
-      glob: '*.{ts,vue,js,cjs,mjs,json,jsonc}'
+      glob: '*.{ts,vue,js,cjs,mjs,json,jsonc,md}'
       run: bunx prettier --write {staged_files} && git add {staged_files}
     lint:
       glob: '*.{ts,vue,js}'

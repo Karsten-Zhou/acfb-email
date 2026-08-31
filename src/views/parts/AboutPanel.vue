@@ -5,7 +5,7 @@ import { Info, ExternalLink } from "@lucide/vue";
 
 const appVersion = __APP_VERSION__;
 const appBuildTime = __APP_BUILD_TIME__;
-const APP_REPO_URL = "https://github.com/XiaoSong-CPE/a-cloudflare-based-email-client";
+const APP_REPO_URL = "https://github.com/Karsten-Zhou/acfb-email";
 </script>
 
 <template>

@@ -1,5 +1,3 @@
--- Initial schema for the Cloudflare email client.
-
 -- ------------------------------------------------------------------
 -- accounts: connected email accounts (provider-agnostic metadata).
 -- ------------------------------------------------------------------

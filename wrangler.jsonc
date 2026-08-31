@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cloudflare-email-client",
+  "name": "acfb-email",
   "main": "server/index.ts",
   "compatibility_date": "2026-08-27",
   "assets": {
