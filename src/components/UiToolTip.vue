@@ -73,6 +73,12 @@ onLongPress(triggerEl, () => (open.value = true), {
   },
 });
 
+// A long-press also fires the browser's native `contextmenu` event, which would
+// pop the system context menu right on top of the tooltip. Suppress it on the
+// trigger (these are icon buttons with no right-click action; a short tap never
+// fires `contextmenu`, so only long-press/right-click are affected).
+useEventListener(triggerEl, "contextmenu", (e: Event) => e.preventDefault());
+
 // A tap anywhere outside the trigger dismisses an open tooltip (Android pattern).
 useEventListener("pointerdown", (e: PointerEvent) => {
   if (!open.value) return;
