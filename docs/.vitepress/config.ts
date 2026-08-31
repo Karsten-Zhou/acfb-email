@@ -31,7 +31,7 @@ export default defineConfig({
           { text: "Architecture", link: "/architecture" },
           { text: "Deployment", link: "/deployment" },
           { text: "Security", link: "/security" },
-          { text: "Contributing", link: "/agents" },
+          { text: "Contributing", link: "/contributing" },
         ],
       },
     ],

@@ -1,4 +1,4 @@
-# Contributing / Agent guidance
+# Contributing
 
 Guidance for AI coding agents and human contributors working in this repository. Keep this file updated when the architecture or conventions change. Be brief — the goal is a quick orientation, not a full spec.
 
@@ -13,20 +13,9 @@ A self-hosted, personal email client (**ACFB Email**) deployed to a single Cloud
 
 The frontend talks to the API through `src/lib/api.ts`. Cross-provider abstractions and their types are defined in `server/email/`.
 
-## Commands (bun)
+## Commands
 
-| Task              | Command                                                                           |
-| ----------------- | --------------------------------------------------------------------------------- |
-| Dev server        | `bun run dev` (Vite default port 5173; the Vite plugin stays on the default port) |
-| Build             | `bun run build`                                                                   |
-| Type-check app    | `bun run typecheck:app`                                                           |
-| Type-check server | `bun run typecheck:server`                                                        |
-| Lint              | `bun run lint`                                                                    |
-| Test              | `bun run test` (vitest)                                                           |
-| Format            | `bun run format`                                                                  |
-| Deploy            | `bun run deploy` (`vite build && wrangler deploy`)                                |
-| Docs              | `bun run docs:dev` / `bun run docs:build` (VitePress)                             |
-| Local DB migrate  | `bunx wrangler d1 execute <DB> --local --file=./migrations/0001_initial.sql`      |
+The full command list is in [Development → Day-to-day commands](./development.md#day-to-day-commands).
 
 - Prefer `bun run …` over `bun …` for scripts that call vitest/tsc — `bun <cmd>` can route to `bun:test` and ignore the vitest config.
 - **Formatting is owned by Prettier 3.9.** After any manual edit, run `bun run format`; `bun run format:check` must pass in CI. Markdown (docs) is formatted too.

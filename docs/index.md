@@ -30,4 +30,4 @@ features:
 - [Architecture](./architecture.md) — how the application is put together and why.
 - [Deployment](./deployment.md) — shipping to Cloudflare Workers.
 - [Security](./security.md) — threat model and controls.
-- [Contributing](./agents.md) — guidance for AI coding agents and contributors.
+- [Contributing](./contributing.md) — guidance for AI coding agents and contributors.

@@ -49,6 +49,8 @@ bunx wrangler d1 execute acfb-email --local --file=./migrations/0001_initial.sql
 | Deploy                   | `bun run deploy`                        |
 | Docs (dev server)        | `bun run docs:dev`                      |
 | Docs (static build)      | `bun run docs:build`                    |
+| Format                   | `bun run format`                        |
+| Format check (CI)        | `bun run format:check`                  |
 
 ### Testing notes
 
