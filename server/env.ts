@@ -19,7 +19,6 @@ export interface Env {
   MICROSOFT_CLIENT_ID?: string;
   MICROSOFT_CLIENT_SECRET?: string;
   // Vars
-  APP_URL: string;
   SYNC_FETCH_LIMIT: string;
   SYNC_TIMEOUT_MS: string;
 }

@@ -2,8 +2,9 @@
 // IMAP/SMTP access (XOAUTH2).
 import type { Env } from "../env";
 import type { OAuthProviderConfig } from "./client";
+import { makeRedirectUri } from "./client";
 
-export function googleConfig(env: Env): OAuthProviderConfig {
+export function googleConfig(env: Env, baseUrl: string): OAuthProviderConfig {
   return {
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
@@ -17,11 +18,11 @@ export function googleConfig(env: Env): OAuthProviderConfig {
       "email",
       "profile",
     ],
-    redirectUri: () => `${env.APP_URL.replace(/\/$/, "")}/api/oauth/google/callback`,
+    redirectUri: makeRedirectUri(baseUrl, "google"),
   };
 }
 
-export function microsoftConfig(env: Env): OAuthProviderConfig {
+export function microsoftConfig(env: Env, baseUrl: string): OAuthProviderConfig {
   return {
     // Personal (consumer) Microsoft accounts — matches an Entra app whose
     // "Supported account types" is "Personal Microsoft accounts only".
@@ -52,10 +53,14 @@ export function microsoftConfig(env: Env): OAuthProviderConfig {
       "https://outlook.office.com/SMTP.Send",
       "offline_access",
     ],
-    redirectUri: () => `${env.APP_URL.replace(/\/$/, "")}/api/oauth/microsoft/callback`,
+    redirectUri: makeRedirectUri(baseUrl, "microsoft"),
   };
 }
 
-export function configFor(env: Env, provider: "google" | "microsoft"): OAuthProviderConfig {
-  return provider === "google" ? googleConfig(env) : microsoftConfig(env);
+export function configFor(
+  env: Env,
+  baseUrl: string,
+  provider: "google" | "microsoft",
+): OAuthProviderConfig {
+  return provider === "google" ? googleConfig(env, baseUrl) : microsoftConfig(env, baseUrl);
 }

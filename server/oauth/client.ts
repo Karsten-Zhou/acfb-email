@@ -24,7 +24,7 @@ export interface OAuthProviderConfig {
   /** Single-resource scopes echoed on the token request so the access token is
    *  minted for the provider's mail endpoints. */
   tokenScopes?: string[];
-  redirectUri: (envBase: string) => string;
+  redirectUri: string;
 }
 
 const SCOPE_DELIMITERS = {
@@ -37,7 +37,7 @@ export function buildAuthorizeUrl(cfg: OAuthProviderConfig, state: string): stri
   const qs = new URLSearchParams({
     client_id: cfg.clientId,
     response_type: "code",
-    redirect_uri: cfg.redirectUri(""),
+    redirect_uri: cfg.redirectUri,
     scope: cfg.scopes.join(SCOPE_DELIMITERS.google),
     state,
     access_type: "offline",

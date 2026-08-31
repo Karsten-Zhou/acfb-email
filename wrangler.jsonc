@@ -34,7 +34,6 @@
     ],
   },
   "vars": {
-    "APP_URL": "http://localhost:5173",
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
   },

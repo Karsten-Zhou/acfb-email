@@ -74,22 +74,7 @@ Then apply migrations:
 bunx wrangler d1 execute acfb-email --remote --file=./migrations/0001_initial.sql
 ```
 
-## 5. Production environment variables
-
-Set the production `APP_URL` (your deployed URL) under `env.production.vars` in `wrangler.jsonc`:
-
-```jsonc
-"env": {
-  "production": {
-    "vars": { "APP_URL": "https://your-worker.workers.dev" },
-    "d1_databases": [/* as above */]
-  }
-}
-```
-
-Deploy the production env with `wrangler deploy --env production`. Secrets are shared across environments unless overridden.
-
-## 6. Create the sync queue
+## 5. Create the sync queue
 
 The `email-sync` Queue must exist before deploy (it's referenced in `wrangler.jsonc`):
 
@@ -97,7 +82,7 @@ The `email-sync` Queue must exist before deploy (it's referenced in `wrangler.js
 bunx wrangler queues create email-sync
 ```
 
-## 7. Deploy
+## 6. Deploy
 
 ```bash
 bun run deploy
@@ -105,7 +90,7 @@ bun run deploy
 
 This runs `vite build` and `wrangler deploy`. First deployment asks you to confirm the Worker name and creates `https://acfb-email.<you>.workers.dev`.
 
-## 8. Post-deploy verification
+## 7. Post-deploy verification
 
 1. Visit the URL → sign in with your Cloudflare account (worker-level Access).
 2. Add an IMAP/SMTP account (below), press "Sync now", and confirm messages appear.

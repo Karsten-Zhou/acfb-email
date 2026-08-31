@@ -5,6 +5,7 @@
 //         tokens, and create the account row. The stored access token is
 //         later used for IMAP/SMTP XOAUTH2 authentication.
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { randomUUID } from "crypto";
 import type { Env } from "../env";
@@ -23,19 +24,26 @@ import { configFor } from "../oauth/config";
 
 const OAUTH_STATE_COOKIE = "ec_oauth_state";
 
+/** Origin (scheme + host) the app was reached at, derived from the request.
+ *  Lets us drop the APP_URL var: the redirect URI, cookie secure flag, and
+ *  final redirect all follow how the client actually reached us. */
+function appOrigin(c: Context<{ Bindings: Env }>): string {
+  return new URL(c.req.url).origin;
+}
+
 export const oauthRoutes = new Hono<{ Bindings: Env }>();
 
 // GET /api/oauth/:provider/start?action=connect|reconnect
 oauthRoutes.get("/:provider/start", async (c) => {
   const provider = parseProvider(c.req.param("provider"));
-  const cfg = configFor(c.env, provider);
+  const cfg = configFor(c.env, appOrigin(c), provider);
   if (!cfg.clientId || !cfg.clientSecret) {
     throw new HttpError(503, `${provider} OAuth is not configured (missing secrets)`);
   }
   const state = randomToken();
   setCookie(c, OAUTH_STATE_COOKIE, state, {
     httpOnly: true,
-    secure: c.env.APP_URL.startsWith("https://"),
+    secure: appOrigin(c).startsWith("https://"),
     sameSite: "Lax",
     path: "/api/oauth",
     maxAge: 600,
@@ -55,9 +63,8 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   }
   setCookie(c, OAUTH_STATE_COOKIE, "", { maxAge: 0, path: "/api/oauth" });
 
-  const cfg = configFor(c.env, provider);
-  const redirectUri = cfg.redirectUri(c.env.APP_URL);
-  const token = await exchangeCode(cfg, code, redirectUri);
+  const cfg = configFor(c.env, appOrigin(c), provider);
+  const token = await exchangeCode(cfg, code, cfg.redirectUri);
 
   const info = await fetchOwnerInfo(provider, token);
 
@@ -114,7 +121,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   }
 
   // Back to Settings with a query flag so the page shows a success notice.
-  return c.redirect(`${c.env.APP_URL}/settings?connected=${provider}`);
+  return c.redirect(`${appOrigin(c)}/settings?connected=${provider}`);
 });
 
 async function fetchOwnerInfo(
@@ -197,7 +204,7 @@ export async function loadOauthToken(
 
   let tok = parsed.token;
   if (!tokenValid(tok)) {
-    const cfg = configFor(env, account.provider === "gmail" ? "google" : "microsoft");
+    const cfg = configFor(env, "", account.provider === "gmail" ? "google" : "microsoft");
     tok = await refreshToken(cfg, tok.refresh_token);
     // Persist the refreshed token.
     const tokenBlob = JSON.stringify({ type: "oauth", token: tok });

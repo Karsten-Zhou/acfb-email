@@ -72,10 +72,10 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 
 ## 6. Secrets management
 
-| Secret                        | Where                             |
-| ----------------------------- | --------------------------------- |
-| `CREDENTIAL_ENCRYPTION_KEY`   | Cloudflare secret                 |
-| `APP_URL`, `SYNC_FETCH_LIMIT` | Wrangler vars (non-secret config) |
+| Secret                      | Where                             |
+| --------------------------- | --------------------------------- |
+| `CREDENTIAL_ENCRYPTION_KEY` | Cloudflare secret                 |
+| `SYNC_FETCH_LIMIT`          | Wrangler vars (non-secret config) |
 
 `.env.example` contains placeholders only. `.env` is never committed (gitignore). No secrets in client bundles: the SPA has no access to any of the above; it can only call our API.
 
