@@ -5,6 +5,7 @@
     "": {
       "name": "acfb-email",
       "dependencies": {
+        "@fluentui/priority-overflow": "^9.4.3",
         "@formatjs/intl-localematcher": "^0.8.13",
         "@lucide/vue": "^1.37.0",
         "@tailwindcss/vite": "^4.3.3",
@@ -213,6 +214,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "https://registry.npmmirror.com/@floating-ui/utils/-/utils-0.2.12.tgz", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@floating-ui/vue": ["@floating-ui/vue@1.1.11", "https://registry.npmmirror.com/@floating-ui/vue/-/vue-1.1.11.tgz", { "dependencies": { "@floating-ui/dom": "^1.7.6", "@floating-ui/utils": "^0.2.11", "vue-demi": ">=0.13.0" } }, "sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw=="],
+
+    "@fluentui/priority-overflow": ["@fluentui/priority-overflow@9.4.3", "https://registry.npmmirror.com/@fluentui/priority-overflow/-/priority-overflow-9.4.3.tgz", { "dependencies": { "@swc/helpers": "^0.5.1" } }, "sha512-2BntHbObEJ8zuHni2/Finy20o0YEX4x1LAhL/lbft38YI1BN06QMdyxH6wD15iBxD9XX5mypdDWg7DusNJsMDw=="],
 
     "@formatjs/fast-memoize": ["@formatjs/fast-memoize@3.1.7", "https://registry.npmmirror.com/@formatjs/fast-memoize/-/fast-memoize-3.1.7.tgz", {}, "sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA=="],
 

@@ -1,12 +1,26 @@
 <script setup lang="ts">
 // MessageReaderPane — the rightmost reading column: header actions
 // (back/reply/star/read/move/delete), meta rows, and the sanitized body.
-// When the pane itself is narrow the icon actions collapse behind a "…" menu
-// (decided by the pane's measured width, not the viewport, since the sidebar
-// + list can squeeze it on any screen size); a roomy pane shows them inline.
-// The "…" menu itself is a generic useOverflowMenu; this file only decides
-// which header renders (ResizeObserver on the pane) and maps actions to emits.
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+//
+// The header actions use a priority overflow (@fluentui/priority-overflow):
+// every action is a labelled button in a single flex row, and as the pane
+// narrows the lowest-priority actions automatically fold into a "…" menu
+// (reply/forward have the highest priority and stay visible longest). The
+// overflow manager measures the action row's own width (not the viewport,
+// since the sidebar + list can squeeze the pane on any screen size). The "…"
+// menu itself is positioned by the generic useOverflowMenu; this file only
+// maps each action's priority and folds the overflowed ones into that menu.
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+  type Component,
+} from "vue";
+import { createOverflowManager } from "@fluentui/priority-overflow";
 import { useRemoteImageControl } from "../../composables/useRemoteImageControl";
 import RemoteImagesBanner from "./RemoteImagesBanner.vue";
 import type { MessageDetail } from "@shared/types";
@@ -52,9 +66,46 @@ const emit = defineEmits<{
   "confirm-delete": [];
 }>();
 
-/** Actions reachable from the mobile "…" menu (map 1:1 to emits). */
+/** Actions reachable from the header (map 1:1 to emits). */
 type ReaderAction =
   "forward" | "reply" | "toggle-star" | "toggle-read" | "move-message" | "confirm-delete";
+
+/** A header action: icon + text label, plus its overflow priority. */
+interface ActionDef {
+  key: ReaderAction;
+  icon: Component;
+  label: () => string;
+  /** Higher priority = overflows later (stays visible longer). */
+  priority: number;
+  danger?: boolean;
+}
+
+/** All header actions, in display order. Reply/forward are the most important,
+ *  so they get the highest priorities and only fold as a last resort. */
+const actions: ActionDef[] = [
+  { key: "reply", icon: Reply, label: () => t("message.reply"), priority: 6 },
+  { key: "forward", icon: Forward, label: () => t("message.forward"), priority: 5 },
+  {
+    key: "toggle-star",
+    icon: Star,
+    label: () => (props.message?.isStarred ? t("message.unstar") : t("message.star")),
+    priority: 4,
+  },
+  {
+    key: "toggle-read",
+    icon: MailIcon,
+    label: () => (props.message?.isRead ? t("message.markUnread") : t("message.markRead")),
+    priority: 3,
+  },
+  { key: "move-message", icon: FolderInput, label: () => t("message.moveTo"), priority: 2 },
+  {
+    key: "confirm-delete",
+    icon: Trash2,
+    label: () => t("common.delete"),
+    priority: 1,
+    danger: true,
+  },
+];
 
 // ---- mobile "…" action menu (generic anchored menu) ----
 const {
@@ -66,66 +117,146 @@ const {
   close: closeMore,
 } = useOverflowMenu();
 
-// ---- header layout: inline buttons vs "…" menu ----
-// The pane's own width decides which header renders (ResizeObserver on the
-// pane, not a viewport breakpoint — the sidebar + list can squeeze the pane
-// on any screen size). Starts wide so a roomy header never flashes collapsed.
-const paneEl = ref<HTMLElement | null>(null);
-const paneWidth = ref(Number.POSITIVE_INFINITY);
-/** Below this pane width the action buttons collapse behind the "…" menu. */
-const COMPACT_HEADER_PX = 420;
-const compactHeader = computed(() => paneWidth.value < COMPACT_HEADER_PX);
-let resizeObserver: ResizeObserver | null = null;
+// ---- priority overflow (@fluentui/priority-overflow) ----
+// The manager observes the action row and, from each item's measured width +
+// priority, decides which buttons fit and which must fold into the "…" menu.
+// Visibility is driven through `itemVisibility` (v-show on each button).
+const overflowContainerEl = ref<HTMLElement | null>(null);
+const actionBtnEls = ref<Partial<Record<ReaderAction, HTMLElement | null>>>({});
+const itemVisibility = reactive<Record<string, boolean>>(
+  Object.fromEntries(actions.map((a) => [a.key, true])),
+);
+const invisibleIds = ref<string[]>([]);
+const overflowVisible = computed(() => invisibleIds.value.length > 0);
 
-// If the pane widens past the threshold while the "…" menu is open, close it.
-watch(compactHeader, (compact) => {
-  if (!compact) closeMore();
-});
+let overflowManager: ReturnType<typeof createOverflowManager> | null = null;
+let overflowObserving = false;
 
-onMounted(() => {
-  resizeObserver = new ResizeObserver((entries) => {
-    const w = entries[0]?.contentRect.width;
-    if (typeof w === "number") paneWidth.value = w;
-  });
-  if (paneEl.value) resizeObserver.observe(paneEl.value);
-});
-onUnmounted(() => {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-});
-
-/** Run a mobile-menu action. Star/read leave the menu open so their in-flight
- *  spinner is visible; the watcher below closes it once the request settles.
- *  Everything else dismisses immediately. */
-function runAction(action: ReaderAction) {
-  switch (action) {
-    case "toggle-star":
-    case "toggle-read":
-      break;
-    default:
-      closeMore();
+// Stable per-key ref callbacks (so re-renders don't null out the DOM refs).
+const actionRefFns: Record<string, (el: unknown) => void> = {};
+function getActionRef(key: ReaderAction) {
+  if (!actionRefFns[key]) {
+    actionRefFns[key] = (el: unknown) => {
+      const node = (el as { $el?: HTMLElement } | null)?.$el ?? (el as HTMLElement | null);
+      actionBtnEls.value[key] = node;
+    };
   }
-  switch (action) {
-    case "reply":
-      emit("reply");
-      break;
-    case "forward":
-      emit("forward");
-      break;
-    case "toggle-star":
-      emit("toggle-star");
-      break;
-    case "toggle-read":
-      emit("toggle-read");
-      break;
-    case "move-message":
-      emit("move-message");
-      break;
-    case "confirm-delete":
-      emit("confirm-delete");
-      break;
-  }
+  return actionRefFns[key];
 }
+
+function teardownOverflow() {
+  overflowManager?.disconnect();
+  overflowManager = null;
+  overflowObserving = false;
+  for (const a of actions) itemVisibility[a.key] = true;
+  invisibleIds.value = [];
+  actionBtnEls.value = {};
+}
+
+function setupOverflow() {
+  if (!props.message) return;
+  nextTick(() => {
+    // The message may have been deselected while we waited for the DOM.
+    if (!props.message || !overflowContainerEl.value) return;
+    if (!overflowManager) {
+      overflowManager = createOverflowManager({
+        overflowDirection: "end",
+        padding: 8, // gap between buttons
+        onUpdateItemVisibility: ({ item, visible }) => {
+          // Apply visibility synchronously (attribute + CSS), as the official
+          // contract requires, so the engine's width measurements and the DOM
+          // never race; also track the id for the "…" menu contents.
+          itemVisibility[item.id] = visible;
+          if (visible) item.element.removeAttribute("data-overflowing");
+          else item.element.setAttribute("data-overflowing", "");
+        },
+        onUpdateOverflow: ({ invisibleItems }) => {
+          invisibleIds.value = invisibleItems.map((i) => i.id);
+        },
+      });
+    }
+    for (const a of actions) {
+      const el = actionBtnEls.value[a.key];
+      if (el) overflowManager.addItem({ element: el, id: a.key, priority: a.priority });
+    }
+    if (moreBtnEl.value) overflowManager.addOverflowMenu(moreBtnEl.value);
+    if (!overflowObserving) {
+      overflowManager.observe(overflowContainerEl.value, { forceUpdate: true });
+      overflowObserving = true;
+    } else {
+      overflowManager.forceUpdate();
+    }
+  });
+}
+
+// Set up overflow when a message opens; tear down and rebuild when it changes.
+watch(
+  () => props.message,
+  (msg, prev) => {
+    if (msg !== prev) {
+      teardownOverflow();
+      if (msg) setupOverflow();
+    }
+  },
+);
+onMounted(() => {
+  if (props.message) setupOverflow();
+});
+onUnmounted(teardownOverflow);
+
+// Re-measure when a button's text/icon width can change (star/read toggling or
+// an in-flight spinner replacing an icon) so folding stays correct.
+watch(
+  [
+    () => props.message?.isStarred,
+    () => props.message?.isRead,
+    () => props.togglingStar,
+    () => props.togglingRead,
+  ],
+  () => nextTick(() => overflowManager?.update()),
+);
+
+// Register/unregister the "…" menu button with the manager so its width is
+// reserved while items are overflowing (mirrors the official register/unregister
+// pattern). When nothing overflows there is no "…" button to open the menu.
+watch(overflowVisible, async (visible) => {
+  if (!visible) {
+    closeMore();
+    overflowManager?.removeOverflowMenu();
+    overflowManager?.update();
+    return;
+  }
+  await nextTick();
+  if (moreBtnEl.value) overflowManager?.addOverflowMenu(moreBtnEl.value);
+  overflowManager?.forceUpdate();
+});
+
+/** Run an action. Star/read leave the menu open so their in-flight spinner is
+ *  visible; the watcher below closes it once the request settles. Everything
+ *  else dismisses immediately. */
+function runAction(action: ReaderAction) {
+  if (action !== "toggle-star" && action !== "toggle-read") closeMore();
+  (emit as (e: ReaderAction) => void)(action);
+}
+
+/** Whether an action shows an in-flight spinner. */
+function spinning(a: ActionDef) {
+  return a.key === "toggle-star"
+    ? props.togglingStar
+    : a.key === "toggle-read"
+      ? props.togglingRead
+      : false;
+}
+
+/** Star icon fill when the message is starred. */
+function starFillClass(a: ActionDef) {
+  return a.key === "toggle-star" && props.message?.isStarred
+    ? "fill-yellow-400 text-yellow-400"
+    : "";
+}
+
+/** Actions currently folded into the "…" menu (kept in display order). */
+const foldedActions = computed(() => actions.filter((a) => !itemVisibility[a.key]));
 
 // When a star/read request started from the menu settles, close the menu that
 // was kept open to show its spinner.
@@ -155,7 +286,6 @@ onMessageChangePush(closeMore);
 
 <template>
   <section
-    ref="paneEl"
     class="min-w-0 flex-1 flex-col bg-background"
     :class="message || loading ? 'flex' : 'hidden lg:flex'"
   >
@@ -175,13 +305,13 @@ onMessageChangePush(closeMore);
       {{ t("mailbox.selectToRead") }}
     </div>
     <template v-else>
-      <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-3">
         <AppTooltip :label="t('common.content')" side="bottom">
           <Button variant="ghost" size="icon" class="h-8 w-8 lg:hidden" @click="emit('back')">
             <ChevronLeft class="h-4 w-4" />
           </Button>
         </AppTooltip>
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 max-w-[50%]">
           <h1 class="truncate text-base font-semibold leading-tight">
             {{ message.subject || "(no subject)" }}
           </h1>
@@ -195,150 +325,77 @@ onMessageChangePush(closeMore);
             <span class="text-xs">{{ formatDateTime(message.receivedAt) }}</span>
           </div>
         </div>
-        <!-- Roomier pane: actions inline. -->
-        <div v-if="!compactHeader" class="flex items-center gap-1">
-          <AppTooltip :label="t('message.reply')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('reply')">
-              <Reply class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <AppTooltip :label="t('message.forward')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('forward')">
-              <Forward class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <AppTooltip :label="t('message.star')">
+        <!-- Header actions: a priority overflow. Each labelled button is
+             measured by @fluentui/priority-overflow; as the row narrows the
+             lowest-priority actions fold into the "…" menu below. -->
+        <div
+          ref="overflowContainerEl"
+          class="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-hidden"
+        >
+          <template v-for="a in actions" :key="a.key">
             <Button
+              :ref="getActionRef(a.key)"
               variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              :disabled="togglingStar"
-              @click="emit('toggle-star')"
+              class="h-8 shrink-0 gap-1.5 px-2.5"
+              :class="a.danger ? 'text-destructive hover:bg-destructive hover:text-white' : ''"
+              :disabled="spinning(a)"
+              @click="runAction(a.key)"
             >
-              <Loader2 v-if="togglingStar" class="h-4 w-4 animate-spin" />
-              <Star
-                v-else
-                class="h-4 w-4"
-                :class="message.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
-              />
+              <Loader2 v-if="spinning(a)" class="h-4 w-4 animate-spin" />
+              <component :is="a.icon" v-else class="h-4 w-4" :class="starFillClass(a)" />
+              <span>{{ a.label() }}</span>
             </Button>
-          </AppTooltip>
-          <AppTooltip :label="message.isRead ? t('message.markUnread') : t('message.markRead')">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              :disabled="togglingRead"
-              @click="emit('toggle-read')"
-            >
-              <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
-              <MailIcon v-else class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <AppTooltip :label="t('message.moveTo')">
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('move-message')">
-              <FolderInput class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <AppTooltip :label="t('common.delete')">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
-              @click="emit('confirm-delete')"
-            >
-              <Trash2 class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-        </div>
-
-        <!-- Narrow pane: collapse the icon group behind a "…" menu so the
-             header doesn't crowd. -->
-        <div v-if="compactHeader" ref="moreBtnEl" class="relative">
-          <AppTooltip :label="t('common.moreActions')">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              aria-haspopup="true"
-              :aria-expanded="moreOpen"
-              @click="toggleMore"
-            >
-              <MoreHorizontal class="h-4 w-4" />
-            </Button>
-          </AppTooltip>
-          <Teleport to="body">
-            <Transition
-              enter-active-class="transition-opacity duration-75"
-              leave-active-class="transition-opacity duration-75"
-              enter-from-class="opacity-0"
-              leave-to-class="opacity-0"
-            >
-              <div
-                v-if="moreOpen"
-                ref="moreMenuEl"
-                role="menu"
-                class="fixed z-100 w-48 rounded-md border border-border bg-popover p-1 shadow-md"
-                :style="
-                  morePos ? { left: `${morePos.left}px`, top: `${morePos.top}px` } : undefined
-                "
+          </template>
+          <div v-if="overflowVisible" ref="moreBtnEl" class="relative shrink-0">
+            <AppTooltip :label="t('common.moreActions')">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                aria-haspopup="true"
+                :aria-expanded="moreOpen"
+                @click="toggleMore"
               >
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                  @click="runAction('reply')"
+                <MoreHorizontal class="h-4 w-4" />
+              </Button>
+            </AppTooltip>
+            <Teleport to="body">
+              <Transition
+                enter-active-class="transition-opacity duration-75"
+                leave-active-class="transition-opacity duration-75"
+                enter-from-class="opacity-0"
+                leave-to-class="opacity-0"
+              >
+                <div
+                  v-if="moreOpen && foldedActions.length"
+                  ref="moreMenuEl"
+                  role="menu"
+                  class="fixed z-100 w-48 rounded-md border border-border bg-popover p-1 shadow-md"
+                  :style="
+                    morePos ? { left: `${morePos.left}px`, top: `${morePos.top}px` } : undefined
+                  "
                 >
-                  <Reply class="h-4 w-4" /> {{ t("message.reply") }}
-                </button>
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                  @click="runAction('forward')"
-                >
-                  <Forward class="h-4 w-4" /> {{ t("message.forward") }}
-                </button>
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                  :disabled="togglingStar"
-                  @click="runAction('toggle-star')"
-                >
-                  <Loader2 v-if="togglingStar" class="h-4 w-4 animate-spin" />
-                  <Star
-                    v-else
-                    class="h-4 w-4"
-                    :class="message.isStarred ? 'fill-yellow-400 text-yellow-400' : ''"
-                  />
-                  {{ message.isStarred ? t("message.unstar") : t("message.star") }}
-                </button>
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                  :disabled="togglingRead"
-                  @click="runAction('toggle-read')"
-                >
-                  <Loader2 v-if="togglingRead" class="h-4 w-4 animate-spin" />
-                  <MailIcon v-else class="h-4 w-4" />
-                  {{ message.isRead ? t("message.markUnread") : t("message.markRead") }}
-                </button>
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                  @click="runAction('move-message')"
-                >
-                  <FolderInput class="h-4 w-4" /> {{ t("message.moveTo") }}
-                </button>
-                <div class="my-1 h-px bg-border" />
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive hover:text-white"
-                  @click="runAction('confirm-delete')"
-                >
-                  <Trash2 class="h-4 w-4" /> {{ t("common.delete") }}
-                </button>
-              </div>
-            </Transition>
-          </Teleport>
+                  <template v-for="a in foldedActions" :key="a.key">
+                    <button
+                      role="menuitem"
+                      class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                      :class="
+                        a.danger
+                          ? 'text-destructive hover:bg-destructive hover:text-white'
+                          : 'hover:bg-accent hover:text-accent-foreground'
+                      "
+                      :disabled="spinning(a)"
+                      @click="runAction(a.key)"
+                    >
+                      <Loader2 v-if="spinning(a)" class="h-4 w-4 animate-spin" />
+                      <component :is="a.icon" v-else class="h-4 w-4" :class="starFillClass(a)" />
+                      {{ a.label() }}
+                    </button>
+                  </template>
+                </div>
+              </Transition>
+            </Teleport>
+          </div>
         </div>
       </header>
 
@@ -382,3 +439,11 @@ onMessageChangePush(closeMore);
     </template>
   </section>
 </template>
+
+<style scoped>
+/* @fluentui/priority-overflow contract: overflowed items must be removed from
+   layout synchronously (the engine measures widths while it folds). */
+[data-overflowing] {
+  display: none;
+}
+</style>
