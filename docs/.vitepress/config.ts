@@ -1,4 +1,9 @@
 import { defineConfig } from "vitepress";
+import { readFileSync } from "node:fs";
+import { URL } from "node:url";
+
+// Single source of truth for the repo URL is package.json#homepage.
+const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8"));
 
 // VitePress site config for the ACFB Email documentation.
 // Docs: https://vitepress.dev/reference/site-config
@@ -39,7 +44,7 @@ export default defineConfig({
     socialLinks: [
       {
         icon: "github",
-        link: "https://github.com/XiaoSong-CPE/acfb-email-client",
+        link: pkg.homepage,
       },
     ],
     footer: {

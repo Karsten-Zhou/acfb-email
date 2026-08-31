@@ -34,6 +34,7 @@ export default tseslint.config(
         ...globals.browser,
         __APP_VERSION__: "readonly",
         __APP_BUILD_TIME__: "readonly",
+        __APP_REPO_URL__: "readonly",
       },
     },
   },

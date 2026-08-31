@@ -32,6 +32,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __APP_REPO_URL__: JSON.stringify(pkg.homepage),
   },
   test: {
     // Vitest config for the workers pool is defined in vitest.config.ts
