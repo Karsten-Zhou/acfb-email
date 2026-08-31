@@ -4,13 +4,14 @@ import { URL } from "node:url";
 
 // Single source of truth for the repo URL is package.json#homepage.
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8"));
+const repoName = new URL(pkg.homepage).pathname.split("/").filter(Boolean).pop();
 
 // VitePress site config for the ACFB Email documentation.
 // Docs: https://vitepress.dev/reference/site-config
 export default defineConfig({
   // GitHub Pages hosts project sites under `/<repo>/`; the deploy workflow sets
   // VITEPRESS_BASE so asset/link paths resolve there. Local dev stays at "/".
-  base: process.env.VITEPRESS_BASE ?? "/",
+  base: `/${repoName}/`,
   title: "ACFB Email",
   description:
     "ACFB Email — a self-hosted, Cloudflare-based email client for connecting IMAP/SMTP accounts.",
