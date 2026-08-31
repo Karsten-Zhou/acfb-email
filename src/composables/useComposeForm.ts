@@ -137,11 +137,16 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
    * from the component's onMounted.
    */
   function init() {
-    // Default the From account once the account list loads (query fetches on
-    // mount; this watcher fires when it resolves).
-    watch(accounts, (list) => {
-      if (accountId.value === "" && list && list.length > 0) accountId.value = list[0].id;
-    });
+    // Default the From account to the first account. immediate so it also
+    // handles client-side navigation where the account list is already cached
+    // (a plain watcher would only fire when the list later changes).
+    watch(
+      accounts,
+      (list) => {
+        if (accountId.value === "" && list && list.length > 0) accountId.value = list[0].id;
+      },
+      { immediate: true },
+    );
     // Prefill from query (reply).
     if (route.query.to) to.value = route.query.to as string;
     if (route.query.subject) subject.value = route.query.subject as string;
