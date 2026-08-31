@@ -24,9 +24,6 @@ import { configFor } from "../oauth/config";
 
 const OAUTH_STATE_COOKIE = "ec_oauth_state";
 
-/** Origin (scheme + host) the app was reached at, derived from the request.
- *  Lets us drop the APP_URL var: the redirect URI, cookie secure flag, and
- *  final redirect all follow how the client actually reached us. */
 function appOrigin(c: Context<{ Bindings: Env }>): string {
   return new URL(c.req.url).origin;
 }
