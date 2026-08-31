@@ -71,6 +71,7 @@
   },
   "message": {
     "reply": "Reply",
+    "forward": "Forward",
     "star": "Star",
     "unstar": "Remove star",
     "markRead": "Mark read",

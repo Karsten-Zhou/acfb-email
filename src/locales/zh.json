@@ -71,6 +71,7 @@
   },
   "message": {
     "reply": "回复",
+    "forward": "转发",
     "star": "标星",
     "unstar": "取消标星",
     "markRead": "标记已读",

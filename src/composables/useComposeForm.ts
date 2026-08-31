@@ -144,6 +144,39 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
     if (route.query.to) to.value = route.query.to as string;
     if (route.query.subject) subject.value = route.query.subject as string;
 
+    // Forward: open a new compose with the original message attached as an
+    // .eml file ("forward as attachment") — the .eml carries the full message
+    // including its attachments. Recipients are left for the user to fill in.
+    const forwardId = route.query.forward as string | undefined;
+    if (forwardId) {
+      void (async () => {
+        try {
+          const [{ message }, raw] = await Promise.all([
+            api.message(forwardId),
+            api.messageRaw(forwardId),
+          ]);
+          if (message.accountId) accountId.value = message.accountId;
+          subject.value = message.subject
+            ? message.subject.startsWith("Fwd:")
+              ? message.subject
+              : `Fwd: ${message.subject}`
+            : "";
+          attachments.value.push({
+            name: raw.filename,
+            mimeType: "message/rfc822",
+            size: raw.size,
+            base64: raw.base64,
+          });
+        } catch (err) {
+          if (err instanceof ApiError && err.code === "message_gone") {
+            await router.replace({ name: "mailbox" });
+          } else {
+            error.value = err instanceof Error ? err.message : "Failed to load message";
+          }
+        }
+      })();
+    }
+
     // Load a draft from the provider's Drafts folder (compose/:draftId where
     // draftId is the message id). api.message() reads the body without marking
     // the message read.

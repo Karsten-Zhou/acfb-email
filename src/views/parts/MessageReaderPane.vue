@@ -19,6 +19,7 @@ import AppTooltip from "../../components/UiToolTip.vue";
 import {
   Star,
   Reply,
+  Forward,
   ChevronLeft,
   Paperclip,
   Mail as MailIcon,
@@ -44,6 +45,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   back: [];
   reply: [];
+  forward: [];
   "toggle-star": [];
   "toggle-read": [];
   "move-message": [];
@@ -51,7 +53,8 @@ const emit = defineEmits<{
 }>();
 
 /** Actions reachable from the mobile "…" menu (map 1:1 to emits). */
-type ReaderAction = "reply" | "toggle-star" | "toggle-read" | "move-message" | "confirm-delete";
+type ReaderAction =
+  "forward" | "reply" | "toggle-star" | "toggle-read" | "move-message" | "confirm-delete";
 
 // ---- mobile "…" action menu (generic anchored menu) ----
 const {
@@ -105,6 +108,9 @@ function runAction(action: ReaderAction) {
   switch (action) {
     case "reply":
       emit("reply");
+      break;
+    case "forward":
+      emit("forward");
       break;
     case "toggle-star":
       emit("toggle-star");
@@ -196,6 +202,11 @@ onMessageChangePush(closeMore);
               <Reply class="h-4 w-4" />
             </Button>
           </AppTooltip>
+          <AppTooltip :label="t('message.forward')">
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('forward')">
+              <Forward class="h-4 w-4" />
+            </Button>
+          </AppTooltip>
           <AppTooltip :label="t('message.star')">
             <Button
               variant="ghost"
@@ -278,6 +289,13 @@ onMessageChangePush(closeMore);
                   @click="runAction('reply')"
                 >
                   <Reply class="h-4 w-4" /> {{ t("message.reply") }}
+                </button>
+                <button
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  @click="runAction('forward')"
+                >
+                  <Forward class="h-4 w-4" /> {{ t("message.forward") }}
                 </button>
                 <button
                   role="menuitem"

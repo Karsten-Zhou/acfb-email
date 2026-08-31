@@ -192,6 +192,12 @@ function replyTo() {
   });
 }
 
+function forward() {
+  const m = selected.value;
+  if (!m) return;
+  void router.push({ name: "compose", query: { forward: m.id } });
+}
+
 // ---- route-driven reading pane ----
 // Toggle the mobile reader on/off as the route enters/leaves a message. The
 // detail itself is loaded by messageQuery above (keyed off the route id).
@@ -289,6 +295,7 @@ const listTitle = computed(() => {
       :toggling-star="togglingStar"
       @back="router.replace('/mail')"
       @reply="replyTo"
+      @forward="forward"
       @toggle-star="toggleStar"
       @toggle-read="toggleReadFromReader"
       @move-message="openMoveMessage(selected!.id)"

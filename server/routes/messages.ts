@@ -7,6 +7,7 @@ import { repo } from "../db/repo";
 import { importOlderPage } from "../sync/sync-service";
 import { pruneOrphanMessages } from "../sync/sync-reconciliation";
 import { readJson } from "../utils/http";
+import { bytesToBase64 } from "../security/crypto";
 import {
   UpdateFlagsInputSchema,
   MoveMessagesInputSchema,
@@ -217,6 +218,41 @@ messageRoutes.get("/:id/attachments/:attachmentId", async (c) => {
   }
 });
 
+// GET /api/messages/:id/raw
+// Returns the original message as base64 for "forward as attachment" (.eml).
+// The .eml carries the full message including its attachments; nothing is
+// stored in Cloudflare infra — the bytes travel provider -> worker on demand.
+messageRoutes.get("/:id/raw", async (c) => {
+  const id = c.req.param("id");
+  const mailboxId = c.req.query("mailboxId") || undefined;
+  const row = await repo.messageById(c.env, id, mailboxId);
+  if (!row) throw new HttpError(404, "Message not found");
+
+  const account = await repo.accountById(c.env, row.account_id);
+  if (!account) throw new HttpError(404, "Account not found");
+  const cred = await repo.credential(c.env, account.id);
+  const provider = await buildProvider(account, cred ? { credential: cred } : null, c.env);
+  const providerId = providerIdFor(row);
+  try {
+    const data = await provider.fetchRawMessage(row.provider_path, providerId);
+    return c.json({
+      filename: `${rawMessageFilename(row.subject)}.eml`,
+      size: data.byteLength,
+      base64: bytesToBase64(data),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to fetch raw message";
+    throw new HttpError(502, `Failed to fetch raw message: ${message}`);
+  }
+});
+
+/** A filesystem-safe `.eml` base name derived from the message subject. */
+function rawMessageFilename(subject: string | null): string {
+  const base =
+    (subject || "forwarded-message").replace(/[\r\n"\\/]/g, " ").trim() || "forwarded-message";
+  return base.slice(0, 80);
+}
+
 // PATCH /api/messages/flags
 messageRoutes.patch("/flags", async (c) => {
   const input = await readJson(c, UpdateFlagsInputSchema);
@@ -421,8 +457,8 @@ async function rowToDetail(
 }
 
 /**
- * The provider-side id of a message. All providers run over IMAP, where a
- * message is identified by its numeric UID within the mailbox (remote_uid).
+ * The provider-side id of a message — the numeric IMAP UID within its mailbox
+ * (remote_uid).
  */
 function providerIdFor(row: { remote_uid: number | null }): string {
   return String(row.remote_uid ?? "");

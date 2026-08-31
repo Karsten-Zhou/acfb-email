@@ -138,6 +138,11 @@ export const api = {
     request<{ message: MessageDetail }>(
       `/messages/${encodeURIComponent(id)}${mailboxId ? `?mailboxId=${encodeURIComponent(mailboxId)}` : ""}`,
     ),
+  /** Original message as base64 (.eml), for "forward as attachment". */
+  messageRaw: (id: string) =>
+    request<{ filename: string; size: number; base64: string }>(
+      `/messages/${encodeURIComponent(id)}/raw`,
+    ),
   flags: (ids: string[], flags: { read?: boolean; starred?: boolean }) =>
     request<{ ok: boolean }>("/messages/flags", {
       method: "PATCH",

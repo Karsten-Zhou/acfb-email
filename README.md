@@ -23,4 +23,3 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
 - Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).
-- **Forward** is not wired (only reply/reply-all); attachments go on new or replied messages, not forwarded ones.

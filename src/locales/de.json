@@ -71,6 +71,7 @@
   },
   "message": {
     "reply": "Antworten",
+    "forward": "Weiterleiten",
     "star": "Markieren",
     "unstar": "Markierung entfernen",
     "markRead": "Als gelesen markieren",

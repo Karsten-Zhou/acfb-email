@@ -1,12 +1,10 @@
-// IMAP/SMTP provider adapter built on `imapflow`. This is the single provider
-// implementation — generic IMAP accounts use password auth, while Gmail and
-// Outlook connect through the same adapter using OAuth2 (XOAUTH2).
+// IMAP/SMTP adapter built on `imapflow`. Generic IMAP accounts authenticate
+// with a password; Gmail and Outlook authenticate via OAuth2 (XOAUTH2).
 
 import { ImapFlow } from "imapflow";
 import { smtpSend, smtpTestConnection } from "./smtp";
 import { roleFromImapName } from "./role-map";
 import type {
-  IEmailProvider,
   ProviderAddress,
   ProviderAttachment,
   ProviderBody,
@@ -44,7 +42,7 @@ export class AbortError extends Error {
   }
 }
 
-export class ImapProvider implements IEmailProvider {
+export class ImapProvider {
   readonly type = "imap" as const;
 
   constructor(
@@ -206,6 +204,19 @@ export class ImapProvider implements IEmailProvider {
       try {
         const raw = await this.fetchSource(client, uid);
         return await this.parseBody(raw);
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async fetchRawMessage(mailboxPath: string, providerId: string): Promise<Uint8Array> {
+    const uid = parseInt(providerId, 10);
+    if (Number.isNaN(uid)) throw new Error("Invalid IMAP message id");
+    return this.withClient(async (client) => {
+      const lock = await client.getMailboxLock(mailboxPath);
+      try {
+        return await this.fetchSource(client, uid);
       } finally {
         lock.release();
       }
