@@ -5,7 +5,6 @@ import { decryptCredential } from "../security/crypto";
 import { ImapProvider } from "./imap";
 import { loadOauthToken } from "../routes/oauth";
 import type { ImapTransport } from "./imap";
-import type { IEmailProvider } from "./types";
 import type { Env } from "../env";
 
 // Well-known IMAP/SMTP endpoints for OAuth-connected providers. Gmail and
@@ -50,7 +49,7 @@ export async function buildProvider(
   account: AccountLike,
   credential: CredentialLike | null,
   env: Env,
-): Promise<IEmailProvider> {
+): Promise<ImapProvider> {
   switch (account.provider) {
     case "imap": {
       if (!credential) throw new Error("Missing credentials for IMAP account");

@@ -1,8 +1,7 @@
-// Provider adapter contract. The rest of the application (sync, routes) only
-// ever talks to this interface. Every provider (generic IMAP, Gmail, Outlook)
-// is served by the IMAP adapter in imap.ts.
+// Provider data shapes shared between the ImapProvider adapter (server/email/)
+// and the sync/routes layers.
 
-import type { MailboxRole, ProviderType } from "@shared/constants";
+import type { MailboxRole } from "@shared/constants";
 
 export interface ProviderMailbox {
   name: string; // display/path name
@@ -112,71 +111,4 @@ export interface SaveDraftOptions {
   bcc?: string[];
   subject: string;
   rawMessage: Uint8Array; // pre-built MIME
-}
-
-export interface IEmailProvider {
-  readonly type: ProviderType;
-
-  /** Verify credentials and retrieve basic info. Should throw on failure. */
-  testConnection(): Promise<{ ok: true }>;
-
-  /**
-   * List mailboxes. Returns provider mailboxes (paths).
-   */
-  listMailboxes(): Promise<ProviderMailbox[]>;
-
-  /**
-   * Incrementally sync a single mailbox folder. Returns new/changed messages.
-   */
-  syncMailbox(
-    mailboxPath: string,
-    options: ProviderSyncOptions,
-    signal?: AbortSignal,
-  ): Promise<ProviderFetchResult>;
-
-  /** Fetch an older page of messages (below `beforeUid`). */
-  fetchOlder(mailboxPath: string, options: ProviderSyncOptions): Promise<ProviderPageResult>;
-
-  /**
-   * Resolve a message's current UID in a mailbox from its Message-ID header.
-   * Used to attach a freshly-moved message to its new location immediately.
-   * Returns null when no match is found.
-   */
-  findByMessageId(
-    mailboxPath: string,
-    messageId: string,
-  ): Promise<{ uid: number; uidValidity: number } | null>;
-
-  /** Fetch the full body & attachments of a message. */
-  fetchBody(mailboxPath: string, providerMessageId: string): Promise<ProviderBody>;
-
-  /**
-   * Fetch a single attachment's binary content directly from the provider
-   * (never stored in Cloudflare infra). `partNumber` is the provider-specific
-   * attachment handle captured at body-fetch time.
-   */
-  fetchAttachment(
-    mailboxPath: string,
-    providerMessageId: string,
-    partNumber: string | null,
-  ): Promise<ProviderAttachment>;
-
-  /** Set flags (read/starred) for a set of provider message ids. */
-  setFlags(
-    mailboxPath: string,
-    providerMessageIds: string[],
-    flags: { read?: boolean; starred?: boolean },
-  ): Promise<void>;
-
-  /** Move provider message ids to another mailbox. */
-  move(mailboxPath: string, providerMessageIds: string[], targetMailboxPath: string): Promise<void>;
-
-  /** Delete provider message ids from a mailbox. */
-  delete(mailboxPath: string, providerMessageIds: string[]): Promise<void>;
-
-  /** Send a message. */
-  send(opts: SendOptions): Promise<void>;
-
-  /** Save a draft into the provider's Drafts folder. */
-  saveDraft(opts: SaveDraftOptions): Promise<void>;
 }

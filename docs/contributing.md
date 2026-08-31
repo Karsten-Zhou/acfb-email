@@ -11,7 +11,7 @@ A self-hosted, personal email client (**ACFB Email**) deployed to a single Cloud
 - **Shared types/schemas**: in `shared/` (Zod schemas live in `shared/schemas.ts`, inferred types in `shared/types.ts`)
 - **Deployment**: Cloudflare Workers with Workers Assets (`wrangler.jsonc` uses `assets.not_found_handling=spa` and `run_worker_first=["/api/*"]`) — the SPA and one API worker ship together
 
-The frontend talks to the API through `src/lib/api.ts`. Cross-provider abstractions and their types are defined in `server/email/`.
+The frontend talks to the API through `src/lib/api.ts`. The provider and its types are defined in `server/email/`.
 
 ## Commands
 
@@ -39,7 +39,7 @@ Some tooling details that matter:
   - **`COMPRESS=DEFLATE` must stay disabled** (`disableCompression: true` in `ImapProvider`) — workerd's compressed stream chain drops large responses, hanging the command.
   - Workers blocks outbound port 25 (SMTP); use 465/587.
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its `setHeader In-Reply-To` expects a bare id (it adds the angle brackets itself).
-- **Provider abstraction**: `server/email/` defines a single `ImapProvider` (imapflow) behind a common interface. Generic IMAP accounts use password auth; Gmail and Outlook connect through the same adapter via OAuth2 (XOAUTH2) on their well-known endpoints (`buildProvider` in `server/email/build-provider.ts`). Provider ids for a message are resolved via `providerIdFor()` in `server/routes/messages.ts` (all providers use the IMAP `remote_uid`).
+- **Provider**: `server/email/imap.ts` is the mail adapter (`ImapProvider`, built on imapflow). Generic IMAP accounts use password auth; Gmail and Outlook authenticate via OAuth2 (XOAUTH2) on their well-known endpoints (`buildProvider` in `server/email/build-provider.ts`). The provider-side message id is the IMAP `remote_uid` (`providerIdFor()` in `server/routes/messages.ts`).
 - **Syncing**: account add / OAuth connect enqueue a sync job to the `email-sync` Queue; the `queue()` consumer in `server/index.ts` runs it (15-min wall-time budget vs waitUntil's 30 s). A manual `POST /api/accounts/:id/sync` trigger also exists. `server/sync/` is split into three modules: `sync-service.ts` (orchestration — `syncMailbox` is the durable unit, `syncAccount` discovers mailboxes and syncs each, plus `importOlderPage`), `sync-persistence.ts` (all D1 statement building + account/mailbox state + the logical-message identity), and `sync-reconciliation.ts` (stale-location delete + orphan prune). The queue accepts `{accountId, mailboxId}` to retry a single mailbox.
 - **Attachments are metadata-only on Cloudflare** — binary content is never stored in Worker infra. The download route re-fetches the part live from the provider on demand (`GET /api/messages/:id/attachments/:attachId`).
 

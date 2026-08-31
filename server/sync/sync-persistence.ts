@@ -321,8 +321,8 @@ function messageUpsert(
   const fromAddress = msg.from?.address ?? null;
   const subject = msg.subject ?? null;
   const date = msg.date ?? null;
-  // Normalize to ISO-8601 so cross-provider sorts are consistent (IMAP
-  // INTERNALDATE is "d-MMM-yyyy …" which sorts lexically above ISO dates).
+  // Normalize to ISO-8601 so sorts are consistent (IMAP INTERNALDATE is
+  // "d-MMM-yyyy …" which sorts lexically above ISO dates).
   const receivedAt = isoDate(msg.internalDate) ?? isoDate(msg.date) ?? now;
   const threadId = msg.messageId ? msg.messageId : null;
   const hasAttachments = msg.hasAttachments === true ? 1 : 0;

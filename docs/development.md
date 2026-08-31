@@ -76,7 +76,7 @@ server/               Worker (Hono)
     compose.ts        mimetext build
     build-provider.ts provider construction from account data
     role-map.ts       mailbox role detection
-    types.ts          IEmailProvider + shared types
+    types.ts          provider + shared types
   routes/             Hono route modules (accounts, mailboxes, messages, send, settings, oauth)
   sync/               syncAccount orchestrator
   security/           AES-GCM crypto
@@ -95,13 +95,6 @@ docs/                 VitePress documentation site
 3. Add a Zod input schema in `shared/schemas.ts` if it takes a body.
 4. Add a typed client method in `src/lib/api.ts`.
 5. Add an integration test in `e2e/`.
-
-## Adding a new provider
-
-1. Implement `IEmailProvider` (see `server/email/types.ts`).
-2. Register it in `buildProvider` (`server/email/build-provider.ts`).
-3. If it needs OAuth tokens, store them encrypted in `account_credentials` (see [security](./security.md)) and refresh on use.
-4. Update the add-account UI (`SettingsView.vue`) to offer the new provider.
 
 ## Conventions
 

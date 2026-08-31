@@ -43,7 +43,7 @@ Cloudflare Worker
 | SMTP client       | `server/email/smtp.ts`      | submission via ports 587/465 (Workers forbid port 25)                                                                  |
 | MIME parse        | `postal-mime`               | RFC5322/MIME parsing of received messages (verified Workers-compatible)                                                |
 | MIME build        | `mimetext`                  | builds outgoing RFC5322 messages                                                                                       |
-| Provider adapters | `server/email/`             | `IEmailProvider` interface; `ImapProvider` is the only adapter                                                         |
+| Provider adapter  | `server/email/`             | `ImapProvider` (imapflow): IMAP/SMTP transport + auth per account                                                      |
 | Sync              | `server/sync/`              | orchestrates mailbox+message upsert; per-mailbox UID cursors                                                           |
 | Repo              | `server/db/repo.ts`         | D1 access, ownership-scoped queries                                                                                    |
 | Crypto            | `server/security/crypto.ts` | AES-GCM for stored credentials                                                                                         |
@@ -158,9 +158,11 @@ app_settings(id PK, data JSON)   -- singleton
 
 ---
 
-## 6. Provider abstraction
+## 6. Provider adapter
 
-`server/email/types.ts` defines `IEmailProvider`:
+`ImapProvider` (`server/email/imap.ts`) is the mail adapter — an IMAP/SMTP implementation built on `imapflow`. Generic IMAP accounts authenticate with a password; Gmail and Outlook authenticate via OAuth2 (XOAUTH2) on their well-known IMAP/SMTP endpoints. `buildProvider` (`server/email/build-provider.ts`) constructs it from a persisted account, selecting the transport and auth method.
+
+`ImapProvider` exposes:
 
 - `testConnection()`
 - `listMailboxes()`
@@ -169,11 +171,10 @@ app_settings(id PK, data JSON)   -- singleton
 - `findByMessageId(path, messageId)` — resolves a message's new UID after a move
 - `fetchBody(path, uid)`
 - `fetchAttachment(path, uid, partNumber)` — re-fetches binary bytes on demand
+- `fetchRawMessage(path, uid)` — full RFC 5322 source (forward as .eml)
 - `setFlags / move / delete`
 - `send(opts)` — relays pre-built MIME over SMTP
 - `saveDraft(opts)` — writes a draft to the provider's Drafts folder
-
-`ImapProvider` (imap.ts) implements it. Every provider — generic IMAP accounts (password auth) plus Gmail and Outlook (OAuth2/XOAUTH2 on their well-known IMAP/SMTP endpoints) — is served by this single adapter; `buildProvider` picks the transport and auth method. Sync, routes, and UI do not change per provider.
 
 ### IMAP via imapflow (patched)
 
@@ -181,7 +182,7 @@ app_settings(id PK, data JSON)   -- singleton
 
 ---
 
-> **Status note (2026-08):** the IMAP/SMTP adapter is **tested live** (QQ Mail). Gmail and Outlook connect through the same adapter using **OAuth2 (XOAUTH2)** — they need Google Cloud / Entra app registrations with OAuth consent to be configured before they can be verified against real accounts.
+> **Status note (2026-08):** the IMAP/SMTP adapter is **tested live** (QQ Mail). Gmail and Outlook authenticate via **OAuth2 (XOAUTH2)** — they need Google Cloud / Entra app registrations with OAuth consent to be configured before they can be verified against real accounts.
 
 ## 7. Cloudflare resource usage
 
@@ -212,6 +213,6 @@ app_settings(id PK, data JSON)   -- singleton
 
 1. **HTML sanitization is client-side (browser), not in the Worker.** Current DOMPurify requires a DOM, which the Worker doesn't have. The Worker still only returns small text/html previews, and the client always runs DOMPurify before rendering. This is standard practice for email clients.
 2. **Cron deferred; sync via Queue**: sync is enqueued on account add / OAuth connect and consumed by the `email-sync` Queue consumer (15-min wall-time, vs waitUntil's 30 s cap). `syncAccount` is the single entry point so a Cron trigger could be added later.
-3. **Attachments are metadata-only**: the `attachments` table tracks filename/type/size/part handle; binary bytes are never stored in Cloudflare infra and are re-fetched live from the provider on download via `fetchAttachment`. **Forward** is not wired (only reply/reply-all).
+3. **Attachments are metadata-only**: the `attachments` table tracks filename/type/size/part handle; binary bytes are never stored in Cloudflare infra and are re-fetched live from the provider on download via `fetchAttachment`. Forward-as-attachment re-fetches the full raw source on demand.
 4. **POP3 is not implemented**: POP3 has materially weaker semantics than IMAP and would not provide inbox-style UX. Deferred; the provider interface allows a read/import-oriented adapter later.
 5. **SMTP on port 25 is impossible from Workers** (verified in official docs); we use 587/465 submission. SPF implications are documented in [deployment](./deployment.md).
