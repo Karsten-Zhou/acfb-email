@@ -26,7 +26,6 @@ export default defineConfig({
       { text: "Development", link: "/development" },
       { text: "Architecture", link: "/architecture" },
       { text: "Deployment", link: "/deployment" },
-      { text: "Security", link: "/security" },
     ],
     sidebar: [
       {
@@ -37,6 +36,7 @@ export default defineConfig({
           { text: "Deployment", link: "/deployment" },
           { text: "Security", link: "/security" },
           { text: "Contributing", link: "/contributing" },
+          { text: "Changelog", link: "/CHANGELOG" },
         ],
       },
     ],

@@ -24,7 +24,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "deploy": "vite build && wrangler deploy",
-    "changelog": "conventional-changelog -p conventionalcommits -i docs/CHANGELOG.md -s",
+    "changelog": "conventional-changelog -p conventionalcommits -i docs/CHANGELOG.md -s -r 0",
     "release": "commit-and-tag-version",
     "release:dryrun": "commit-and-tag-version --dry-run"
   },
