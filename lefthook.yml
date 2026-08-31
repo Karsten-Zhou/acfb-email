@@ -29,3 +29,9 @@ pre-commit:
 #
 #     - script: "hello.go"
 #       runner: go run
+
+# Enforce Conventional Commits on every commit message.
+commit-msg:
+  commands:
+    lint-commit:
+      run: bunx commitlint --edit $1
