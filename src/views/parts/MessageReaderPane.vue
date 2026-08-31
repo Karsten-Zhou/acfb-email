@@ -7,7 +7,8 @@
 // The "…" menu itself is a generic useOverflowMenu; this file only decides
 // which header renders (ResizeObserver on the pane) and maps actions to emits.
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { sanitizeHtml } from "../../lib/sanitize";
+import { useRemoteImageControl } from "../../composables/useRemoteImageControl";
+import RemoteImagesBanner from "./RemoteImagesBanner.vue";
 import type { MessageDetail } from "@shared/types";
 import { t, formatDateTime } from "../../lib/i18n";
 import { api } from "../../lib/api";
@@ -133,6 +134,17 @@ watch(
 const downloadableAttachments = computed(() =>
   (props.message?.attachments ?? []).filter((a) => !a.isInline),
 );
+
+// ---- remote-image privacy ----
+const {
+  sanitized,
+  showBanner,
+  loadImagesThisTime,
+  allowFromSender,
+  alwaysAllowImages,
+  onMessageChangePush,
+} = useRemoteImageControl(() => props.message);
+onMessageChangePush(closeMore);
 </script>
 
 <template>
@@ -341,15 +353,13 @@ const downloadableAttachments = computed(() =>
       </div>
 
       <div class="flex-1 overflow-y-auto p-5">
-        <div
-          class="email-body text-[15px]"
-          v-html="
-            sanitizeHtml(message.html || message.text || '', {
-              messageId: message.id,
-              attachments: message.attachments,
-            })
-          "
+        <RemoteImagesBanner
+          v-if="showBanner"
+          @load-this-time="loadImagesThisTime"
+          @allow-from-sender="allowFromSender"
+          @always-allow="alwaysAllowImages"
         />
+        <div class="email-body text-[15px]" v-html="sanitized?.html ?? ''" />
       </div>
     </template>
   </section>

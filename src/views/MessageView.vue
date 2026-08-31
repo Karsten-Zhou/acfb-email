@@ -3,7 +3,8 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMessage, useUpdateFlags, useDeleteMessages } from "../stores/mail";
-import { sanitizeHtml } from "../lib/sanitize";
+import { useRemoteImageControl } from "../composables/useRemoteImageControl";
+import RemoteImagesBanner from "./parts/RemoteImagesBanner.vue";
 import { t, formatDateTime } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
@@ -64,6 +65,10 @@ function reply() {
     },
   });
 }
+
+// ---- remote-image privacy ----
+const { sanitized, showBanner, loadImagesThisTime, allowFromSender, alwaysAllowImages } =
+  useRemoteImageControl(() => msg.value);
 </script>
 
 <template>
@@ -142,15 +147,14 @@ function reply() {
           </div>
         </div>
 
-        <div
-          class="email-body mt-5 text-[15px]"
-          v-html="
-            sanitizeHtml(msg.html || msg.text || '', {
-              messageId: msg.id,
-              attachments: msg.attachments,
-            })
-          "
+        <RemoteImagesBanner
+          v-if="showBanner"
+          @load-this-time="loadImagesThisTime"
+          @allow-from-sender="allowFromSender"
+          @always-allow="alwaysAllowImages"
         />
+
+        <div class="email-body mt-5 text-[15px]" v-html="sanitized?.html ?? ''" />
       </template>
     </main>
 

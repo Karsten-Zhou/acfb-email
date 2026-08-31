@@ -82,7 +82,12 @@
     "moveMixedAccounts": "Select messages from a single account to move",
     "moving": "Moving…",
     "confirmDelete": "Delete?",
-    "confirmDeleteMessages": "Delete the selected messages?"
+    "confirmDeleteMessages": "Delete the selected messages?",
+    "imagesBlockedTitle": "Images hidden",
+    "imagesBlockedBody": "This email tried to load images from the internet. Loading them can reveal that you opened it and where you are.",
+    "loadImagesThisTime": "Load images this time",
+    "allowFromSender": "Allow images from this sender",
+    "alwaysAllowImages": "Always load images"
   },
   "accounts": {
     "emailAccounts": "Email accounts",
@@ -137,5 +142,23 @@
     "themeAuto": "Auto",
     "language": "Language",
     "languageAuto": "Auto ({0})"
+  },
+  "privacy": {
+    "title": "Privacy",
+    "remoteImages": "Remote images",
+    "remoteImagesHint": "Emails can contain images that load from the sender's servers when you open them. Loading them can tell the sender you read the email and roughly where you are. Choose what works for you.",
+    "remoteImagesBlock": "Never load",
+    "remoteImagesBlockHint": "Block images unless you load them manually.",
+    "remoteImagesAllow": "Always load",
+    "remoteImagesAllowHint": "Load images in all emails automatically.",
+    "remoteImagesWhitelist": "Only from trusted senders",
+    "remoteImagesWhitelistHint": "Load images only from senders you add below.",
+    "allowlistLabel": "Trusted senders",
+    "allowlistPlaceholder": "name{'@'}example.com or example.com",
+    "allowlistHint": "Enter an email address or a whole domain. Press Enter to add it.",
+    "allowlistAdd": "Add",
+    "allowlistRemove": "Remove",
+    "allowlistInvalid": "Enter a valid email address or domain (e.g. name{'@'}example.com or example.com).",
+    "allowlistEmpty": "No trusted senders yet. Images stay blocked until you add one."
   }
 }

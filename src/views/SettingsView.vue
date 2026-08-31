@@ -12,6 +12,7 @@ import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";
 import AccountSettings from "./parts/AccountSettings.vue";
 import PreferencesPanel from "./parts/PreferencesPanel.vue";
+import PrivacyPanel from "./parts/PrivacyPanel.vue";
 import AboutPanel from "./parts/AboutPanel.vue";
 import { ChevronLeft } from "@lucide/vue";
 
@@ -49,6 +50,7 @@ onMounted(async () => {
       <section class="mx-auto max-w-2xl space-y-6">
         <AccountSettings :meta="meta" />
         <PreferencesPanel />
+        <PrivacyPanel />
         <AboutPanel />
       </section>
     </main>

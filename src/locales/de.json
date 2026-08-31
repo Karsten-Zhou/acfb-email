@@ -82,7 +82,12 @@
     "moveMixedAccounts": "Wähle Nachrichten aus nur einem Konto aus, um sie zu verschieben",
     "moving": "Verschieben…",
     "confirmDelete": "Löschen?",
-    "confirmDeleteMessages": "Ausgewählte Nachrichten löschen?"
+    "confirmDeleteMessages": "Ausgewählte Nachrichten löschen?",
+    "imagesBlockedTitle": "Bilder ausgeblendet",
+    "imagesBlockedBody": "Diese E-Mail versuchte, Bilder aus dem Internet zu laden. Wenn du sie lädst, kann der Absender sehen, dass du die E-Mail geöffnet hast und wo du dich befindest.",
+    "loadImagesThisTime": "Bilder diesmal laden",
+    "allowFromSender": "Bilder von diesem Absender erlauben",
+    "alwaysAllowImages": "Bilder immer laden"
   },
   "accounts": {
     "emailAccounts": "E-Mail-Konten",
@@ -137,5 +142,23 @@
     "themeAuto": "Auto",
     "language": "Sprache",
     "languageAuto": "Auto ({0})"
+  },
+  "privacy": {
+    "title": "Datenschutz",
+    "remoteImages": "Remote-Bilder",
+    "remoteImagesHint": "E-Mails können Bilder enthalten, die beim Öffnen von den Servern des Absenders geladen werden. Das Laden kann dem Absender verraten, dass du die E-Mail gelesen hast und wo du dich ungefähr befindest. Wähle, was für dich passt.",
+    "remoteImagesBlock": "Nie laden",
+    "remoteImagesBlockHint": "Bilder blockieren, außer du lädst sie manuell.",
+    "remoteImagesAllow": "Immer laden",
+    "remoteImagesAllowHint": "Bilder in allen E-Mails automatisch laden.",
+    "remoteImagesWhitelist": "Nur von vertrauenswürdigen Absendern",
+    "remoteImagesWhitelistHint": "Bilder nur von den unten hinzugefügten Absendern laden.",
+    "allowlistLabel": "Vertrauenswürdige Absender",
+    "allowlistPlaceholder": "name{'@'}example.com oder example.com",
+    "allowlistHint": "Gib eine E-Mail-Adresse oder eine ganze Domain ein. Drücke Enter zum Hinzufügen.",
+    "allowlistAdd": "Hinzufügen",
+    "allowlistRemove": "Entfernen",
+    "allowlistInvalid": "Gib eine gültige E-Mail-Adresse oder Domain ein (z. B. name{'@'}example.com oder example.com).",
+    "allowlistEmpty": "Noch keine vertrauenswürdigen Absender. Bilder bleiben blockiert, bis du einen hinzufügst."
   }
 }

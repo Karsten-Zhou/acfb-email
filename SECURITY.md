@@ -88,8 +88,11 @@ endpoints, and the app protects its own data.
 - The list API returns only small previews; the detail API returns parsed
   text/html previews from PostalMime (which bounds nesting/headers).
 - Attachments are metadata-only in v1 (no inline execution possible).
-- External images are rendered by the browser normally (a tracking risk by
-  design; a privacy-conscious user can disable remote images — not yet a setting).
+- External images are hidden by default (never/whitelist/always setting in
+  Settings → Privacy, persisted client-side in localStorage). When hidden, a
+  banner lets the user load them once, allow the sender, or always allow.
+  Inline (`cid:`) images — the actual attachments, served same-origin via our
+  endpoint — always render.
 
 ## 6. Secrets management
 
@@ -147,5 +150,5 @@ Configure both under **Zero Trust → Access controls → Applications → Confi
 - [x] Input validation via Zod on all API bodies
 - [x] No secrets in client bundle; `.env.example` placeholders only
 - [ ] Browser Push (phase 8) — subscription storage table exists
-- [ ] Remote-image blocking setting (privacy enhancement) — not yet
+- [x] Remote-image blocking setting (Privacy) + per-message banner (load once / allow sender / always)
 - [x] OAuth state validation + code exchange server-side (Gmail/Outlook connect)

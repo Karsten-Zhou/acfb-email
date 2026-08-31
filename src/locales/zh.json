@@ -82,7 +82,12 @@
     "moveMixedAccounts": "请选择同一账户的邮件进行移动",
     "moving": "移动中…",
     "confirmDelete": "删除？",
-    "confirmDeleteMessages": "删除所选邮件？"
+    "confirmDeleteMessages": "删除所选邮件？",
+    "imagesBlockedTitle": "已隐藏图片",
+    "imagesBlockedBody": "此邮件尝试从互联网加载图片。加载图片可能会让发件人知道你已打开它以及你所在的位置。",
+    "loadImagesThisTime": "本次加载图片",
+    "allowFromSender": "允许来自此发件人的图片",
+    "alwaysAllowImages": "始终加载图片"
   },
   "accounts": {
     "emailAccounts": "邮件账户",
@@ -137,5 +142,23 @@
     "themeAuto": "自动",
     "language": "语言",
     "languageAuto": "自动（{0}）"
+  },
+  "privacy": {
+    "title": "隐私",
+    "remoteImages": "远程图片",
+    "remoteImagesHint": "邮件可能包含打开时从发件人服务器加载的图片。加载它们可能会告诉发件人你已阅读邮件以及你大致所在的位置。请选择适合你的方式。",
+    "remoteImagesBlock": "从不加载",
+    "remoteImagesBlockHint": "除非你手动加载，否则阻止图片。",
+    "remoteImagesAllow": "始终加载",
+    "remoteImagesAllowHint": "自动加载所有邮件中的图片。",
+    "remoteImagesWhitelist": "仅来自受信任的发件人",
+    "remoteImagesWhitelistHint": "仅加载你下方添加的发件人的图片。",
+    "allowlistLabel": "受信任的发件人",
+    "allowlistPlaceholder": "name{'@'}example.com 或 example.com",
+    "allowlistHint": "输入邮箱地址或整个域名，按回车添加。",
+    "allowlistAdd": "添加",
+    "allowlistRemove": "移除",
+    "allowlistInvalid": "请输入有效的邮箱地址或域名（例如 name{'@'}example.com 或 example.com）。",
+    "allowlistEmpty": "还没有受信任的发件人。添加之前图片将保持阻止。"
   }
 }
