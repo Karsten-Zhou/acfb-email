@@ -39,6 +39,7 @@ const {
   showBcc,
   sending,
   savingDraft,
+  loading,
   error,
   canSend,
   accountOptions,
@@ -89,118 +90,128 @@ const {
     </header>
 
     <div class="flex-1 overflow-y-auto p-4">
+      <!-- Async prefill (forward / edit draft) still loading: show a spinner
+           instead of a partially-filled form. -->
       <div
-        v-if="error"
-        class="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        v-if="loading"
+        class="flex h-full items-center justify-center text-sm text-muted-foreground"
       >
-        {{ error }}
+        <Loader2 class="mr-2 h-4 w-4 animate-spin" /> {{ t("common.loading") }}
       </div>
-
-      <div class="space-y-3">
-        <div class="flex items-center gap-2 text-sm">
-          <label for="compose-to" class="w-14 shrink-0 text-muted-foreground">{{
-            t("compose.to")
-          }}</label>
-          <input
-            id="compose-to"
-            v-model="to"
-            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
-            :placeholder="'recipient@example.com'"
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            :class="cn(showCc && 'bg-accent text-accent-foreground')"
-            @click="showCc = !showCc"
-          >
-            {{ t("compose.cc") }}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            :class="cn(showBcc && 'bg-accent text-accent-foreground')"
-            @click="showBcc = !showBcc"
-          >
-            {{ t("compose.bcc") }}
-          </Button>
+      <template v-else>
+        <div
+          v-if="error"
+          class="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {{ error }}
         </div>
 
-        <div v-if="showCc" class="flex items-center gap-2 text-sm">
-          <label for="compose-cc" class="w-14 shrink-0 text-muted-foreground">{{
-            t("compose.cc")
-          }}</label>
-          <input
-            id="compose-cc"
-            v-model="cc"
-            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
-            :placeholder="'cc@example.com'"
-          />
-        </div>
-
-        <div v-if="showBcc" class="flex items-center gap-2 text-sm">
-          <label for="compose-bcc" class="w-14 shrink-0 text-muted-foreground">{{
-            t("compose.bcc")
-          }}</label>
-          <input
-            id="compose-bcc"
-            v-model="bcc"
-            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
-            :placeholder="'bcc@example.com'"
-          />
-        </div>
-
-        <div class="flex items-center gap-2 text-sm">
-          <label for="compose-subject" class="w-14 shrink-0 text-muted-foreground">{{
-            t("compose.subject")
-          }}</label>
-          <input
-            id="compose-subject"
-            v-model="subject"
-            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
-            :placeholder="t('compose.subject')"
-          />
-        </div>
-
-        <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
-
-        <RichTextEditor ref="editorRef" v-model="body" :placeholder="t('common.content')">
-          <template #toolbar>
-            <AppTooltip :label="t('compose.attach')">
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-7 w-7"
-                :disabled="addingFiles"
-                @click="pickFiles"
-              >
-                <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
-                <Paperclip v-else class="h-4 w-4" />
-              </Button>
-            </AppTooltip>
-          </template>
-        </RichTextEditor>
-
-        <div v-if="attachments.length" class="flex flex-wrap gap-2">
-          <div
-            v-for="(a, i) in attachments"
-            :key="i"
-            class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
-          >
-            <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
-            <span class="max-w-55 truncate">{{ a.name }}</span>
-            <span v-if="a.size > 0" class="text-muted-foreground">
-              ({{ formatAttachmentSize(a.size) }})
-            </span>
-            <button
-              class="ml-1 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              :aria-label="t('compose.removeAttachment')"
-              @click="removeAttachment(i)"
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 text-sm">
+            <label for="compose-to" class="w-14 shrink-0 text-muted-foreground">{{
+              t("compose.to")
+            }}</label>
+            <input
+              id="compose-to"
+              v-model="to"
+              class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
+              :placeholder="'recipient@example.com'"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              :class="cn(showCc && 'bg-accent text-accent-foreground')"
+              @click="showCc = !showCc"
             >
-              <X class="h-3.5 w-3.5" />
-            </button>
+              {{ t("compose.cc") }}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              :class="cn(showBcc && 'bg-accent text-accent-foreground')"
+              @click="showBcc = !showBcc"
+            >
+              {{ t("compose.bcc") }}
+            </Button>
+          </div>
+
+          <div v-if="showCc" class="flex items-center gap-2 text-sm">
+            <label for="compose-cc" class="w-14 shrink-0 text-muted-foreground">{{
+              t("compose.cc")
+            }}</label>
+            <input
+              id="compose-cc"
+              v-model="cc"
+              class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
+              :placeholder="'cc@example.com'"
+            />
+          </div>
+
+          <div v-if="showBcc" class="flex items-center gap-2 text-sm">
+            <label for="compose-bcc" class="w-14 shrink-0 text-muted-foreground">{{
+              t("compose.bcc")
+            }}</label>
+            <input
+              id="compose-bcc"
+              v-model="bcc"
+              class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
+              :placeholder="'bcc@example.com'"
+            />
+          </div>
+
+          <div class="flex items-center gap-2 text-sm">
+            <label for="compose-subject" class="w-14 shrink-0 text-muted-foreground">{{
+              t("compose.subject")
+            }}</label>
+            <input
+              id="compose-subject"
+              v-model="subject"
+              class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground"
+              :placeholder="t('compose.subject')"
+            />
+          </div>
+
+          <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesChosen" />
+
+          <RichTextEditor ref="editorRef" v-model="body" :placeholder="t('common.content')">
+            <template #toolbar>
+              <AppTooltip :label="t('compose.attach')">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-7 w-7"
+                  :disabled="addingFiles"
+                  @click="pickFiles"
+                >
+                  <Loader2 v-if="addingFiles" class="h-4 w-4 animate-spin" />
+                  <Paperclip v-else class="h-4 w-4" />
+                </Button>
+              </AppTooltip>
+            </template>
+          </RichTextEditor>
+
+          <div v-if="attachments.length" class="flex flex-wrap gap-2">
+            <div
+              v-for="(a, i) in attachments"
+              :key="i"
+              class="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs"
+            >
+              <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
+              <span class="max-w-55 truncate">{{ a.name }}</span>
+              <span v-if="a.size > 0" class="text-muted-foreground">
+                ({{ formatAttachmentSize(a.size) }})
+              </span>
+              <button
+                class="ml-1 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                :aria-label="t('compose.removeAttachment')"
+                @click="removeAttachment(i)"
+              >
+                <X class="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>

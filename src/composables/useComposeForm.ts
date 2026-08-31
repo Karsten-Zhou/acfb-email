@@ -36,6 +36,8 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
   const showBcc = ref(false);
   const sending = ref(false);
   const savingDraft = ref(false);
+  /** True while async route prefill (forward / edit draft) is loading. */
+  const loading = ref(false);
   const draftId = ref<string | null>(null);
   const error = ref<string | null>(null);
 
@@ -149,6 +151,7 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
     // including its attachments. Recipients are left for the user to fill in.
     const forwardId = route.query.forward as string | undefined;
     if (forwardId) {
+      loading.value = true;
       void (async () => {
         try {
           const [{ message }, raw] = await Promise.all([
@@ -173,6 +176,8 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
           } else {
             error.value = err instanceof Error ? err.message : "Failed to load message";
           }
+        } finally {
+          loading.value = false;
         }
       })();
     }
@@ -183,6 +188,7 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
     const draftParam = route.params.draftId as string | undefined;
     if (draftParam) {
       draftId.value = draftParam;
+      loading.value = true;
       void (async () => {
         try {
           const { message } = await api.message(draftParam);
@@ -201,6 +207,8 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
           if (err instanceof ApiError && err.code === "message_gone") {
             await router.replace({ name: "mailbox" });
           }
+        } finally {
+          loading.value = false;
         }
       })();
     }
@@ -217,6 +225,7 @@ export function useComposeForm({ route, router, editorRef, attachments }: UseCom
     showBcc,
     sending,
     savingDraft,
+    loading,
     draftId,
     error,
     canSend,
