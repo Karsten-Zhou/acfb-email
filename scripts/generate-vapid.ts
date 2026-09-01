@@ -1,5 +1,5 @@
 // Generate a Web Push VAPID key pair. Prints the values to set as Cloudflare
-// secrets (see docs/deployment.md). Run: bun run vapid:generate
+// secrets (see docs/deployment.md). Run: bun run scripts/generate-vapid.ts
 import webpush from "web-push";
 
 const keys = webpush.generateVAPIDKeys();

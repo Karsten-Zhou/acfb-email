@@ -111,7 +111,7 @@ To receive new-mail push notifications, generate a Web Push **VAPID** key pair a
 store it as Worker secrets. Skip this step to leave push disabled.
 
 ```bash
-bun run vapid:generate
+bun run scripts/generate-vapid.ts
 ```
 
 Upload the printed values:
