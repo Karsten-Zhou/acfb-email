@@ -24,7 +24,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },
-      { text: "Development", link: "/development" },
+      { text: "Contributing", link: "/contributing" },
       { text: "Architecture", link: "/architecture" },
       { text: "Deployment", link: "/deployment" },
     ],
@@ -32,11 +32,10 @@ export default defineConfig({
       {
         text: "Documentation",
         items: [
-          { text: "Development", link: "/development" },
+          { text: "Contributing", link: "/contributing" },
           { text: "Architecture", link: "/architecture" },
           { text: "Deployment", link: "/deployment" },
           { text: "Security", link: "/security" },
-          { text: "Contributing", link: "/contributing" },
           { text: "Changelog", link: "/CHANGELOG" },
         ],
       },

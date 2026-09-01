@@ -1,8 +1,10 @@
 # Deployment
 
-Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier). Send this page to an AI if you are not sure how to do.
+Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier).
 
-> If you are an AI agent, consider asking the user providing a cloudflare token with proper permissions to automate the deployment process.
+**Need help?** you can also give this page to an AI assistant and ask it to guide you through the step you are on.
+
+> Note to AI agents: If you are an AI agent, consider asking the user providing a cloudflare token with proper permissions to automate the deployment process.
 
 ## 0. Prerequisites
 
@@ -33,7 +35,7 @@ The output shows a **database_id** UUID. Put it in `wrangler.jsonc`:
 "d1_databases": [{
   "binding": "DB",
   "database_name": "acfb-email",
-  "database_id": "<paste-uuid>"
+  "database_id": "<paste-your-id-here>"
 }]
 ```
 
@@ -45,15 +47,13 @@ bunx wrangler d1 migrations apply acfb-email --remote
 
 ## 3. Create the sync queue
 
-The `email-sync` Queue must exist before deployment, as it is referenced in `wrangler.jsonc`:
-
 ```bash
 bunx wrangler queues create email-sync
 ```
 
 ## 4. Create the core encryption secret
 
-Generate an encryption key:
+Run this command to generate a random, secure key:
 
 ```bash
 bun -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
@@ -65,13 +65,29 @@ Save it securely to your Cloudflare Worker:
 bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
 ```
 
-> Never commit secrets to source control or the client bundle.
+## 5. Deploy
 
-## 5. Configure OAuth providers (Gmail / Outlook)
+```bash
+bun run deploy
+```
 
-This step is optional. Follow this step only if you need to connect your Gmail or Outlook account.
+After deployment, Wrangler should show the Worker URL. It will normally look like: `https://<worker-name>.<your-subdomain>.workers.dev`. This is your email client address. You might need it for some of the following steps.
 
-Gmail and Outlook require OAuth. Create your own OAuth App (for free) is the only way to protect your privacy and avoid sharing credentials with a third party.
+## 6. Cloudflare Access
+
+Now that the Worker is deployed, protect it in the Cloudflare dashboard.
+
+1. If Zero Trust is not yet enabled, enable it at <https://one.dash.cloudflare.com>.
+2. Go to **Workers & Pages** → select your Worker → **Access** tab.
+3. Click **Protect this Worker behind Access**.
+   - **Scope**: All traffic
+   - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
+
+## 7. Configure OAuth providers (Optional)
+
+_Skip this step if you don't plan to use Gmail or Outlook._
+
+Gmail and Outlook require OAuth. Creating your own OAuth (for free) secures your privacy the best.
 
 ### Google Cloud app (Gmail)
 
@@ -105,10 +121,9 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-## 6. Configure browser push (optional)
+## 8. Configure browser push (optional)
 
-To receive new-mail push notifications, generate a Web Push **VAPID** key pair and
-store it as Worker secrets. Skip this step to leave push disabled.
+To receive new-mail push notifications, generate a Web Push **VAPID** key pair and store it as Worker secrets. Skip this step to leave push disabled.
 
 ```bash
 bun run scripts/generate-vapid.ts
@@ -121,36 +136,7 @@ bunx wrangler secret put VAPID_PUBLIC_KEY
 bunx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-Optionally set `VAPID_SUBJECT` (a `mailto:` or `https:` URI identifying the app) via
-`wrangler.jsonc` `vars` or a secret; it defaults to `mailto:acfb-email@localhost`.
-`VAPID_PUBLIC_KEY` is public (served to the browser for `pushManager.subscribe`);
-`VAPID_PRIVATE_KEY` is a secret and never leaves the Worker.
-
-## 7. Deploy
-
-With the database, queue, and secrets in place, you can safely deploy:
-
-```bash
-bun run deploy
-```
-
-## 8. Cloudflare Access
-
-Now that the Worker is deployed, protect it in the Cloudflare dashboard.
-
-1. If Zero Trust is not yet enabled, enable it at <https://one.dash.cloudflare.com>.
-2. Go to **Workers & Pages** → select your Worker → **Access** tab.
-3. Click **Protect this Worker behind Access**.
-   - **Scope**: All traffic
-   - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
-
-### Cookie / CSRF settings
-
-1. Navigate to **Zero Trust → Access controls → Applications → Choose the application named something like `acfb-email - Cloudflare Workers` → Additional settings → Cookie settings**
-   - **Same Site Attribute**: Lax
-2. Click **Save**.
-
-## 8. Done!
+## 9. Done!
 
 Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` and log in with your Cloudflare account. Enjoy!
 
@@ -160,4 +146,3 @@ Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` a
 - **Data**: D1 is the authoritative store; deleting the Worker does not delete the database (it must be deleted explicitly).
 - **Lost encryption key**: Stored credentials become undecryptable with no backdoor — rotate all connected email credentials before changing the key.
 - **Access sessions**: Sign out via your Cloudflare account session or by clearing browser cookies.
-- **DB reset**: Schema changes during early development may require recreating the database (`wrangler d1 delete` then recreate and migrate); connected email accounts must then be re-added.

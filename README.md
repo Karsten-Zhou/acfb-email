@@ -15,13 +15,13 @@ A Cloudflare based (ACFB) web email client that runs on **Cloudflare Workers (Fr
 
 If you want to have your own email client, see [docs/deployment.md](./docs/deployment.md).
 
-If you want to develop or contribute, see [docs/contributing.md](./docs/contributing.md) and [docs/development.md](./docs/development.md).
+If you want to develop or contribute, see [docs/contributing.md](./docs/contributing.md).
 
 ## Documentation
 
-The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/architecture.md), [security](./docs/security.md), [development](./docs/development.md), and [deployment](./docs/deployment.md).
+The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/architecture.md), [security](./docs/security.md), [contributing](./docs/contributing.md), and [deployment](./docs/deployment.md).
 
-## Status & known limitations
+## Limitations
 
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
 - Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).

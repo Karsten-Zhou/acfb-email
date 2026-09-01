@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /development
+      link: /contributing
     - theme: alt
       text: Architecture
       link: /architecture
@@ -26,8 +26,7 @@ features:
 
 ## Documentation
 
-- [Development](./development.md) — daily workflow, commands, and conventions.
+- [Contributing](./contributing.md) — daily workflow, commands, and conventions.
 - [Architecture](./architecture.md) — how the application is put together and why.
 - [Deployment](./deployment.md) — shipping to Cloudflare Workers.
 - [Security](./security.md) — threat model and controls.
-- [Contributing](./contributing.md) — guidance for AI coding agents and contributors.
