@@ -5,7 +5,6 @@ import { decryptCredential } from "../security/crypto";
 import { ImapProvider } from "./imap";
 import { loadOauthToken } from "../routes/oauth";
 import type { ImapTransport } from "./imap";
-import type { Env } from "../env";
 
 // Well-known IMAP/SMTP endpoints for OAuth-connected providers. Gmail and
 // Outlook disable password login, so these accounts always authenticate with

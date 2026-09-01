@@ -3,8 +3,15 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env, SyncMessage } from "./env";
 import { syncAccount, syncMailbox } from "./sync/sync-service";
+
+// Payload for account-sync jobs enqueued to the SYNC_QUEUE. A job without a
+// mailboxId syncs every mailbox in the account; with one, it retries that single
+// mailbox.
+interface SyncMessage {
+  accountId: string;
+  mailboxId?: string;
+}
 import { markAccountSyncSucceeded } from "./sync/sync-persistence";
 import { HttpError } from "./http-error";
 import { accountRoutes } from "./routes/accounts";

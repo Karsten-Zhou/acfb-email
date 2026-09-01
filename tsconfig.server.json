@@ -8,11 +8,11 @@
       "@server/*": ["./server/*"],
       "@shared/*": ["./shared/*"]
     },
-    "types": ["@cloudflare/workers-types", "@types/bun"],
+    "types": ["@cloudflare/workers-types", "@types/bun", "./server/worker-configuration.d.ts"],
     "lib": ["ES2022", "DOM", "WebWorker"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "target": "ES2022"
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts", "worker-configuration.d.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts", "server/worker-configuration.d.ts"]
 }

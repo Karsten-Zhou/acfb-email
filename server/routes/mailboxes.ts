@@ -1,7 +1,6 @@
 // Mailbox routes: /api/mailboxes
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
-import type { Env } from "../env";
 import { MailboxSchema } from "@shared/schemas";
 import type { Mailbox } from "@shared/types";
 

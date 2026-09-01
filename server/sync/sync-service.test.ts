@@ -8,7 +8,6 @@
 // contains the message.
 import { describe, it, expect, beforeEach } from "vitest";
 import { env as testEnv } from "cloudflare:workers";
-import type { Env } from "../env";
 import { reconcileMailboxLocations } from "./sync-reconciliation";
 import { applyProviderMessages, logicalMessageId, locationKey } from "./sync-persistence";
 import type { ProviderMessage } from "../email/types";

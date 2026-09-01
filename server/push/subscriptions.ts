@@ -3,7 +3,6 @@
 // active subscription receives new-mail notifications. `account_id` stays NULL
 // and the endpoint uniquely identifies a device (UNIQUE(endpoint)).
 import { randomUUID } from "crypto";
-import type { Env } from "../env";
 
 export interface PushSubscriptionRow {
   id: string;

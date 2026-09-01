@@ -7,7 +7,6 @@
 import { randomUUID } from "crypto";
 import { roleFromImapName, roleSortOrder } from "../email/role-map";
 import type { ProviderMailbox, ProviderMessage } from "../email/types";
-import type { Env } from "../env";
 
 export interface AcctRow {
   id: string;

@@ -1,7 +1,6 @@
 // Message routes: /api/messages
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
-import type { Env } from "../env";
 import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
 import { importOlderPage } from "../sync/sync-service";

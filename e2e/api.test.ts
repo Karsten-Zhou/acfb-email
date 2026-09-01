@@ -3,14 +3,19 @@
 //
 // The API gate refuses requests with no Cloudflare Access evidence. Tests
 // simulate an approved request with the `Cf-Access-Jwt-Assertion` header.
-// @ts-expect-error -- runtime-only module provided by the Cloudflare vitest pool (no static types)
 import { env, exports } from "cloudflare:workers";
 import { describe, it, expect } from "vitest";
+
+// `env` is typed via the `ProvidedEnv` augmentation in `e2e/env.d.ts`. `exports`
+// is the main Worker's exports; its fetch handler is called with a URL string.
+const worker = exports as unknown as {
+  default: { fetch: (request: Request | string, init?: RequestInit) => Promise<Response> };
+};
 
 const ACCESS_HEADER = { "cf-access-jwt-assertion": "test-access-jwt" };
 
 async function api(path: string, init?: RequestInit): Promise<Response> {
-  return exports.default.fetch(`http://localhost${path}`, init);
+  return worker.default.fetch(`http://localhost${path}`, init);
 }
 
 describe("api routes", () => {

@@ -4,7 +4,6 @@
 // The ledger (INSERT ... ON CONFLICT DO NOTHING) makes delivery idempotent, so
 // a re-run sync can never re-notify the same mail.
 import webpush from "web-push";
-import type { Env } from "../env";
 import { configureWebPush, getVapidConfig } from "./vapid";
 import type { PushSubscriptionRow } from "./subscriptions";
 

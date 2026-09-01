@@ -3,7 +3,6 @@
 // message_locations row carrying the IMAP UID/UIDVALIDITY and per-location
 // read/starred flags. All list/detail queries join through locations.
 import { randomUUID } from "crypto";
-import type { Env } from "../env";
 
 export interface MailboxRow {
   id: string;

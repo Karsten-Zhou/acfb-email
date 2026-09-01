@@ -14,7 +14,6 @@
 
 import { buildProvider } from "../email/build-provider";
 import { AbortError } from "../email/imap";
-import type { Env } from "../env";
 import { newMailSince, notifyNewMail } from "../push/service";
 import { reconcileMailboxLocations } from "./sync-reconciliation";
 import {

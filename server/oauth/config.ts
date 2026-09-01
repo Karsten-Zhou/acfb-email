@@ -1,6 +1,5 @@
 // OAuth provider configurations (Google / Microsoft). Tokens are used for
 // IMAP/SMTP access (XOAUTH2).
-import type { Env } from "../env";
 import type { OAuthProviderConfig } from "./client";
 import { makeRedirectUri } from "./client";
 

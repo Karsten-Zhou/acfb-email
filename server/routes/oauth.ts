@@ -8,7 +8,6 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { randomUUID } from "crypto";
-import type { Env } from "../env";
 import { HttpError } from "../http-error";
 import { randomToken, safeEqual } from "../utils/token";
 import { decryptCredential, encryptCredential } from "../security/crypto";

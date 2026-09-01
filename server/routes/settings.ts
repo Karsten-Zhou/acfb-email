@@ -1,7 +1,6 @@
 // Settings routes: /api/settings
 import { Hono } from "hono";
 import { HttpError } from "../http-error";
-import type { Env } from "../env";
 
 export const settingsRoutes = new Hono<{ Bindings: Env }>();
 

@@ -2,7 +2,6 @@
 // here (server-side) and signed into the JWT `Authorization` header for each
 // request; the public key is served to the browser for `pushManager.subscribe`.
 import webpush from "web-push";
-import type { Env } from "../env";
 
 export interface VapidConfig {
   publicKey: string;

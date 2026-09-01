@@ -5,7 +5,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { PushSubscriptionSchema } from "../../shared/schemas";
 import { HttpError } from "../http-error";
-import type { Env } from "../env";
 import { cleanupInactiveSubscriptions } from "../push/service";
 import {
   listPushSubscriptions,
