@@ -38,6 +38,14 @@ export default tseslint.config(
       },
     },
   },
+  // The root-scoped service worker (public/sw.js) is plain JS running in a
+  // worker scope (`self`, `clients`, `URL`, ...), not a browser tab.
+  {
+    files: ["public/sw.js"],
+    languageOptions: {
+      globals: globals.worker,
+    },
+  },
   {
     rules: {
       "@typescript-eslint/no-unused-vars": [

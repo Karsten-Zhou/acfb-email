@@ -3,6 +3,7 @@
 //
 // The API gate refuses requests with no Cloudflare Access evidence. Tests
 // simulate an approved request with the `Cf-Access-Jwt-Assertion` header.
+// @ts-expect-error -- runtime-only module provided by the Cloudflare vitest pool (no static types)
 import { env, exports } from "cloudflare:workers";
 import { describe, it, expect } from "vitest";
 

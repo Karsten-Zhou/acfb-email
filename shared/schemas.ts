@@ -118,6 +118,20 @@ export const AddAccountInputSchema = z.object({
 
 export const TestConnectionInputSchema = AddAccountInputSchema;
 
+// --- Browser push ---
+
+/** A browser `PushSubscription`, as produced by JSON.stringify(). The endpoint
+ * is a push-service capability URL; keys.p256dh/auth are the URL-safe base64
+ * P-256 public key and auth secret used to encrypt payloads. */
+export const PushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(2048),
+  expirationTime: z.coerce.number().int().nonnegative().nullable().optional(),
+  keys: z.object({
+    p256dh: z.string().min(1).max(1024),
+    auth: z.string().min(1).max(1024),
+  }),
+});
+
 export const SendAttachmentSchema = z.object({
   name: z.string().min(1).max(255),
   mimeType: z.string().max(255).optional().default("application/octet-stream"),

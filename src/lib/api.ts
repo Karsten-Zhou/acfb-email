@@ -8,6 +8,7 @@ import type {
   Mailbox,
   Message,
   MessageDetail,
+  PushSubscriptionInput,
   SendMessageInput,
 } from "@shared/types";
 
@@ -166,6 +167,21 @@ export const api = {
       body: JSON.stringify(draft),
     }),
 
+  // browser push
+  pushCapability: () => request<PushCapability>("/push/capability", {}, { noToast: true }),
+  pushSubscribe: (input: PushSubscriptionInput) =>
+    request<{ ok: boolean; id: string }>("/push/subscription", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+  pushUnsubscribe: (id: string) =>
+    request<{ ok: boolean }>(`/push/subscription/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  pushRemoveByEndpoint: (endpoint: string) =>
+    request<{ ok: boolean }>("/push/subscription/remove", {
+      method: "POST",
+      body: JSON.stringify({ endpoint }),
+    }),
+
   // settings
   settings: () => request<{ settings: Record<string, unknown> }>("/settings"),
   saveSettings: (settings: Record<string, unknown>) =>
@@ -188,4 +204,17 @@ export interface HealthPayload {
     gmailOauth: boolean;
     outlookOauth: boolean;
   };
+}
+
+export interface PushSubscriptionSummary {
+  id: string;
+  endpoint: string;
+  enabled: number;
+  created_at: string;
+}
+
+export interface PushCapability {
+  configured: boolean;
+  publicKey: string | null;
+  subscriptions: PushSubscriptionSummary[];
 }

@@ -7,5 +7,11 @@
     "types": ["@types/bun"],
     "lib": ["ES2022"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js", "e2e/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "eslint.config.js",
+    "scripts/**/*.ts",
+    "e2e/**/*.ts"
+  ]
 }

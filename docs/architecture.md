@@ -43,6 +43,7 @@ Cloudflare Worker
 | Sync              | `server/sync/`              | orchestrates mailbox+message upsert; per-mailbox UID cursors                                                           |
 | Repo              | `server/db/repo.ts`         | D1 access, ownership-scoped queries                                                                                    |
 | Crypto            | `server/security/crypto.ts` | AES-GCM for stored credentials                                                                                         |
+| Push              | `server/push/`              | Web Push (VAPID) via `web-push`; subscription CRUD + new-mail delivery + cross-device revoke                           |
 | Shared            | `shared/`                   | Zod schemas + inferred types used by both ends                                                                         |
 
 ## 3. End-to-end flows
@@ -104,7 +105,9 @@ attachments(id, message_id FK, filename, mime_type, size, is_inline, content_id,
 sync_state(account_id FK, mailbox_id FK, uid_validity, last_uid, last_total,
            state, last_error, error_count, last_sync_at, last_success_at,
            PRIMARY KEY(account_id, mailbox_id))
-push_subscriptions(id, account_id FK, endpoint, p256dh, auth, enabled)
+push_subscriptions(id, account_id FK, endpoint, p256dh, auth, enabled, failure_count,
+                  last_failure_at, last_delivered_at, UNIQUE(endpoint))
+notification_deliveries(message_id FK, notification_type, status, created_at, delivered_at)
 app_settings(id PK, data JSON)   -- singleton
 ```
 
@@ -172,17 +175,17 @@ app_settings(id PK, data JSON)   -- singleton
 
 ## 7. Cloudflare resource usage
 
-| Resource             | Used? | Why                                                                 |
-| -------------------- | ----- | ------------------------------------------------------------------- |
-| Workers              | ✅    | Serves SPA + API (free-tier 100k req/day)                           |
-| D1                   | ✅    | Relational data (accounts, mailboxes, messages)                     |
-| Workers Assets       | ✅    | Serves the Vue SPA from edge (free)                                 |
-| `cloudflare:sockets` | ✅    | Outbound SMTP TCP                                                   |
-| KV                   | ❌    | Not needed for now; possible later for short-lived caches           |
-| R2                   | ❌    | Not needed for now                                                  |
-| Queues               | ✅    | Background account syncs (`email-sync` consumer) — 15-min wall-time |
-| Cron                 | ❌    | Not needed for now                                                  |
-| Browser Push         | ⏳    | Table reserved; Service Worker + push to be wired in a later phase  |
+| Resource             | Used? | Why                                                                                    |
+| -------------------- | ----- | -------------------------------------------------------------------------------------- |
+| Workers              | ✅    | Serves SPA + API (free-tier 100k req/day)                                              |
+| D1                   | ✅    | Relational data (accounts, mailboxes, messages)                                        |
+| Workers Assets       | ✅    | Serves the Vue SPA from edge (free)                                                    |
+| `cloudflare:sockets` | ✅    | Outbound SMTP TCP                                                                      |
+| KV                   | ❌    | Not needed for now; possible later for short-lived caches                              |
+| R2                   | ❌    | Not needed for now                                                                     |
+| Queues               | ✅    | Background account syncs (`email-sync` consumer) — 15-min wall-time                    |
+| Cron                 | ❌    | Not needed for now                                                                     |
+| Browser Push         | ✅    | Web Push via `web-push` + `public/sw.js`; new-mail notifications + cross-device revoke |
 
 ### Free-tier risks
 

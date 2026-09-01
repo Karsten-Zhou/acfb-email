@@ -13,6 +13,7 @@ import { mailboxRoutes } from "./routes/mailboxes";
 import { messageRoutes } from "./routes/messages";
 import { sendRoutes } from "./routes/send";
 import { settingsRoutes } from "./routes/settings";
+import { pushRoutes } from "./routes/push";
 
 type AppEnv = { Bindings: Env };
 
@@ -59,6 +60,7 @@ api.route("/mailboxes", mailboxRoutes);
 api.route("/messages", messageRoutes);
 api.route("/send", sendRoutes);
 api.route("/settings", settingsRoutes);
+api.route("/push", pushRoutes);
 
 app.route("/api", api);
 

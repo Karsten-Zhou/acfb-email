@@ -160,15 +160,34 @@ CREATE TABLE IF NOT EXISTS sync_state (
 -- push_subscriptions: browser push subscriptions (per account)
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id          TEXT PRIMARY KEY,              -- uuid
-  account_id  TEXT REFERENCES accounts(id) ON DELETE CASCADE,
-  endpoint    TEXT NOT NULL,
-  p256dh      TEXT NOT NULL,
-  auth        TEXT NOT NULL,
-  enabled     INTEGER NOT NULL DEFAULT 1,
-  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  id               TEXT PRIMARY KEY,         -- uuid
+  account_id       TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+  endpoint         TEXT NOT NULL,
+  p256dh           TEXT NOT NULL,
+  auth             TEXT NOT NULL,
+  enabled          INTEGER NOT NULL DEFAULT 1,
+  -- delivery bookkeeping (transient; dead endpoints are pruned by cleanup)
+  failure_count    INTEGER NOT NULL DEFAULT 0,
+  last_failure_at  TEXT,
+  last_delivered_at TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (endpoint)
 );
+
+-- ------------------------------------------------------------------
+-- notification_deliveries: idempotency ledger for Web Push. A message is
+-- claimed here (INSERT ... ON CONFLICT DO NOTHING) before any push is sent,
+-- so re-running a sync can never re-notify the same mail. Also lets a
+-- cross-device "read" revoke only messages that were actually delivered.
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+  message_id        TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+  notification_type TEXT NOT NULL DEFAULT 'new-mail',
+  status            TEXT NOT NULL DEFAULT 'claimed',   -- claimed | sent
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  delivered_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_created ON notification_deliveries(created_at);
 
 -- ------------------------------------------------------------------
 -- app_settings: app-wide settings (JSON blob, single row)

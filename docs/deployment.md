@@ -105,7 +105,28 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-## 6. Deploy
+## 6. Configure browser push (optional)
+
+To receive new-mail push notifications, generate a Web Push **VAPID** key pair and
+store it as Worker secrets. Skip this step to leave push disabled.
+
+```bash
+bun run vapid:generate
+```
+
+Upload the printed values:
+
+```bash
+bunx wrangler secret put VAPID_PUBLIC_KEY
+bunx wrangler secret put VAPID_PRIVATE_KEY
+```
+
+Optionally set `VAPID_SUBJECT` (a `mailto:` or `https:` URI identifying the app) via
+`wrangler.jsonc` `vars` or a secret; it defaults to `mailto:acfb-email@localhost`.
+`VAPID_PUBLIC_KEY` is public (served to the browser for `pushManager.subscribe`);
+`VAPID_PRIVATE_KEY` is a secret and never leaves the Worker.
+
+## 7. Deploy
 
 With the database, queue, and secrets in place, you can safely deploy:
 
@@ -113,7 +134,7 @@ With the database, queue, and secrets in place, you can safely deploy:
 bun run deploy
 ```
 
-## 7. Cloudflare Access
+## 8. Cloudflare Access
 
 Now that the Worker is deployed, protect it in the Cloudflare dashboard.
 

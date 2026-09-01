@@ -161,5 +161,20 @@
     "allowlistRemove": "Entfernen",
     "allowlistInvalid": "Gib eine gültige E-Mail-Adresse oder Domain ein (z. B. name{'@'}example.com oder example.com).",
     "allowlistEmpty": "Noch keine vertrauenswürdigen Absender. Bilder bleiben blockiert, bis du einen hinzufügst."
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "hint": "Erhalte eine Push-Benachrichtigung, wenn neue E-Mail in deinem Posteingang ankommt.",
+    "on": "An — dieses Gerät wird benachrichtigt.",
+    "off": "Aus — dieses Gerät wird nicht benachrichtigt.",
+    "unsupported": "Push-Benachrichtigungen werden in diesem Browser nicht unterstützt.",
+    "notConfigured": "Push ist auf dem Server nicht eingerichtet.",
+    "permissionDenied": "Benachrichtigungen werden vom Browser blockiert. Erlaube sie in den Browser-Einstellungen.",
+    "permissionDeniedTitle": "Benachrichtigungen blockiert",
+    "permissionDeniedBody": "Erlaube Benachrichtigungen für diese Seite in den Browser-Einstellungen und versuche es erneut.",
+    "enableFailed": "Benachrichtigungen konnten nicht aktiviert werden.",
+    "enabledTitle": "Benachrichtigungen aktiviert",
+    "enabledBody": "Du wirst benachrichtigt, wenn neue E-Mail ankommt.",
+    "disableFailed": "Benachrichtigungen konnten nicht deaktiviert werden."
   }
 }

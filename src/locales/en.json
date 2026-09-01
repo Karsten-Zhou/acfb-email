@@ -161,5 +161,20 @@
     "allowlistRemove": "Remove",
     "allowlistInvalid": "Enter a valid email address or domain (e.g. name{'@'}example.com or example.com).",
     "allowlistEmpty": "No trusted senders yet. Images stay blocked until you add one."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "hint": "Get a push notification when new mail arrives in your inbox.",
+    "on": "On — this device will be notified.",
+    "off": "Off — this device won't be notified.",
+    "unsupported": "Push notifications aren't supported in this browser.",
+    "notConfigured": "Push isn't configured on the server.",
+    "permissionDenied": "Notifications are blocked by the browser. Allow them in your browser settings.",
+    "permissionDeniedTitle": "Notifications blocked",
+    "permissionDeniedBody": "Allow notifications for this site in your browser settings, then try again.",
+    "enableFailed": "Couldn't enable notifications.",
+    "enabledTitle": "Notifications enabled",
+    "enabledBody": "You'll be notified when new mail arrives.",
+    "disableFailed": "Couldn't disable notifications."
   }
 }

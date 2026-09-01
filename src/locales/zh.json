@@ -161,5 +161,20 @@
     "allowlistRemove": "移除",
     "allowlistInvalid": "请输入有效的邮箱地址或域名（例如 name{'@'}example.com 或 example.com）。",
     "allowlistEmpty": "还没有受信任的发件人。添加之前图片将保持阻止。"
+  },
+  "notifications": {
+    "title": "通知",
+    "hint": "收件箱收到新邮件时发送推送通知。",
+    "on": "已开启——此设备将收到通知。",
+    "off": "已关闭——此设备不会收到通知。",
+    "unsupported": "此浏览器不支持推送通知。",
+    "notConfigured": "服务器尚未配置推送。",
+    "permissionDenied": "通知被浏览器阻止。请在浏览器设置中允许。",
+    "permissionDeniedTitle": "通知被阻止",
+    "permissionDeniedBody": "请在浏览器设置中允许此网站的通知，然后重试。",
+    "enableFailed": "无法开启通知。",
+    "enabledTitle": "通知已开启",
+    "enabledBody": "收到新邮件时你将被通知。",
+    "disableFailed": "无法关闭通知。"
   }
 }

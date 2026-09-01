@@ -15,6 +15,7 @@
 import { buildProvider } from "../email/build-provider";
 import { AbortError } from "../email/imap";
 import type { Env } from "../env";
+import { newMailSince, notifyNewMail } from "../push/service";
 import { reconcileMailboxLocations } from "./sync-reconciliation";
 import {
   applyProviderMessages,
@@ -196,6 +197,10 @@ export async function syncMailbox(
     ),
   );
 
+  // Watermark for new-mail push detection: any inbox location created at or
+  // after this instant during this pass is mail that just arrived.
+  const syncStart = new Date().toISOString();
+
   const seen = await applyProviderMessages(
     env,
     account.id,
@@ -213,6 +218,18 @@ export async function syncMailbox(
   await env.DB.prepare(`UPDATE mailboxes SET total_messages = ?, unseen_messages = ? WHERE id = ?`)
     .bind(result.total ?? null, await unseenForBox(env, mailbox.id), mailbox.id)
     .run();
+
+  // Notify for mail that just arrived in the inbox on an incremental sync.
+  // First syncs (no prior cursor) and UIDVALIDITY resets re-import history and
+  // are never notified; the delivery ledger makes this idempotent.
+  if (!reset && cursor?.last_uid != null) {
+    const box = await env.DB.prepare(`SELECT role FROM mailboxes WHERE id = ?`)
+      .bind(mailbox.id)
+      .first<{ role: string | null }>();
+    if (box?.role === "inbox") {
+      await notifyNewMail(env, await newMailSince(env, mailbox.id, syncStart));
+    }
+  }
 
   return { seen };
 }

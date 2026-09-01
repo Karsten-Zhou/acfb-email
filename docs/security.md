@@ -62,6 +62,7 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 - Sanitization: `DOMPurify` (browser) on every render path; blocked tags/attrs (scripts, event handlers, `javascript:` URLs, `iframe`, etc.).
 - The list API returns only small previews; the detail API returns parsed text/html previews from PostalMime (which bounds nesting/headers).
 - External images are hidden by default (never/whitelist/always setting in Settings → Privacy, persisted client-side in localStorage). When hidden, a banner lets the user load them once, allow the sender, or always allow. Inline (`cid:`) images — the actual attachments, served same-origin via our endpoint — always render.
+- **Browser push (optional)**: notifications are opt-in and per-device (Settings → Preferences → Notifications). The encrypted push payload (Web Push / VAPID, `aes128gcm`) carries only the sender, subject, and the message id used to open it — never the body. The sender/subject are shown in the OS notification and may be visible on a lock screen. Reading a message on one device dismisses its notification on every other (cross-device revoke).
 
 ## 6. Secrets management
 
@@ -102,6 +103,6 @@ Configure both under **Zero Trust → Access controls → Applications → Confi
 - [x] Ownership-scoped queries (no IDOR)
 - [x] Input validation via Zod on all API bodies
 - [x] No secrets in client bundle; `.env.example` placeholders only
-- [ ] Browser Push (phase 8) — subscription storage table exists
+- [x] Browser Push — subscription storage table exists
 - [x] Remote-image blocking setting (Privacy) + per-message banner (load once / allow sender / always)
 - [x] OAuth state validation + code exchange server-side (Gmail/Outlook connect)

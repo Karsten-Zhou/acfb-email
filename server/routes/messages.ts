@@ -6,6 +6,7 @@ import { buildProvider } from "../email/build-provider";
 import { repo } from "../db/repo";
 import { importOlderPage } from "../sync/sync-service";
 import { pruneOrphanMessages } from "../sync/sync-reconciliation";
+import { revokeNotifications } from "../push/service";
 import { readJson } from "../utils/http";
 import { bytesToBase64 } from "../security/crypto";
 import {
@@ -280,6 +281,11 @@ messageRoutes.patch("/flags", async (c) => {
     await provider.setFlags(box.provider_path, pids, flags);
     for (const m of msgs) await repo.updateFlags(c.env, m.location_id, flags);
     await repo.refreshUnseen(c.env, mailboxId);
+  }
+  // A message read on this device should dismiss its notification on every
+  // other device (best-effort; no-op when push is unconfigured).
+  if (input.read === true) {
+    await revokeNotifications(c.env, input.ids);
   }
   return c.json({ ok: true });
 });
