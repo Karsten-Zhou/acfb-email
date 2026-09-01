@@ -103,7 +103,7 @@ docs/                 VitePress documentation site
 - **Single worker, SPA routing**: `src/router/index.ts` uses `createWebHistory`. Server redirects use plain paths — the Workers asset SPA fallback handles deep links. `/mail/message/:id` maps to `MailboxView`, which reads the route param and renders it in the rightmost reading pane on wide screens.
 - **IMAP via `imapflow`**, patched for a workerd stream-timing quirk (`patches/imapflow@1.7.6.patch` — keep it in sync when bumping). SMTP is implemented over sockets in `server/email/smtp.ts`.
   - Don't pass `tls.rejectUnauthorized` to imapflow (workerd throws `ERR_OPTION_NOT_IMPLEMENTED`); pass an explicit `servername`.
-  - **`COMPRESS=DEFLATE` must stay disabled** (`disableCompression: true` in `ImapProvider`) — workerd's compressed stream chain drops large responses, hanging the command.
+  - The imapflow patch (in `patches/imapflow@1.7.6.patch`) also fixes a workerd `ImapStream` input-drain race that made large responses hang.
   - Workers blocks outbound port 25 (SMTP); use 465/587.
 - **MIME parsing**: `postal-mime` (zero-dep, Workers-safe; has `maxNestingDepth`/`maxHeadersSize` limits). `mimetext` builds MIME; its `setHeader In-Reply-To` expects a bare id (it adds the angle brackets itself).
 - **Provider**: `server/email/imap.ts` is the mail adapter (`ImapProvider`, built on imapflow). Generic IMAP accounts use password auth; Gmail and Outlook authenticate via OAuth2 (XOAUTH2) on their well-known endpoints (`buildProvider` in `server/email/build-provider.ts`). The provider-side message id is the IMAP `remote_uid` (`providerIdFor()` in `server/routes/messages.ts`).

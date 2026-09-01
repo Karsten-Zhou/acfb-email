@@ -9,3 +9,5 @@ dist
 .DS_Store
 docs/.vitepress/cache
 docs/.vitepress/dist
+# Throwaway scratch files (repros, servers, etc.)
+/.temp/

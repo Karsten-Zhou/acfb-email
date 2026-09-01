@@ -35,3 +35,46 @@ index db6f380..faf0f89 100644
          };
  
          this.streamer.on('readable', this.socketReadable);
+diff --git a/lib/handler/imap-stream.js b/lib/handler/imap-stream.js
+index d0b4fda..6e2d9cd 100644
+--- a/lib/handler/imap-stream.js
++++ b/lib/handler/imap-stream.js
+@@ -407,6 +407,26 @@ class ImapStream extends Transform {
+         }
+     }
+ 
++    /**
++     * Starts the async input-draining loop under the single-flight guard, and
++     * restarts it if a chunk is queued during teardown. The `processingInput`
++     * flag is reset in a `.finally()` microtask; on workerd a `_transform` call
++     * can land in that window after the loop has already exited, leaving a
++     * queued chunk stranded (the line never completes -> the parser hangs).
++     * Re-draining here guarantees every queued chunk is processed.
++     */
++    _startProcessInput() {
++        this.processingInput = true;
++        this.processInput()
++            .catch(err => this.failStream(err))
++            .finally(() => {
++                this.processingInput = false;
++                if (this.inputQueue.length && !this.destroyed) {
++                    this._startProcessInput();
++                }
++            });
++    }
++
+     /**
+      * Drains the input queue by processing each queued chunk sequentially.
+      * Yields to the event loop every 10 chunks to prevent CPU blocking on
+@@ -475,10 +495,7 @@ class ImapStream extends Transform {
+         this.inputQueue.push({ chunk, next });
+ 
+         if (!this.processingInput) {
+-            this.processingInput = true;
+-            this.processInput()
+-                .catch(err => this.failStream(err))
+-                .finally(() => (this.processingInput = false));
++            this._startProcessInput();
+         }
+     }
+ 

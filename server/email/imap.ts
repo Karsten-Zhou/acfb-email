@@ -60,9 +60,6 @@ export class ImapProvider {
       auth: this.creds.accessToken
         ? { user: this.creds.username, accessToken: this.creds.accessToken }
         : { user: this.creds.username, pass: this.creds.password ?? "" },
-      // Workerd's compressed stream chain drops large responses (e.g. UID
-      // SEARCH), so COMPRESS=DEFLATE stays off.
-      disableCompression: true,
       logger: false,
     });
   }

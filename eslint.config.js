@@ -13,7 +13,16 @@ import globals from "globals";
 const vueRecommended = pluginVue.configs["flat/recommended"];
 
 export default tseslint.config(
-  { ignores: ["dist/**", ".wrangler/**", "docs/.vitepress/**", "node_modules/**", "**/*.d.ts"] },
+  {
+    ignores: [
+      "dist/**",
+      ".wrangler/**",
+      "docs/.vitepress/**",
+      "node_modules/**",
+      "**/*.d.ts",
+      ".temp/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...vueRecommended.map((cfg) => ({

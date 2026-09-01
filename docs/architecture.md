@@ -150,8 +150,7 @@ app_settings(id PK, data JSON)   -- singleton
 
 ### IMAP via imapflow (patched)
 
-- `imapflow` needs one small patch (kept in `patches/imapflow@1.7.6.patch`): see <https://github.com/cloudflare/workerd/issues/7136>.
-- `COMPRESS=DEFLATE` is disabled (`disableCompression: true`) because workerd's compressed stream chain drops large responses.
+- `imapflow` needs a small patch (kept in `patches/imapflow@1.7.6.patch`) for two workerd stream-timing quirks: the `socketReadable` reentrancy race (workerd issue <https://github.com/cloudflare/workerd/issues/7136>) and an `ImapStream` input-drain race that otherwise drops large responses when `COMPRESS=DEFLATE` is on.
 
 ## 7. Cloudflare resource usage
 
