@@ -128,7 +128,7 @@ docs/                 VitePress documentation site
 - Component naming: reusable components are `Ui*`-prefixed; follows the Vue multi-word component rule.
 - **Composables**: reusable, domain-focused logic lives in `src/composables/`.
 - Design system: custom Tailwind + semantic `oklch` tokens in `src/styles/main.css`, `cn()` in `src/lib/cn.ts`.
-- i18n is in `src/lib/i18n.ts`; keys are nested in `src/locales/*.json`. `MessageKey` in `src/lib/i18n.ts` is a recursive path type over `en`, so keys are compile-time checked (typecheck), and `@intlify/eslint-plugin-vue-i18n` in `eslint.config.js` enforces key consistency across locales + no unused keys (lint). Keys reached only via dynamic lookup (`SYNC_ERROR_KEYS`, `ROLE_LABEL_KEY`) are ignored there. `en` is the fallback locale.
+- i18n is in `src/lib/i18n.ts`; keys are nested in `src/locales/*.json`. `MessageKey` in `src/lib/i18n.ts` is a recursive path type over `en`, so keys are compile-time checked (typecheck), and `@intlify/eslint-plugin-vue-i18n` in `eslint.config.ts` enforces key consistency across locales + no unused keys (lint). `en` is the fallback locale.
 - Lint is expected to be warning-free.
 
 ## Security & sanitization

@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import pluginVue from "eslint-plugin-vue";
 import pluginVueI18n from "@intlify/eslint-plugin-vue-i18n";
@@ -12,7 +13,7 @@ import globals from "globals";
 // last so it wins over the recommended configs.
 const vueRecommended = pluginVue.configs["flat/recommended"];
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       "dist/**",
@@ -74,11 +75,18 @@ export default tseslint.config(
   },
   // i18n key checks via @intlify/eslint-plugin-vue-i18n: keys used in code must
   // exist, every locale file must carry the same keys, and dead keys are
-  // rejected. `ignores` covers keys referenced only via dynamic lookup
-  // (SYNC_ERROR_KEYS in lib/i18n.ts, ROLE_LABEL_KEY in lib/roles.ts), which
-  // this plugin can't trace back to a literal t("...") call.
+  // rejected.
   {
     plugins: {
+      // TODO: Timed-out on the residual @intlify/eslint-plugin-vue-i18n
+      // `defineConfig` type gap: this plugin's rules are typed as RuleModule
+      // with `meta.fixable: "code" | "whitespace" | null`, which isn't
+      // assignable to eslint core's RuleFixType | undefined (the `null`).
+      // Closed intlify/eslint-plugin-vue-i18n#669 (fixed v4.2.0) covered only
+      // the plugin `configs` types, not this `rules` typing. No open upstream
+      // issue exists for the residual gap — file one against the plugin with
+      // this error snippet before removing the suppression.
+      // @ts-expect-error -- see TODO above; runtime-harmless, lint passes.
       "@intlify/vue-i18n": pluginVueI18n,
     },
     settings: {
@@ -96,7 +104,6 @@ export default tseslint.config(
         {
           src: "./src",
           extensions: [".js", ".ts", ".vue"],
-          ignores: ["/^accounts\\.err/", "/^mailbox\\.role/"],
         },
       ],
     },

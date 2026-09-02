@@ -90,18 +90,23 @@ export function t(
 // account's state_message; translate it here (raw provider detail passes
 // through unchanged).
 // ---------------------------------------------------------------
-const SYNC_ERROR_KEYS = new Set<MessageKey>([
-  "accounts.errOauthRequired",
-  "accounts.errAuth",
-  "accounts.errNetwork",
-  "accounts.errTimeout",
-  "accounts.errSyncFailed",
-]);
 
 /** Translate a server-stored sync error code; pass through raw detail. */
 export function syncErrorLabel(codeOrMessage: string): string {
-  const key = codeOrMessage as MessageKey;
-  return SYNC_ERROR_KEYS.has(key) ? t(key) : codeOrMessage;
+  switch (codeOrMessage) {
+    case "errOauthRequired":
+      return t("accounts.errOauthRequired");
+    case "errAuth":
+      return t("accounts.errAuth");
+    case "errNetwork":
+      return t("accounts.errNetwork");
+    case "errTimeout":
+      return t("accounts.errTimeout");
+    case "errSyncFailed":
+      return t("accounts.errSyncFailed");
+    default:
+      return codeOrMessage;
+  }
 }
 
 // ---------------------------------------------------------------
