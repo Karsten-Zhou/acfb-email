@@ -36,7 +36,7 @@ export default defineConfig({
           { text: "Architecture", link: "/architecture" },
           { text: "Deployment", link: "/deployment" },
           { text: "Security", link: "/security" },
-          { text: "Changelog", link: "/CHANGELOG" },
+          { text: "Changelog", link: "/changelog" },
         ],
       },
     ],
