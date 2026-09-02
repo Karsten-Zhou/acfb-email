@@ -92,5 +92,10 @@
   },
   "patchedDependencies": {
     "imapflow@1.7.6": "patches/imapflow@1.7.6.patch"
+  },
+  "commit-and-tag-version": {
+    "scripts": {
+      "posttag": "git add package.json docs/changelog.md"
+    }
   }
 }
