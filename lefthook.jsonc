@@ -1,0 +1,43 @@
+// Lefthook git hooks configuration.
+// Formatting and static checks run automatically before each commit.
+// Docs: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+//
+// Note: `bun run test` (vitest + the Cloudflare workerd pool) is intentionally
+// NOT a pre-commit hook — spawning workerd subprocesses from a git hook on
+// Windows can leave orphaned processes that hold .git/index.lock and block all
+// subsequent commits ("commit looks stuck"). Tests run on demand (`bun run
+// test`) and in CI.
+//
+// Hooks run sequentially (`parallel: false`). Running several commands at once
+// from a git hook on Windows can deadlock on inherited console/pipe handles,
+// which also shows up as a stuck commit. Total hook time is ~5s, so sequential
+// execution costs nothing and removes that failure class entirely.
+
+{
+  "pre-commit": {
+    "parallel": false,
+    "commands": {
+      "format": {
+        // Code, JSON, and markdown (docs included).
+        // Re-add the (re)written files so the commit picks up the formatted output.
+        "glob": "*.{ts,vue,js,cjs,mjs,json,jsonc,md}",
+        "run": "bunx prettier --write {staged_files} && git add {staged_files}",
+      },
+      "lint": {
+        "glob": "*.{ts,vue,js}",
+        "run": "bun run lint",
+      },
+      "typecheck": {
+        "run": "bun run typecheck",
+      },
+    },
+  },
+  // Enforce Conventional Commits on every commit message.
+  "commit-msg": {
+    "commands": {
+      "lint-commit": {
+        "run": "bunx commitlint --edit $1",
+      },
+    },
+  },
+}
