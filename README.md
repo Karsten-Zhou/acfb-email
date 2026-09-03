@@ -29,7 +29,6 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 ## TODO
 
 - [ ] Upgrade Cloudflare Access detection (currently only a simple check)
-- [ ] Apply `@fluentui/priority-overflow` to multiple item selection menu in `MessageListPane.vue`
 - [ ] Trace upstream issues
   - [ ] [🐛 Bug Report — Runtime APIs: `node:stream` on workerd drops a `'readable'` event under a reentrancy-guarded reader with manual backpressure](https://github.com/cloudflare/workerd/issues/7136)
   - [ ] [Type error when registering plugin with ESLint `defineConfig`](https://github.com/intlify/eslint-plugin-vue-i18n/issues/767)

@@ -14,6 +14,7 @@ import {
   Star,
   Loader2,
   Paperclip,
+  Menu,
 } from "@lucide/vue";
 import type { Message } from "@shared/types";
 
@@ -37,6 +38,7 @@ const emit = defineEmits<{
   "mark-read": [];
   "move-selected": [];
   "confirm-delete": [];
+  "toggle-sidebar": [];
   open: [m: Message];
   toggleSelect: [id: string];
   scroll: [e: Event];
@@ -93,25 +95,41 @@ function onTouchEnd() {
     class="flex min-w-0 flex-1 flex-col border-r border-border bg-background lg:max-w-md"
     :class="reading ? 'hidden lg:flex' : 'flex'"
   >
-    <header
-      class="hidden flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 md:flex"
-    >
-      <h2 class="truncate text-sm font-semibold">{{ title }}</h2>
-      <div class="flex items-center gap-1">
+    <header class="flex items-center gap-2 border-b border-border px-4 py-2.5">
+      <!-- Left: mobile-only sidebar menu + title, which becomes "N selected"
+           while messages are selected (mirroring the old mobile top bar). -->
+      <div class="flex min-w-0 items-center gap-2">
         <button
-          class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground md:hidden"
+          :aria-label="t('accounts.emailAccounts')"
+          @click="emit('toggle-sidebar')"
+        >
+          <Menu class="h-4 w-4" />
+        </button>
+        <h2 v-if="selectedCount === 0" class="truncate text-sm font-semibold">{{ title }}</h2>
+        <span v-else class="truncate text-sm font-semibold">
+          {{ selectedCount }} {{ t("common.selected") }}
+        </span>
+      </div>
+      <!-- Right: bulk actions fold via @fluentui/priority-overflow; the unread
+           toggle shows only when nothing is selected. -->
+      <div class="flex min-w-0 flex-1 items-center justify-end gap-1">
+        <BulkActions
+          v-if="selectedCount > 0"
+          :selected-count="selectedCount"
+          @mark-read="emit('mark-read')"
+          @move="emit('move-selected')"
+          @delete="emit('confirm-delete')"
+        />
+        <button
+          v-else
+          class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors hover:bg-accent"
           :class="onlyUnread ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'"
           :title="t('mailbox.showOnlyUnread')"
           @click="emit('toggleUnread')"
         >
           <MailOpen class="h-3.5 w-3.5" /> {{ t("mailbox.showOnlyUnread") }}
         </button>
-        <BulkActions
-          :selected-count="selectedCount"
-          @mark-read="emit('mark-read')"
-          @move="emit('move-selected')"
-          @delete="emit('confirm-delete')"
-        />
       </div>
     </header>
 

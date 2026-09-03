@@ -25,14 +25,9 @@ import UiDialog from "../components/UiDialog.vue";
 import MailboxSidebar from "./parts/MailboxSidebar.vue";
 import MessageListPane from "./parts/MessageListPane.vue";
 import MessageReaderPane from "./parts/MessageReaderPane.vue";
-import BulkActions from "../components/BulkActions.vue";
 import {
-  RefreshCw,
   Plus,
-  Settings,
   Loader2,
-  Menu,
-  MailOpen,
   Inbox,
   Send,
   FileText,
@@ -248,10 +243,7 @@ const listTitle = computed(() => {
 </script>
 
 <template>
-  <!-- Mobile: the fixed top bar overlays the top of the window (it's
-       `v-if=!reading`), so pad the layout on small screens while the bar is
-       shown to keep the first list row below it. -->
-  <div class="flex h-full bg-background text-foreground" :class="reading ? '' : 'pt-12 md:pt-0'">
+  <div class="flex h-full bg-background text-foreground">
     <MailboxSidebar
       :mailboxes="mailboxTree"
       :active-mailbox-id="activeMailboxId"
@@ -281,6 +273,7 @@ const listTitle = computed(() => {
       @mark-read="markSelectedRead"
       @move-selected="openMoveSelected"
       @confirm-delete="confirmDeleteSelected"
+      @toggle-sidebar="sidebarOpen = true"
       @open="openMessageRow"
       @toggle-select="toggleSelect"
       @scroll="onListScroll"
@@ -301,58 +294,6 @@ const listTitle = computed(() => {
       @move-message="openMoveMessage(selected!.id)"
       @confirm-delete="confirmDeleteOne(selected!.id)"
     />
-
-    <!-- Mobile top bar (when no message open) -->
-    <div
-      v-if="!reading"
-      class="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden"
-    >
-      <div class="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8"
-          :aria-label="t('accounts.emailAccounts')"
-          @click="sidebarOpen = true"
-          ><Menu class="h-4 w-4"
-        /></Button>
-        <span v-if="selectedCount > 0" class="text-sm font-semibold">
-          {{ selectedCount }} {{ t("common.selected") }}
-        </span>
-        <span v-else class="text-sm font-semibold">Mail</span>
-      </div>
-      <div class="flex items-center gap-1">
-        <template v-if="selectedCount > 0">
-          <BulkActions
-            :selected-count="selectedCount"
-            @mark-read="markSelectedRead"
-            @move="openMoveSelected"
-            @delete="confirmDeleteSelected"
-          />
-        </template>
-        <template v-else>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8"
-            :class="onlyUnread ? 'bg-accent text-accent-foreground' : ''"
-            :aria-label="t('mailbox.showOnlyUnread')"
-            @click="onlyUnread = !onlyUnread"
-            ><MailOpen class="h-4 w-4"
-          /></Button>
-          <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="syncing" @click="syncNow"
-            ><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': syncing }"
-          /></Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8"
-            @click="router.push({ name: 'settings' })"
-            ><Settings class="h-4 w-4"
-          /></Button>
-        </template>
-      </div>
-    </div>
 
     <!-- Mobile compose FAB -->
     <button
