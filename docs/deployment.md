@@ -21,34 +21,18 @@ Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier).
    bunx wrangler login
    ```
 
-## 2. Create the D1 database
-
-Create the database first so its ID can be added to your configuration:
+## 2. Deploy
 
 ```bash
-bunx wrangler d1 create acfb-email
+bun run deploy
 ```
 
-The output shows a **database_id** UUID. Put it in `wrangler.jsonc`:
+After deployment, Wrangler should show the Worker URL. It will normally look like: `https://<worker-name>.<your-subdomain>.workers.dev`. This is your email client URL. You might need the URL for the following steps.
 
-```jsonc
-"d1_databases": [{
-  "binding": "DB",
-  "database_name": "acfb-email",
-  "database_id": "<paste-your-id-here>"
-}]
-```
-
-Then apply the migrations:
+## 3. Apply the migrations
 
 ```bash
-bunx wrangler d1 migrations apply acfb-email --remote
-```
-
-## 3. Create the sync queue
-
-```bash
-bunx wrangler queues create email-sync
+bunx wrangler d1 migrations apply DB --remote
 ```
 
 ## 4. Create the core encryption secret
@@ -65,15 +49,7 @@ Save it securely to your Cloudflare Worker:
 bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
 ```
 
-## 5. Deploy
-
-```bash
-bun run deploy
-```
-
-After deployment, Wrangler should show the Worker URL. It will normally look like: `https://<worker-name>.<your-subdomain>.workers.dev`. This is your email client address. You might need it for some of the following steps.
-
-## 6. Cloudflare Access
+## 5. Cloudflare Access
 
 Now that the Worker is deployed, protect it in the Cloudflare dashboard.
 
@@ -83,7 +59,7 @@ Now that the Worker is deployed, protect it in the Cloudflare dashboard.
    - **Scope**: All traffic
    - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
 
-## 7. Configure OAuth providers (Optional)
+## 6. Configure OAuth providers (Optional)
 
 _Skip this step if you don't plan to use Gmail or Outlook._
 
@@ -121,7 +97,7 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-## 8. Configure browser push (optional)
+## 7. Configure browser push (optional)
 
 To receive new-mail push notifications, generate a Web Push **VAPID** key pair and store it as Worker secrets. Skip this step to leave push disabled.
 
@@ -136,7 +112,7 @@ bunx wrangler secret put VAPID_PUBLIC_KEY
 bunx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-## 9. Done!
+## 8. Done!
 
 Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` and log in with your Cloudflare account. Enjoy!
 

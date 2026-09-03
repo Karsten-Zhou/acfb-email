@@ -157,7 +157,7 @@ docs/                 VitePress documentation site
 
 | Symptom                             | Likely cause / fix                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------- |
-| `/api/*` returns 503 at startup     | D1 binding misconfigured; check `database_id` in `wrangler.jsonc` (use zeros for local) |
+| `/api/*` returns 503 at startup     | D1 binding misconfigured; check the `d1_databases` block in `wrangler.jsonc` is present |
 | `Failed to load` in browser console | Dev server not running                                                                  |
 | Type errors in editor but not CLI   | Restart the language server / `bun run typecheck` to sync tsbuildinfo                   |
 
