@@ -75,7 +75,7 @@ Gmail and Outlook require OAuth. Creating your own OAuth (for free) secures your
    - **Name**: ACFB Email Client (or whatever you like)
    - **Authorized JavaScript origins**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev`
    - **Authorized redirect URIs**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev/api/oauth/google/callback`
-5. You should now have a **Client ID** and **Client Secret**.
+5. You should now have the **Client ID** and **Client Secret**.
 
 ### Microsoft Entra app (Outlook)
 
@@ -85,6 +85,7 @@ Gmail and Outlook require OAuth. Creating your own OAuth (for free) secures your
    - **Supported account types**: Select **"Personal Microsoft accounts only"**.
    - **Redirect URI Platform**: Web
    - **Redirect URI**: `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev/api/oauth/microsoft/callback`
+3. You should now have the **Client ID** and **Client Secret**.
 
 ### Set OAuth Secrets in Cloudflare
 

@@ -25,3 +25,12 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 
 - **SMTP port 25 is blocked by Cloudflare Workers**; use submission ports 587/465.
 - Outbound email is sent from Cloudflare's IP, so SPF/DMARC records for your domain must include Cloudflare's sending IPs (or DNS-based SPF for the outbound range).
+
+## TODO
+
+- [ ] Node.js support (currently only Bun is tested)
+- [ ] Upgrade Cloudflare Access detection (currently only a simple check)
+- [ ] Apply `@fluentui/priority-overflow` to multiple item selection menu in `MessageListPane.vue`
+- [ ] Trace upstream issues
+  - [ ] [🐛 Bug Report — Runtime APIs: `node:stream` on workerd drops a `'readable'` event under a reentrancy-guarded reader with manual backpressure](https://github.com/cloudflare/workerd/issues/7136)
+  - [ ] [Type error when registering plugin with ESLint `defineConfig`](https://github.com/intlify/eslint-plugin-vue-i18n/issues/767)
