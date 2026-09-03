@@ -17,6 +17,7 @@ import {
   onUnmounted,
   reactive,
   ref,
+  useTemplateRef,
   watch,
   type Component,
 } from "vue";
@@ -121,7 +122,7 @@ const {
 // The manager observes the action row and, from each item's measured width +
 // priority, decides which buttons fit and which must fold into the "…" menu.
 // Visibility is driven through `itemVisibility` (v-show on each button).
-const overflowContainerEl = ref<HTMLElement | null>(null);
+const overflowContainerEl = useTemplateRef<HTMLElement>("overflowContainerEl");
 const actionBtnEls = ref<Partial<Record<ReaderAction, HTMLElement | null>>>({});
 const itemVisibility = reactive<Record<string, boolean>>(
   Object.fromEntries(actions.map((a) => [a.key, true])),

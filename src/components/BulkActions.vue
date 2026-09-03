@@ -12,6 +12,7 @@ import {
   onUnmounted,
   reactive,
   ref,
+  useTemplateRef,
   watch,
   type Component,
 } from "vue";
@@ -74,7 +75,7 @@ const {
 } = useOverflowMenu();
 
 // ---- priority overflow (@fluentui/priority-overflow) ----
-const overflowContainerEl = ref<HTMLElement | null>(null);
+const overflowContainerEl = useTemplateRef<HTMLElement>("overflowContainerEl");
 const actionBtnEls = ref<Partial<Record<BulkAction, HTMLElement | null>>>({});
 const itemVisibility = reactive<Record<string, boolean>>(
   Object.fromEntries(actions.map((a) => [a.key, true])),

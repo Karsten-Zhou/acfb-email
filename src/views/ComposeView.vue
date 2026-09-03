@@ -4,9 +4,9 @@
 // sit in the header/to-row to match the rest of the app's density. Form logic
 // (fields, send/save-draft/discard, draft loading) lives in useComposeForm and
 // attachment file handling in useComposeAttachments.
-import { onMounted, ref } from "vue";
+import { onMounted, useTemplateRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useComposeForm } from "../composables/useComposeForm";
+import { useComposeForm, type ComposeEditor } from "../composables/useComposeForm";
 import { useComposeAttachments } from "../composables/useComposeAttachments";
 import { t } from "../lib/i18n";
 import { formatAttachmentSize } from "../lib/utils";
@@ -21,7 +21,7 @@ const route = useRoute();
 const router = useRouter();
 
 /** The editor, exposing getText() for the text/plain MIME part. */
-const editorRef = ref<{ getText: () => string } | null>(null);
+const editorRef = useTemplateRef<ComposeEditor>("editorRef");
 const { attachments, addingFiles, fileInput, pickFiles, onFilesChosen, removeAttachment } =
   useComposeAttachments();
 const form = useComposeForm({ route, router, editorRef, attachments });
