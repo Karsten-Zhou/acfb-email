@@ -1,26 +1,17 @@
-// Integration tests: exercise the Hono API through the Workers runtime with
-// the local D1 binding (migrations applied in e2e/apply-migrations.ts).
-//
-// The API gate refuses requests with no Cloudflare Access evidence. Tests
-// simulate an approved request with the `Cf-Access-Jwt-Assertion` header.
-import { env, exports } from "cloudflare:workers";
-import { describe, it, expect } from "vitest";
+// Core smoke tests: the API gate, the health endpoint, and dev-secret wiring.
+// Per-route coverage lives in the sibling files (accounts/mailboxes/messages/
+// settings/push); each group is isolated via `clearDb()` in `beforeEach`.
+import { env } from "cloudflare:workers";
+import { describe, it, expect, beforeEach } from "vitest";
+import { api, clearDb } from "./helpers";
 
-// `env` is typed via the `ProvidedEnv` augmentation in `e2e/env.d.ts`. `exports`
-// is the main Worker's exports; its fetch handler is called with a URL string.
-const worker = exports as unknown as {
-  default: { fetch: (request: Request | string, init?: RequestInit) => Promise<Response> };
-};
+describe("api gate", () => {
+  beforeEach(() => clearDb(env));
 
-const ACCESS_HEADER = { "cf-access-jwt-assertion": "test-access-jwt" };
-
-async function api(path: string, init?: RequestInit): Promise<Response> {
-  return worker.default.fetch(`http://localhost${path}`, init);
-}
-
-describe("api routes", () => {
   it("health endpoint returns ok", async () => {
-    const res = await api("/api/health", { headers: ACCESS_HEADER });
+    const res = await api("/api/health", {
+      headers: { "cf-access-jwt-assertion": "test-access-jwt" },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
@@ -35,69 +26,10 @@ describe("api routes", () => {
     expect(env.CREDENTIAL_ENCRYPTION_KEY).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("returns the empty accounts list", async () => {
-    const res = await api("/api/accounts", { headers: ACCESS_HEADER });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { accounts: unknown[] };
-    expect(body.accounts).toEqual([]);
-  });
-
-  it("updates the mailbox unseen count when flags change (refreshUnseen)", async () => {
-    // Seed an account + mailbox + two messages (one unread).
-    await env.DB.prepare(
-      `INSERT INTO accounts (id, provider, name, email, state, sync_enabled, created_at)
-       VALUES ('acct1', 'imap', 'Test', 't@example.com', 'healthy', 1, ?)`,
-    )
-      .bind(new Date().toISOString())
-      .run();
-    await env.DB.prepare(
-      `INSERT INTO mailboxes (id, account_id, name, role, provider_path, sort_order, total_messages, unseen_messages)
-       VALUES ('box1', 'acct1', 'INBOX', 'inbox', 'INBOX', 0, NULL, NULL)`,
-    ).run();
-    const now = new Date().toISOString();
-    const seed = [
-      ["msg1", 10],
-      ["msg2", 20],
-    ] as const;
-    for (const [id, uid] of seed) {
-      await env.DB.prepare(
-        `INSERT INTO messages (id, account_id, subject, received_at)
-         VALUES (?, 'acct1', ?, ?)`,
-      )
-        .bind(id, `Subj ${id}`, now)
-        .run();
-      await env.DB.prepare(
-        `INSERT INTO message_locations (id, message_id, mailbox_id, uid, uid_validity, is_read, is_starred)
-         VALUES (?, ?, 'box1', ?, 1, 0, 0)`,
-      )
-        .bind(`${id}-loc`, id, uid)
-        .run();
-    }
-
-    // Emulate the route's post-flag-update recompute (repo.refreshUnseen).
-    await env.DB.prepare(
-      `UPDATE message_locations SET is_read = 1 WHERE message_id = 'msg1'`,
-    ).run();
-    const n = await env.DB.prepare(
-      `SELECT COUNT(*) as n FROM message_locations WHERE mailbox_id = 'box1' AND is_read = 0`,
-    ).first<{ n: number }>();
-    await env.DB.prepare(`UPDATE mailboxes SET unseen_messages = ? WHERE id = 'box1'`)
-      .bind(n?.n ?? 0)
-      .run();
-    const row = await env.DB.prepare(
-      `SELECT unseen_messages FROM mailboxes WHERE id = 'box1'`,
-    ).first<{ unseen_messages: number | null }>();
-    expect(row?.unseen_messages).toBe(1);
-  });
-
-  it("messages list exposes remoteUid for load-older cursor", async () => {
-    const res = await api("/api/messages?mailboxId=box1&limit=50&offset=0", {
-      headers: ACCESS_HEADER,
+  it("returns 404 for unknown api paths", async () => {
+    const res = await api("/api/does-not-exist", {
+      headers: { "cf-access-jwt-assertion": "test-access-jwt" },
     });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { messages: { remoteUid: number | null }[] };
-    expect(Array.isArray(body.messages)).toBe(true);
-    expect(body.messages.length).toBe(2);
-    expect(body.messages[0]).toHaveProperty("remoteUid");
+    expect(res.status).toBe(404);
   });
 });
