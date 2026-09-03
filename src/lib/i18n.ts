@@ -5,7 +5,7 @@
 // `MessageKey` is a recursive dotted-path type over it, so t() keys are
 // compile-time checked (a mistyped key fails typecheck). Key consistency across
 // locale files and unused keys are enforced by @intlify/eslint-plugin-vue-i18n
-// in `bun run lint`. Adding a new locale = add a JSON file + extend the types.
+// in `npm run lint`. Adding a new locale = add a JSON file + extend the types.
 
 import { match } from "@formatjs/intl-localematcher";
 import { createI18n } from "vue-i18n";

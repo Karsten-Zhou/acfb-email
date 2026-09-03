@@ -2,10 +2,10 @@
 // Formatting and static checks run automatically before each commit.
 // Docs: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
 //
-// Note: `bun run test` (vitest + the Cloudflare workerd pool) is intentionally
+// Note: `npm run test` (vitest + the Cloudflare workerd pool) is intentionally
 // NOT a pre-commit hook — spawning workerd subprocesses from a git hook on
 // Windows can leave orphaned processes that hold .git/index.lock and block all
-// subsequent commits ("commit looks stuck"). Tests run on demand (`bun run
+// subsequent commits ("commit looks stuck"). Tests run on demand (`npm run
 // test`) and in CI.
 //
 // Hooks run sequentially (`parallel: false`). Running several commands at once
@@ -21,14 +21,14 @@
         // Code, JSON, and markdown (docs included).
         // Re-add the (re)written files so the commit picks up the formatted output.
         "glob": "*.{ts,vue,js,cjs,mjs,json,jsonc,md}",
-        "run": "bunx prettier --write {staged_files} && git add {staged_files}",
+        "run": "npm exec -- prettier --write {staged_files} && git add {staged_files}",
       },
       "lint": {
         "glob": "*.{ts,vue,js}",
-        "run": "bun run lint",
+        "run": "npm run lint",
       },
       "typecheck": {
-        "run": "bun run typecheck",
+        "run": "npm run typecheck",
       },
     },
   },
@@ -36,7 +36,7 @@
   "commit-msg": {
     "commands": {
       "lint-commit": {
-        "run": "bunx commitlint --edit $1",
+        "run": "npm exec -- commitlint --edit $1",
       },
     },
   },

@@ -8,14 +8,14 @@ Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier).
 
 ## 0. Prerequisites
 
-- [Bun](https://bun.sh) (recommended) or [Node.js](https://nodejs.org) (If using Node.js, replace `bun`/`bunx` with `npm`/`npx` in the commands below)
+- [Node.js](https://nodejs.org) (v24+) or [Bun](https://bun.sh)
 - A [Cloudflare account](https://dash.cloudflare.com)
 
 ## 1. Deploy
 
 ```bash
-bun install
-bun run deploy
+npm install
+npm run deploy
 ```
 
 After deployment, Wrangler should show the Worker URL. It will normally look like: `https://<worker-name>.<your-subdomain>.workers.dev`. This is your email client URL. You might need the URL for the following steps.
@@ -23,7 +23,7 @@ After deployment, Wrangler should show the Worker URL. It will normally look lik
 ## 2. Apply the migrations
 
 ```bash
-bunx wrangler d1 migrations apply DB --remote
+npx wrangler d1 migrations apply DB --remote
 ```
 
 ## 3. Create the core encryption secret
@@ -31,13 +31,13 @@ bunx wrangler d1 migrations apply DB --remote
 Run this command to generate a random, secure key:
 
 ```bash
-bun -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
+node -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
 ```
 
 Save it securely to your Cloudflare Worker:
 
 ```bash
-bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
+npx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
 ```
 
 ## 4. Cloudflare Access
@@ -83,10 +83,10 @@ Gmail and Outlook require OAuth. Creating your own OAuth (for free) secures your
 Once you have generated the credentials from the steps above, upload them:
 
 ```bash
-bunx wrangler secret put GOOGLE_CLIENT_ID
-bunx wrangler secret put GOOGLE_CLIENT_SECRET
-bunx wrangler secret put MICROSOFT_CLIENT_ID
-bunx wrangler secret put MICROSOFT_CLIENT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put MICROSOFT_CLIENT_ID
+npx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
 ## 6. Configure browser push (optional)
@@ -94,14 +94,14 @@ bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 To receive new-mail push notifications, generate a Web Push **VAPID** key pair and store it as Worker secrets. Skip this step to leave push disabled.
 
 ```bash
-bun run scripts/generate-vapid.ts
+node scripts/generate-vapid.ts
 ```
 
 Upload the printed values:
 
 ```bash
-bunx wrangler secret put VAPID_PUBLIC_KEY
-bunx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
 ## 7. Done!
@@ -110,7 +110,7 @@ Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` a
 
 ## Rollback / recovery
 
-- **Code rollback**: `bunx wrangler rollback` reverts to the last deployed version.
+- **Code rollback**: `npx wrangler rollback` reverts to the last deployed version.
 - **Data**: D1 is the authoritative store; deleting the Worker does not delete the database (it must be deleted explicitly).
 - **Lost encryption key**: Stored credentials become undecryptable with no backdoor — rotate all connected email credentials before changing the key.
 - **Access sessions**: Sign out via your Cloudflare account session or by clearing browser cookies.

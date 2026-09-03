@@ -28,7 +28,6 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 
 ## TODO
 
-- [ ] Node.js support (currently only Bun is tested)
 - [ ] Upgrade Cloudflare Access detection (currently only a simple check)
 - [ ] Apply `@fluentui/priority-overflow` to multiple item selection menu in `MessageListPane.vue`
 - [ ] Trace upstream issues

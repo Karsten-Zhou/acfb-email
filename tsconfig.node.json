@@ -1,10 +1,10 @@
-// Node-side tooling: config files, scripts, e2e tests run with Bun/Node.
+// Node-side tooling: config files, scripts, e2e tests run with Node/Bun.
 {
   "extends": "@vue/tsconfig/tsconfig.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "noEmit": true,
-    "types": ["@types/bun"],
+    "types": ["@types/node"],
     "lib": ["ES2022"]
   },
   "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.ts", "scripts/**/*.ts"]

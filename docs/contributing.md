@@ -14,13 +14,13 @@ The frontend talks to the API through `src/lib/api.ts`. The provider and its typ
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) or [Node.js](https://nodejs.org)
+- [Node.js](https://nodejs.org) (v24+) or [Bun](https://bun.sh)
 - A [Cloudflare account](https://dash.cloudflare.com) (only for deploy/preview; local dev works without the account)
 
 ## First-time setup
 
 ```bash
-bun install
+npm install
 cp .env.example .env
 # Edit .env with real values:
 #   CREDENTIAL_ENCRYPTION_KEY   (64 hex chars; generate below)
@@ -29,37 +29,35 @@ cp .env.example .env
 Generate a key:
 
 ```bash
-bun -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
+node -e "console.log([...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''))"
 ```
 
 Apply local D1 schema:
 
 ```bash
-bunx wrangler d1 migrations apply acfb-email --local
+npx wrangler d1 migrations apply acfb-email --local
 ```
 
 ## Day-to-day commands
 
 | Task                         | Command                                 |
 | ---------------------------- | --------------------------------------- |
-| Local dev server             | `bun run dev` → `http://localhost:5173` |
-| Type check (all)             | `bun run typecheck`                     |
-| Type check app only          | `bun run typecheck:app`                 |
-| Type check worker only       | `bun run typecheck:server`              |
-| Type check integration tests | `bun run typecheck:e2e`                 |
-| Type check configs + scripts | `bun run typecheck:node`                |
-| Unit + integration tests     | `bun run test`                          |
-| Watch tests                  | `bun run test:watch`                    |
-| Lint                         | `bun run lint`                          |
-| Production build             | `bun run build`                         |
-| Preview built output         | `bun run preview`                       |
-| Deploy                       | `bun run deploy`                        |
-| Docs (dev server)            | `bun run docs:dev`                      |
-| Docs (static build)          | `bun run docs:build`                    |
-| Format                       | `bun run format`                        |
-| Format check (CI)            | `bun run format:check`                  |
-
-- Prefer `bun run …` over `bun …` for scripts that call vitest/tsc — `bun <cmd>` can route to `bun:test` and ignore the vitest config.
+| Local dev server             | `npm run dev` → `http://localhost:5173` |
+| Type check (all)             | `npm run typecheck`                     |
+| Type check app only          | `npm run typecheck:app`                 |
+| Type check worker only       | `npm run typecheck:server`              |
+| Type check integration tests | `npm run typecheck:e2e`                 |
+| Type check configs + scripts | `npm run typecheck:node`                |
+| Unit + integration tests     | `npm run test`                          |
+| Watch tests                  | `npm run test:watch`                    |
+| Lint                         | `npm run lint`                          |
+| Production build             | `npm run build`                         |
+| Preview built output         | `npm run preview`                       |
+| Deploy                       | `npm run deploy`                        |
+| Docs (dev server)            | `npm run docs:dev`                      |
+| Docs (static build)          | `npm run docs:build`                    |
+| Format                       | `npm run format`                        |
+| Format check (CI)            | `npm run format:check`                  |
 
 ### Testing notes
 
@@ -159,7 +157,7 @@ docs/                 VitePress documentation site
 | ----------------------------------- | --------------------------------------------------------------------------------------- |
 | `/api/*` returns 503 at startup     | D1 binding misconfigured; check the `d1_databases` block in `wrangler.jsonc` is present |
 | `Failed to load` in browser console | Dev server not running                                                                  |
-| Type errors in editor but not CLI   | Restart the language server / `bun run typecheck` to sync tsbuildinfo                   |
+| Type errors in editor but not CLI   | Restart the language server / `npm run typecheck` to sync tsbuildinfo                   |
 
 ## More documentation
 
