@@ -26,6 +26,18 @@ export default defineConfig(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // Type-aware linting: the TS project service resolves each file's tsconfig
+  // so @typescript-eslint/no-deprecated (and any other typed rules we opt into)
+  // get the type information they need.
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts", "**/*.vue"],
+    languageOptions: {
+      parserOptions: {
+        projectService: { allowDefaultProject: ["commitlint.config.ts", "prettier.config.ts"] },
+        extraFileExtensions: [".vue"],
+      },
+    },
+  },
   ...vueRecommended.map((cfg) => ({
     ...cfg,
     rules: { ...cfg.rules, ...prettier.rules },
@@ -33,7 +45,7 @@ export default defineConfig(
   {
     files: ["**/*.vue"],
     languageOptions: {
-      parserOptions: { parser: tseslint.parser },
+      parserOptions: { projectService: true, parser: tseslint.parser },
       globals: globals.browser,
     },
   },
@@ -63,6 +75,15 @@ export default defineConfig(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-deprecated": "warn",
+    },
+  },
+  // The service worker is plain JS (not in any tsconfig), so it has no type
+  // info for the type-aware no-deprecated rule — turn it off there.
+  {
+    files: ["public/sw.js"],
+    rules: {
+      "@typescript-eslint/no-deprecated": "off",
     },
   },
   // Email bodies are rendered with `v-html` *only* through our DOMPurify

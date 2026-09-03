@@ -16,8 +16,8 @@ import { getVapidConfig } from "../push/vapid";
 
 export const pushRoutes = new Hono<{ Bindings: Env }>();
 
-const idSchema = z.string().uuid();
-const removeByEndpointSchema = z.object({ endpoint: z.string().url().max(2048) });
+const idSchema = z.uuid();
+const removeByEndpointSchema = z.object({ endpoint: z.url().max(2048) });
 
 function parseOr400<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);

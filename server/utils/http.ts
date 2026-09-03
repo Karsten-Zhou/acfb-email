@@ -7,7 +7,7 @@ import type { z } from "zod";
  * Read and parse a JSON body through a Zod schema, returning typed data.
  * `T` is inferred from the schema's output type.
  */
-export async function readJson<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<z.infer<S>> {
+export async function readJson<S extends z.ZodType>(c: Context, schema: S): Promise<z.infer<S>> {
   let body: unknown;
   try {
     body = await c.req.json();

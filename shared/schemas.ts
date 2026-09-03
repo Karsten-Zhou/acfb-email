@@ -104,7 +104,7 @@ export const AccountDetailSchema = AccountSummarySchema.extend({
 export const AddAccountInputSchema = z.object({
   provider: z.literal("imap"),
   name: z.string().min(1).max(100),
-  email: z.string().email().max(254),
+  email: z.email().max(254),
   displayName: z.string().max(100).optional().default(""),
   imapHost: z.string().min(1).max(255),
   imapPort: z.number().int().min(1).max(65535).optional().default(993),
@@ -124,7 +124,7 @@ export const TestConnectionInputSchema = AddAccountInputSchema;
  * is a push-service capability URL; keys.p256dh/auth are the URL-safe base64
  * P-256 public key and auth secret used to encrypt payloads. */
 export const PushSubscriptionSchema = z.object({
-  endpoint: z.string().url().max(2048),
+  endpoint: z.url().max(2048),
   expirationTime: z.coerce.number().int().nonnegative().nullable().optional(),
   keys: z.object({
     p256dh: z.string().min(1).max(1024),
@@ -142,9 +142,9 @@ export const SendAttachmentSchema = z.object({
 
 export const SendMessageInputSchema = z.object({
   accountId: z.string().min(1),
-  to: z.array(z.string().email()).min(1).max(50),
-  cc: z.array(z.string().email()).max(50).optional().default([]),
-  bcc: z.array(z.string().email()).max(50).optional().default([]),
+  to: z.array(z.email()).min(1).max(50),
+  cc: z.array(z.email()).max(50).optional().default([]),
+  bcc: z.array(z.email()).max(50).optional().default([]),
   subject: z.string().max(998).optional().default(""),
   html: z.string().max(2_000_000).optional().default(""),
   text: z.string().max(2_000_000).optional().default(""),
