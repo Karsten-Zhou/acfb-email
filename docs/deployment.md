@@ -11,31 +11,22 @@ Step-by-step guide for shipping ACFB Email to Cloudflare Workers (Free tier).
 - [Bun](https://bun.sh) (recommended) or [Node.js](https://nodejs.org) (If using Node.js, replace `bun`/`bunx` with `npm`/`npx` in the commands below)
 - A [Cloudflare account](https://dash.cloudflare.com)
 
-## 1. Cloudflare account setup
-
-1. Create a Cloudflare account (free) at <https://dash.cloudflare.com>.
-2. Install dependencies and log in:
-
-   ```bash
-   bun install
-   bunx wrangler login
-   ```
-
-## 2. Deploy
+## 1. Deploy
 
 ```bash
+bun install
 bun run deploy
 ```
 
 After deployment, Wrangler should show the Worker URL. It will normally look like: `https://<worker-name>.<your-subdomain>.workers.dev`. This is your email client URL. You might need the URL for the following steps.
 
-## 3. Apply the migrations
+## 2. Apply the migrations
 
 ```bash
 bunx wrangler d1 migrations apply DB --remote
 ```
 
-## 4. Create the core encryption secret
+## 3. Create the core encryption secret
 
 Run this command to generate a random, secure key:
 
@@ -49,7 +40,7 @@ Save it securely to your Cloudflare Worker:
 bunx wrangler secret put CREDENTIAL_ENCRYPTION_KEY
 ```
 
-## 5. Cloudflare Access
+## 4. Cloudflare Access
 
 Now that the Worker is deployed, protect it in the Cloudflare dashboard.
 
@@ -59,7 +50,7 @@ Now that the Worker is deployed, protect it in the Cloudflare dashboard.
    - **Scope**: All traffic
    - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
 
-## 6. Configure OAuth providers (Optional)
+## 5. Configure OAuth providers (Optional)
 
 _Skip this step if you don't plan to use Gmail or Outlook._
 
@@ -98,7 +89,7 @@ bunx wrangler secret put MICROSOFT_CLIENT_ID
 bunx wrangler secret put MICROSOFT_CLIENT_SECRET
 ```
 
-## 7. Configure browser push (optional)
+## 6. Configure browser push (optional)
 
 To receive new-mail push notifications, generate a Web Push **VAPID** key pair and store it as Worker secrets. Skip this step to leave push disabled.
 
@@ -113,7 +104,7 @@ bunx wrangler secret put VAPID_PUBLIC_KEY
 bunx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-## 8. Done!
+## 7. Done!
 
 Now visit `https://<your-worker-name>.<your-cloudflare-subdomain>.workers.dev` and log in with your Cloudflare account. Enjoy!
 
