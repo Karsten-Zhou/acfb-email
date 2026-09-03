@@ -34,3 +34,4 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 - [ ] Trace upstream issues
   - [ ] [🐛 Bug Report — Runtime APIs: `node:stream` on workerd drops a `'readable'` event under a reentrancy-guarded reader with manual backpressure](https://github.com/cloudflare/workerd/issues/7136)
   - [ ] [Type error when registering plugin with ESLint `defineConfig`](https://github.com/intlify/eslint-plugin-vue-i18n/issues/767)
+  - [ ] [Wrangler D1 Migrations Path Bug (Vite Plugin)](https://github.com/cloudflare/workers-sdk/issues/15484)

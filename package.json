@@ -26,7 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate-types": "wrangler types server/worker-configuration.d.ts --include-runtime=false",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "node scripts/deploy.ts",
     "changelog": "conventional-changelog -p conventionalcommits -i docs/changelog.md -s -r 0",
     "release": "commit-and-tag-version --infile docs/changelog.md",
     "release:dryrun": "commit-and-tag-version --infile docs/changelog.md --dry-run"
