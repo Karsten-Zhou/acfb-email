@@ -9,7 +9,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env as testEnv } from "cloudflare:workers";
 import { reconcileMailboxLocations } from "./sync-reconciliation";
-import { applyProviderMessages, logicalMessageId, locationKey } from "./sync-persistence";
+import {
+  applyProviderMessages,
+  claimAccountSync,
+  logicalMessageId,
+  locationKey,
+  markAccountSyncSucceeded,
+} from "./sync-persistence";
 import type { ProviderMessage } from "../email/types";
 
 // The test binding is a real D1 database, but its type is the generic
@@ -275,5 +281,19 @@ describe("applyProviderMessages", () => {
     const oldRow = await env.DB.prepare(`SELECT id FROM messages WHERE id = ?`).bind(oldId).first();
     expect(oldRow).toBeNull();
     expect(await messagesWithNoLocations()).toBe(0);
+  });
+});
+
+describe("claimAccountSync", () => {
+  it("claims a non-running account, then discards a second claim", async () => {
+    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
+    // A sync is already in flight → a duplicate enqueue/claim is discarded.
+    expect(await claimAccountSync(env, ACCOUNT)).toBe(false);
+  });
+
+  it("releases the claim when the sync settles", async () => {
+    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
+    await markAccountSyncSucceeded(env, ACCOUNT);
+    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import { themeState, setTheme, type ThemeSetting } from "../../lib/theme";
 import UiSelect from "../../components/UiSelect.vue";
 import UiSwitch from "../../components/UiSwitch.vue";
 import { usePushNotifications } from "../../composables/usePushNotifications";
+import SyncPanel from "./SyncPanel.vue";
 import { Bell, Languages, Monitor, Sun, Moon } from "@lucide/vue";
 
 const localeValue = computed({
@@ -117,6 +118,10 @@ async function onPushToggle(value: boolean) {
           </button>
         </div>
       </div>
+    </div>
+
+    <div class="mt-4 border-t border-border pt-4">
+      <SyncPanel />
     </div>
 
     <div class="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">

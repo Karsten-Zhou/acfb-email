@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { HttpError } from "../http-error";
 import { encryptCredential } from "../security/crypto";
 import { ImapProvider } from "../email/imap";
-import { syncAccount } from "../sync/sync-service";
+import { enqueueEligibleSyncs, enqueueSync } from "../sync/sync-service";
 import { readJson } from "../utils/http";
 import {
   AddAccountInputSchema,
@@ -136,7 +136,7 @@ accountRoutes.post("/", async (c) => {
       (id, provider, name, email, display_name,
        imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure,
        state, sync_enabled, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', 1, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'healthy', 1, ?)`,
   )
     .bind(
       id,
@@ -161,17 +161,11 @@ accountRoutes.post("/", async (c) => {
     .bind(id, encrypted)
     .run();
 
-  // Enqueue the first sync. The queue consumer runs it with a 15-minute
-  // wall-time budget (vs waitUntil's 30 s), so a slow multi-mailbox IMAP sync
-  // has room to finish. A failed enqueue must not roll back the account row
-  // already created above.
+  // Enqueue the first (full) sync; a later cron/manual sync retries on failure.
   try {
-    await c.env.SYNC_QUEUE.send({ accountId: id });
+    await enqueueSync(c.env, id, "full");
   } catch (err) {
     console.error("[sync-queue] enqueue failed for account", id, err);
-    // No sync will ever run for this account; revert the optimistic 'running'
-    // so it isn't stuck showing as syncing forever.
-    await c.env.DB.prepare(`UPDATE accounts SET state = 'healthy' WHERE id = ?`).bind(id).run();
   }
 
   const summary = AccountSummarySchema.parse({
@@ -180,7 +174,7 @@ accountRoutes.post("/", async (c) => {
     name: input.name,
     email: input.email,
     displayName: input.displayName || null,
-    state: "running",
+    state: "healthy",
     stateMessage: null,
     createdAt: now,
     lastSyncedAt: null,
@@ -269,27 +263,23 @@ accountRoutes.delete("/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-// POST /api/accounts/:id/sync  -> trigger sync now
+// POST /api/accounts/:id/sync  -> enqueue a full sync for one account
 accountRoutes.post("/:id/sync", async (c) => {
   const id = c.req.param("id");
+  const { enqueued } = await enqueueSync(c.env, id, "full");
+  return c.json({ ok: true, enqueued });
+});
+
+// POST /api/accounts/sync  -> enqueue a sync for every due account (mode
+// "check" = fast inbox check for the browser auto-check).
+accountRoutes.post("/sync", async (c) => {
+  let mode: "check" | "full" = "full";
   try {
-    const result = await syncAccount(c.env, id);
-    if (result.timedOut) {
-      // The sync hit its time budget; report it as a failure so the UI can
-      // surface the reason (the account was left in a coherent partial state).
-      return c.json({ ok: false, message: "errTimeout" }, 200);
-    }
-    return c.json({ ok: true, ...result });
-  } catch (err) {
-    // syncAccount() persists a detailed, classified message to the account's
-    // state_message before rethrowing the raw error — surface that (fall back
-    // to the raw message). Return 200 so the client can read the raw
-    // { ok:false, message } detail (a non-2xx would make the generic client
-    // throw and lose the message).
-    const row = await c.env.DB.prepare(`SELECT state_message FROM accounts WHERE id = ?`)
-      .bind(id)
-      .first<{ state_message: string | null }>();
-    const message = row?.state_message ?? (err instanceof Error ? err.message : "errSyncFailed");
-    return c.json({ ok: false, message }, 200);
+    const body = await c.req.json<{ mode?: "check" | "full" }>();
+    if (body?.mode === "check") mode = "check";
+  } catch {
+    // Empty body → full sync.
   }
+  const enqueuedIds = await enqueueEligibleSyncs(c.env, mode);
+  return c.json({ ok: true, enqueuedIds });
 });

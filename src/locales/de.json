@@ -142,7 +142,13 @@
     "themeDark": "Dunkel",
     "themeAuto": "Auto",
     "language": "Sprache",
-    "languageAuto": "Auto ({0})"
+    "languageAuto": "Auto ({0})",
+    "syncTitle": "Automatisch auf neue E-Mails prüfen",
+    "syncHint": "Neue E-Mails erscheinen von selbst, solange diese App geöffnet ist — der Server prüft außerdem alle 5 Minuten.",
+    "syncActive": "Während dieser Tab offen ist",
+    "syncInactive": "Während dieser Tab im Hintergrund ist",
+    "syncOff": "Aus",
+    "syncMinutes": "Alle {0} Min."
   },
   "privacy": {
     "title": "Datenschutz",

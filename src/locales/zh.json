@@ -142,7 +142,13 @@
     "themeDark": "深色",
     "themeAuto": "自动",
     "language": "语言",
-    "languageAuto": "自动（{0}）"
+    "languageAuto": "自动（{0}）",
+    "syncTitle": "自动检查新邮件",
+    "syncHint": "应用打开时新邮件会自动出现——服务器也会每 5 分钟检查一次。",
+    "syncActive": "标签页打开时",
+    "syncInactive": "标签页在后台时",
+    "syncOff": "关闭",
+    "syncMinutes": "每 {0} 分钟"
   },
   "privacy": {
     "title": "隐私",

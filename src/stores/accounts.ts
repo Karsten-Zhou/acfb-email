@@ -23,6 +23,23 @@ export interface AccountStateSummary {
   lastSyncedAt: string | null;
 }
 
+/** Accounts seen syncing since the last poll. */
+let lastRunning = new Set<string>();
+
+/** When an account that was syncing isn't anymore, its sync just finished — so
+ *  refresh accounts/tree/messages. Runs on every /states poll, so whichever
+ *  trigger started the sync (manual, cron, auto-check) lands here. */
+function refreshAfterSettle(rows: AccountStateSummary[]) {
+  const runningNow = new Set(rows.filter((a) => a.state === "running").map((a) => a.id));
+  const settled = [...lastRunning].some((id) => !runningNow.has(id));
+  lastRunning = runningNow;
+  if (!settled) return;
+  queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+  queryClient.invalidateQueries({ queryKey: queryKeys.mailboxTree });
+  queryClient.invalidateQueries({ queryKey: ["messages"] });
+  queryClient.invalidateQueries({ queryKey: ["unified"] });
+}
+
 // ---- queries ----
 
 export function useAccounts() {
@@ -32,14 +49,15 @@ export function useAccounts() {
   });
 }
 
-/** Polled live sync state. Cadence adapts to activity: 1s while any account is
- *  running, 60s when idle. The interval derives from the server truth in the
- *  query data, so a fresh page load mid-sync still polls fast (no dependency
- *  on the accounts list being loaded yet). */
+/** Polled live sync state; 1s while any account is running, 60s idle. */
 export function useAccountStates() {
   return useQuery({
     queryKey: queryKeys.accountStates,
-    queryFn: async () => (await api.accountStates()).accounts as AccountStateSummary[],
+    queryFn: async () => {
+      const rows = (await api.accountStates()).accounts as AccountStateSummary[];
+      refreshAfterSettle(rows);
+      return rows;
+    },
     refetchInterval: (query) =>
       query.state.data?.some((a) => a.state === "running") ? RUNNING_POLL_MS : IDLE_POLL_MS,
   });
@@ -107,10 +125,9 @@ export function useMailboxTree() {
 
 // ---- mutations ----
 
-/** Optimistically flip the given accounts to "running" in the states cache so
- *  spinners appear instantly and the poller drops to the 1s cadence. The next
- *  poll (or the sync's onSettled invalidation) applies the server's truth. */
+/** Optimistically mark accounts as syncing (instant spinner + 1s poll). */
 function setAccountsRunning(ids: string[]) {
+  for (const id of ids) lastRunning.add(id);
   queryClient.setQueryData<AccountStateSummary[]>(queryKeys.accountStates, (prev) => {
     const arr = prev ?? [];
     const byId = new Map(arr.map((a) => [a.id, a]));
@@ -126,8 +143,21 @@ function setAccountsRunning(ids: string[]) {
   });
 }
 
-/** Sync one or more accounts. Marks them running optimistically; on settle,
- *  refreshes state, accounts, the mailbox tree, and message lists. */
+/** Surface a just-enqueued sync so spinners show and the poll drops to 1s. */
+export function markAccountsRunning(ids: string[]) {
+  if (ids.length === 0) return;
+  setAccountsRunning(ids);
+  void queryClient.invalidateQueries({ queryKey: queryKeys.accountStates });
+}
+
+/** Enqueue a fast inbox check for every account (auto-sync timer). */
+export async function runSyncCheck() {
+  const { enqueuedIds } = await api.syncAllAccounts("check");
+  if (enqueuedIds.length > 0) markAccountsRunning(enqueuedIds);
+}
+
+/** Sync one or more accounts. Marks them running optimistically; content
+ *  refreshes when the /states poll sees the sync settle. */
 export function useSyncAccounts() {
   const qc = queryClient;
   return useMutation({
@@ -148,10 +178,6 @@ export function useSyncAccounts() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accountStates });
-      qc.invalidateQueries({ queryKey: queryKeys.accounts });
-      qc.invalidateQueries({ queryKey: queryKeys.mailboxTree });
-      qc.invalidateQueries({ queryKey: ["messages"] });
-      qc.invalidateQueries({ queryKey: ["unified"] });
     },
   });
 }
@@ -161,6 +187,10 @@ export function useAddAccount() {
   const qc = queryClient;
   return useMutation({
     mutationFn: (input: AddAccountInput) => api.addAccount(input),
+    onSuccess: (data) => {
+      const id = data.account.id;
+      if (id) markAccountsRunning([id]);
+    },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accountStates });
       qc.invalidateQueries({ queryKey: queryKeys.accounts });

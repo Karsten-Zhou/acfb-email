@@ -89,6 +89,25 @@ export async function setAccountState(
     .run();
 }
 
+/** Enabled accounts (and their state) that an automatic sync may consider. */
+export async function listEnabledAccounts(env: Env): Promise<{ id: string; state: string }[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, state FROM accounts WHERE sync_enabled = 1 AND state != 'paused'`,
+  ).all<{ id: string; state: string }>();
+  return results;
+}
+
+/** Atomically mark an account as syncing; false when it already is. */
+export async function claimAccountSync(env: Env, accountId: string): Promise<boolean> {
+  const r = await env.DB.prepare(
+    `UPDATE accounts SET state = 'running', state_message = NULL
+     WHERE id = ? AND COALESCE(state, '') != 'running'`,
+  )
+    .bind(accountId)
+    .run();
+  return (r.meta.changes ?? 0) > 0;
+}
+
 /** Settle an account as healthy only when no sibling mailbox is in error. */
 export async function markAccountSyncSucceeded(env: Env, accountId: string): Promise<void> {
   await env.DB.prepare(

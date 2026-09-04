@@ -115,10 +115,15 @@ export const api = {
       body: JSON.stringify({ orderedIds }),
     }),
   syncAccount: (id: string) =>
-    request<{ ok: boolean; mailboxesSynced?: number; messagesSeen?: number; message?: string }>(
-      `/accounts/${id}/sync`,
-      { method: "POST" },
-    ),
+    request<{ ok: boolean; enqueued: boolean; message?: string }>(`/accounts/${id}/sync`, {
+      method: "POST",
+    }),
+  /** Enqueue a sync for every account that is due. mode "check" = fast inbox check. */
+  syncAllAccounts: (mode: "check" | "full" = "full") =>
+    request<{ ok: boolean; enqueuedIds: string[] }>("/accounts/sync", {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    }),
 
   // attachments
   /** Absolute URL that streams an attachment from its provider. */

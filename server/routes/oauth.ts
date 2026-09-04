@@ -9,6 +9,7 @@ import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { randomUUID } from "crypto";
 import { HttpError } from "../http-error";
+import { enqueueSync } from "../sync/sync-service";
 import { randomToken, safeEqual } from "../utils/token";
 import { decryptCredential, encryptCredential } from "../security/crypto";
 import {
@@ -64,21 +65,15 @@ oauthRoutes.get("/:provider/callback", async (c) => {
 
   const info = await fetchOwnerInfo(provider, token);
 
-  // Reuse an existing account with the same email; else create one.
+  // Reuse the account for this email, or create it in a neutral state.
   let accountId = await existingAccountId(c.env, info.email);
   const now = new Date().toISOString();
-  if (accountId) {
-    await c.env.DB.prepare(
-      `UPDATE accounts SET state='running', state_message=NULL, last_synced_at = ? WHERE id = ?`,
-    )
-      .bind(now, accountId)
-      .run();
-  } else {
+  if (!accountId) {
     accountId = randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO accounts
         (id, provider, name, email, display_name, state, sync_enabled, created_at)
-       VALUES (?, ?, ?, ?, ?, 'running', 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, 'healthy', 1, ?)`,
     )
       .bind(
         accountId,
@@ -101,19 +96,12 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     .bind(accountId, encrypted)
     .run();
 
-  // Enqueue the first sync (new accounts) / refresh (reconnects). The queue
-  // consumer runs it with a 15-minute wall-time budget (vs waitUntil's 30 s),
-  // so a slow multi-mailbox IMAP sync has room to finish. A failed enqueue
-  // must not break the OAuth redirect flow.
+  // Full sync (first sync or reconnect; `force` also recovers an auth_required
+  // account). A failed enqueue must not break the OAuth redirect flow.
   try {
-    await c.env.SYNC_QUEUE.send({ accountId });
+    await enqueueSync(c.env, accountId, "full", { force: true });
   } catch (err) {
     console.error("[sync-queue] enqueue failed for account", accountId, err);
-    // No sync will ever run for this account; revert the optimistic 'running'
-    // so it isn't stuck showing as syncing forever.
-    await c.env.DB.prepare(`UPDATE accounts SET state = 'healthy' WHERE id = ?`)
-      .bind(accountId)
-      .run();
   }
 
   // Back to Settings with a query flag so the page shows a success notice.

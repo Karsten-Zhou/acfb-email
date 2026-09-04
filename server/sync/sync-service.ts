@@ -18,11 +18,13 @@ import { newMailSince, notifyNewMail } from "../push/service";
 import { reconcileMailboxLocations } from "./sync-reconciliation";
 import {
   applyProviderMessages,
+  claimAccountSync,
   classifyError,
   getAccount,
   getCredential,
   getMailbox,
   getSyncCursor,
+  listEnabledAccounts,
   markAccountSyncFailed,
   markAccountSyncSucceeded,
   markMailboxSyncFailed,
@@ -33,11 +35,66 @@ import {
   upsertMailbox,
 } from "./sync-persistence";
 
+/** "check" = fast new-mail (inbox-only); "full" = every mailbox + reconcile. */
+export type SyncMode = "check" | "full";
+
 export interface SyncResult {
   mailboxesSynced: number;
   messagesSeen: number;
   /** True when the sync was stopped by its time budget before finishing. */
   timedOut?: boolean;
+}
+
+/** States that allow a new sync to be enqueued. */
+function isRunnable(state: string): boolean {
+  return (
+    state !== "running" &&
+    state !== "paused" &&
+    state !== "auth_required" &&
+    state !== "invalid_config"
+  );
+}
+
+/** Enqueue a sync for one account — the per-account claim point (a second
+ *  enqueue while one is queued/syncing is discarded). `force` skips the state
+ *  gate, e.g. an OAuth reconnect of an auth_required account. */
+export async function enqueueSync(
+  env: Env,
+  accountId: string,
+  mode: SyncMode,
+  opts: { force?: boolean } = {},
+): Promise<{ enqueued: boolean }> {
+  const row = await env.DB.prepare(`SELECT state FROM accounts WHERE id = ?`)
+    .bind(accountId)
+    .first<{ state: string }>();
+  if (!row) return { enqueued: false };
+  if (row.state === "running") return { enqueued: false }; // already queued/syncing
+  if (!opts.force && !isRunnable(row.state)) return { enqueued: false };
+
+  // Claim the slot: only the caller that flips the account to 'running' sends.
+  const claimed = await claimAccountSync(env, accountId);
+  if (!claimed) return { enqueued: false };
+  try {
+    await env.SYNC_QUEUE.send({ accountId, mode });
+    return { enqueued: true };
+  } catch (err) {
+    // Release the slot so the account isn't stuck as syncing.
+    await env.DB.prepare(`UPDATE accounts SET state = ? WHERE id = ?`)
+      .bind(row.state, accountId)
+      .run();
+    throw err;
+  }
+}
+
+/** Enqueue a sync for every eligible account (cron / "sync all"). */
+export async function enqueueEligibleSyncs(env: Env, mode: SyncMode): Promise<string[]> {
+  const accounts = await listEnabledAccounts(env);
+  const enqueued: string[] = [];
+  for (const acct of accounts) {
+    const { enqueued: ok } = await enqueueSync(env, acct.id, mode);
+    if (ok) enqueued.push(acct.id);
+  }
+  return enqueued;
 }
 
 export interface MailboxSyncResult {
@@ -50,11 +107,18 @@ export interface MailboxSyncResult {
  * between provider round-trips, so a hung provider socket is cut off rather
  * than blocking the queue consumer indefinitely.
  */
-export async function syncAccount(env: Env, accountId: string): Promise<SyncResult> {
+export async function syncAccount(
+  env: Env,
+  accountId: string,
+  opts: { mode?: SyncMode } = {},
+): Promise<SyncResult> {
   const account = await getAccount(env, accountId);
   if (!account) throw new Error("Account not found");
 
+  // Set at enqueue; keep it asserted while the job runs (covers direct callers).
   await setAccountState(env, accountId, "running", null);
+
+  const mode = opts.mode ?? "full";
 
   const controller = new AbortController();
   const timeBudgetMs = parseInt(env.SYNC_TIMEOUT_MS ?? "", 10) || 480_000;
@@ -76,6 +140,8 @@ export async function syncAccount(env: Env, accountId: string): Promise<SyncResu
     for (const mb of mailboxes) {
       if (controller.signal.aborted) throw new AbortError();
       const mailbox = await upsertMailbox(env, accountId, mb);
+      // Check mode pulls new mail only from inbox folders.
+      if (mode === "check" && mailbox.role !== "inbox") continue;
       try {
         const r = await syncMailbox(env, accountId, mailbox.id, { signal: controller.signal });
         mailboxesSynced += 1;

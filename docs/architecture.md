@@ -105,10 +105,14 @@ app_settings(id PK, data JSON)   -- singleton
 
 ## 5. Synchronization design
 
-**Sync is enqueued, not inline**: account add / OAuth connect push a job to the `email-sync` Queue (`wrangler.jsonc` producer binding `SYNC_QUEUE`); the `queue()` consumer in `server/index.ts` runs it. A queue consumer gets 15 minutes of wall-time (vs `waitUntil`'s 30 s), which a slow multi-mailbox IMAP sync needs. A manual "Sync now" button still calls `POST /api/accounts/:id/sync` synchronously.
+**Sync is enqueued, not inline**: every trigger (account add / OAuth connect, manual "Sync now", the 5-minute cron, the browser auto-check) pushes a job to the `email-sync` Queue; the `queue()` consumer runs it with 15-min wall-time (vs `waitUntil`'s 30 s).
+
+**One sync per account**: enqueueing claims the account atomically (`claimAccountSync`), so a sync already queued/running discards new ones, and settling releases it. Enqueue helpers skip `auth_required` / `invalid_config` / `paused` accounts.
+
+**Check vs full**: a job carries a `mode`. "full" syncs every mailbox + reconciles (add/connect, manual Sync now, send/draft refreshes). "check" is fast new-mail (inbox-only), used by the cron and the browser auto-check. The SPA polls `/api/accounts/states` (1 s while syncing, 60 s idle) and refreshes the lists when a sync settles — whichever trigger started it.
 
 - `server/sync/` is split into three modules:
-  - `sync-service.ts` — orchestration: `syncMailbox(accountId, mailboxId)` is the durable unit; `syncAccount` discovers mailboxes and runs one per folder; `importOlderPage` serves the load-older path. The queue payload is `{accountId, mailboxId?}` so a single mailbox can be retried.
+  - `sync-service.ts` — orchestration: `syncMailbox(accountId, mailboxId)` is the durable unit; `syncAccount` discovers mailboxes and runs one per folder (inbox-only in `check` mode); `importOlderPage` serves the load-older path. Queue payload: `{accountId, mailboxId?, mode?}`.
   - `sync-persistence.ts` — all D1 statement building + account/mailbox state, the logical-message identity (SHA-256), and `applyProviderMessages`.
   - `sync-reconciliation.ts` — stale-location delete + orphan prune.
 - Sync runs within a hard time budget enforced by a cooperative `AbortSignal` (checked between provider round-trips) rather than a racing timeout — a cancelled sync never leaves a competing writer mutating the DB.
@@ -163,7 +167,7 @@ app_settings(id PK, data JSON)   -- singleton
 | KV                   | ❌    | Not needed for now; possible later for short-lived caches                              |
 | R2                   | ❌    | Not needed for now                                                                     |
 | Queues               | ✅    | Background account syncs (`email-sync` consumer) — 15-min wall-time                    |
-| Cron                 | ❌    | Not needed for now                                                                     |
+| Cron                 | ✅    | 5-min new-mail checks (`scheduled` → enqueue `check` jobs; ~288 req/day)               |
 | Browser Push         | ✅    | Web Push via `web-push` + `public/sw.js`; new-mail notifications + cross-device revoke |
 
 ### Free-tier risks

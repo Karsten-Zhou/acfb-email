@@ -4,14 +4,14 @@
 import process from "node:process";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { syncAccount, syncMailbox } from "./sync/sync-service";
+import { enqueueEligibleSyncs, syncAccount, syncMailbox, type SyncMode } from "./sync/sync-service";
 
-// Payload for account-sync jobs enqueued to the SYNC_QUEUE. A job without a
-// mailboxId syncs every mailbox in the account; with one, it retries that single
-// mailbox.
+// Payload for account-sync jobs: no mailboxId = whole account (mode "check" =
+// inbox-only); mailboxId = single-mailbox retry.
 interface SyncMessage {
   accountId: string;
   mailboxId?: string;
+  mode?: SyncMode;
 }
 import { markAccountSyncSucceeded } from "./sync/sync-persistence";
 import { HttpError } from "./http-error";
@@ -125,24 +125,32 @@ app.onError((err, c) => {
   return c.json({ error: message }, 500);
 });
 
-// Queue consumer: runs syncs in the background. A queue batch gets 15 minutes
-// of wall-time (vs waitUntil's 30 s), which a slow multi-mailbox IMAP sync
-// needs. A bare accountId syncs every mailbox; a mailboxId retries that single
-// mailbox. Errors are acked (no infinite retries) and surfaced through the
-// account's state_message / the mailbox's sync_state.
+// Queue consumer: a bare accountId syncs the whole account (or inbox folders
+// in "check" mode); a mailboxId retries one mailbox. Errors ack and surface
+// via the account's state_message / the mailbox's sync_state.
 async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
-    const { accountId, mailboxId } = msg.body;
+    const { accountId, mailboxId, mode } = msg.body;
     try {
       if (mailboxId) {
         await syncMailbox(env, accountId, mailboxId);
         await markAccountSyncSucceeded(env, accountId);
       } else {
-        await syncAccount(env, accountId);
+        await syncAccount(env, accountId, { mode });
       }
     } catch (err) {
       console.error("[queue] sync failed for account", accountId, mailboxId ?? "", err);
     }
+  }
+}
+
+// Cron: enqueue an inbox check for every enabled account that isn't already
+// syncing (or waiting on user action). Syncs run in the queue consumer.
+async function handleScheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  try {
+    await enqueueEligibleSyncs(env, "check");
+  } catch (err) {
+    console.error("[cron] enqueue checks failed", err);
   }
 }
 
@@ -152,4 +160,5 @@ async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
   queue: handleQueue,
+  scheduled: handleScheduled,
 };

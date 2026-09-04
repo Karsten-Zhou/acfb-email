@@ -142,7 +142,13 @@
     "themeDark": "Dark",
     "themeAuto": "Auto",
     "language": "Language",
-    "languageAuto": "Auto ({0})"
+    "languageAuto": "Auto ({0})",
+    "syncTitle": "Auto-check for new mail",
+    "syncHint": "New mail shows up on its own while this app is open — the server also checks every 5 minutes.",
+    "syncActive": "While this tab is open",
+    "syncInactive": "While this tab is in the background",
+    "syncOff": "Off",
+    "syncMinutes": "Every {0} min"
   },
   "privacy": {
     "title": "Privacy",

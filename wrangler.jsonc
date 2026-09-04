@@ -31,13 +31,15 @@
       },
     ],
   },
+  "triggers": {
+    // Background new-mail discovery: the scheduled handler enqueues an inbox
+    // check for every account that is due. Cadence is fixed at deploy time;
+    // the browser's own auto-check cadence is a frontend preference.
+    "crons": ["*/5 * * * *"],
+  },
   "vars": {
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
-  },
-  "secrets": {
-    // Empty: stops `wrangler types` emitting secrets from .env (typed in server/env.d.ts).
-    "required": [],
   },
   "access": {
     // Local dev: simulates a signed-in user via ctx.access so the API gate

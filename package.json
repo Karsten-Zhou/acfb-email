@@ -26,7 +26,7 @@
     "docs:preview": "vitepress preview docs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate-types": "wrangler types server/worker-configuration.d.ts --include-runtime=false",
+    "generate-types": "wrangler types server/worker-configuration.d.ts --env-interface GeneratedEnv --include-runtime=false",
     "deploy": "node scripts/deploy.ts",
     "changelog": "conventional-changelog -p conventionalcommits -i docs/changelog.md -s -r 0",
     "release": "commit-and-tag-version --infile docs/changelog.md",
