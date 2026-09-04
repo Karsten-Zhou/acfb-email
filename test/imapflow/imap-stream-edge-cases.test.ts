@@ -253,6 +253,52 @@ it("Many chunks trigger event loop yield", async () => {
   );
 });
 
+it("re-drains a chunk queued in the processInput teardown window (workerd race)", async () => {
+  // Regression for the `_startProcessInput` single-flight drain patch. On workerd a
+  // `_transform` can land after the drain loop has exited (queue empty) but before the
+  // `.finally()` resets `processingInput`, leaving the queued chunk stranded so the line
+  // never completes and the parser hangs. The fix re-checks the queue in `.finally()` and
+  // restarts the drain. Deterministically reproduce that window by overriding the async
+  // drain loop so a second command is queued at the teardown boundary: after the first
+  // chunk is drained and the loop resolves, but before `processingInput` is reset.
+  const stream = new ImapStream({ cid: "test" });
+  const got: string[] = [];
+  const streamErrors: Error[] = [];
+  stream.on("data", (cmd) => {
+    got.push(cmd.payload.toString());
+    cmd.next();
+  });
+  stream.on("error", (err) => streamErrors.push(err));
+
+  const realProcessInput = stream.processInput.bind(stream);
+  let injected = false;
+  stream.processInput = async () => {
+    await realProcessInput();
+    if (!injected) {
+      injected = true;
+      // Queue a second command exactly as `_transform` would, while `processingInput` is
+      // still true (the drain loop already exited). Pre-patch this chunk was never re-drained.
+      stream.inputQueue.push({
+        chunk: Buffer.from("B CMD2\r\n"),
+        next: () => {},
+      });
+    }
+  };
+
+  stream.write(Buffer.from("A CMD1\r\n"));
+
+  // Wait (with a timeout) for the teardown-window chunk to be drained. Without the fix the
+  // second chunk is stranded and `data` never fires twice, so the loop times out and fails.
+  const deadline = Date.now() + 2000;
+  while (got.length < 2 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  stream.destroy();
+
+  expect(streamErrors).toEqual([]);
+  expect(got).toEqual(["A CMD1", "B CMD2"]);
+});
+
 it("Destroy with queued items does not hang", async () => {
   const stream = new ImapStream({ cid: "test" });
   let errorEmitted = false;

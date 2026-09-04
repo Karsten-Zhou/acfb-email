@@ -47,7 +47,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.14",
     "hono": "^4.13.5",
-    "imapflow": "^1.7.6",
+    "imapflow": "^1.7.8",
     "jose": "^6.2.11",
     "mimetext": "^3.0.28",
     "postal-mime": "^3.0.0",
@@ -92,11 +92,19 @@
     "wrangler": "^4.127.1"
   },
   "patchedDependencies": {
-    "imapflow@1.7.6": "patches/imapflow@1.7.6.patch"
+    "imapflow@1.7.8": "patches/imapflow@1.7.8.patch"
   },
   "commit-and-tag-version": {
     "scripts": {
       "posttag": "git add package.json docs/changelog.md"
     }
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.21.5": true,
+    "workerd@1.20260903.1": true,
+    "lefthook@2.1.12": true,
+    "vue-demi@0.14.10": true,
+    "core-js-pure@3.50.0": true
   }
 }

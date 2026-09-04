@@ -46,6 +46,9 @@ declare module "imapflow/lib/handler/imap-stream" {
     destroyed: boolean;
     log: ImapStreamLogger;
     inputQueue: Array<{ chunk: Uint8Array; next: () => void }>;
+    processingInput: boolean;
+    processInput(): Promise<void>;
+    _startProcessInput(): void;
 
     on(event: "readable" | "end", listener: () => void): this;
     on(event: "data", listener: (cmd: ImapStreamCommand) => void): this;
