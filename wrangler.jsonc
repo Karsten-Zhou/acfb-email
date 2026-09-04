@@ -35,6 +35,10 @@
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
   },
+  "secrets": {
+    // Empty: stops `wrangler types` emitting secrets from .env (typed in server/env.d.ts).
+    "required": [],
+  },
   "access": {
     // Local dev: simulates a signed-in user via ctx.access so the API gate
     // passes. Comment this block to simulate Access not being enabled (403).

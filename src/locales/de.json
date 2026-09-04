@@ -2,7 +2,7 @@
   "app": {
     "appName": "Mail",
     "accessRequiredTitle": "Zugriff erforderlich",
-    "accessRequiredBody": "Diese App wird durch Cloudflare Access geschützt, aber Access ist für diese Bereitstellung nicht aktiviert. Aktiviere es im Cloudflare-Dashboard — siehe DEPLOYMENT.md."
+    "accessRequiredBody": "Diese App sollte durch Cloudflare Access geschützt sein, aber Access ist derzeit nicht aktiviert. Aktiviere es im Cloudflare-Dashboard — siehe deployment.md."
   },
   "common": {
     "compose": "Verfassen",
@@ -161,6 +161,21 @@
     "allowlistRemove": "Entfernen",
     "allowlistInvalid": "Gib eine gültige E-Mail-Adresse oder Domain ein (z. B. name{'@'}example.com oder example.com).",
     "allowlistEmpty": "Noch keine vertrauenswürdigen Absender. Bilder bleiben blockiert, bis du einen hinzufügst."
+  },
+  "access": {
+    "title": "Zugriffssicherheit",
+    "badgeEnabled": "Verifiziert",
+    "badgeBasic": "Basisprüfung",
+    "hintEnabled": "Jede Anfrage wird als von deiner Cloudflare-Access-Anmeldung bestätigt.",
+    "hintBasic": "Access bestätigt die Anmeldung, aber Anfragen werden nicht einzeln geprüft. Siehe die Bereitstellungsanleitung, um strengere Prüfungen zu aktivieren.",
+    "aud": "Anwendung",
+    "sessionTitle": "Sitzungsdetails",
+    "sessionNone": "In dieser Vorschau sind keine Anmeldedetails verfügbar.",
+    "email": "E-Mail",
+    "groups": "Gruppen",
+    "country": "Land",
+    "ip": "IP-Adresse",
+    "expires": "Läuft ab"
   },
   "notifications": {
     "title": "Benachrichtigungen",

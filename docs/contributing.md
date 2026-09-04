@@ -128,10 +128,11 @@ docs/                 VitePress documentation site
 - Design system: custom Tailwind + semantic `oklch` tokens in `src/styles/main.css`, `cn()` in `src/lib/cn.ts`.
 - i18n is in `src/lib/i18n.ts`; keys are nested in `src/locales/*.json`. `MessageKey` in `src/lib/i18n.ts` is a recursive path type over `en`, so keys are compile-time checked (typecheck), and `@intlify/eslint-plugin-vue-i18n` in `eslint.config.ts` enforces key consistency across locales + no unused keys (lint). `en` is the fallback locale.
 - Lint is expected to be warning-free.
+- **Env types**: secrets are typed in `server/env.d.ts` (merged onto the global `Env`); optional ones are `string | undefined`. Keep that list in sync with `.env.example` and the deployment docs.
 
 ## Security & sanitization
 
-- The Worker should be protected by Cloudflare Access. We have a simple Cloudflare Access detection middleware that rejects requests if Access is not enabled.
+- The Worker should be protected by Cloudflare Access. A middleware rejects requests when Access isn't enabled (403, `access_required`). Optionally, when the `ACCESS_JWKS` and `ACCESS_AUD` secrets are set, it verifies each request's Access JWT (signature, issuer, audience) via `server/access.ts`; the asserted claims are served at `/api/access` and shown in Settings → Access security.
 - Email HTML is sanitized client-side with DOMPurify before `v-html`. The shared entry is `sanitizeHtml()` in `src/lib/sanitize.ts`:
   - Rewrites `cid:` inline-image references to the app's attachment endpoint. It lets DOMPurify parse & sanitize first (`RETURN_DOM`), then walks the already-clean output tree with DOM APIs — never regexes raw email HTML.
 - `vue/no-v-html` is deliberately enabled only in the two views that render sanitized bodies (`MessageReaderPane.vue`, `MessageView.vue`).

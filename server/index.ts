@@ -21,8 +21,13 @@ import { messageRoutes } from "./routes/messages";
 import { sendRoutes } from "./routes/send";
 import { settingsRoutes } from "./routes/settings";
 import { pushRoutes } from "./routes/push";
+import { accessRoutes } from "./routes/access";
+import { isAccessVerificationEnabled, verifyAccessSession, type AccessSession } from "./access";
 
-type AppEnv = { Bindings: Env };
+type AppEnv = {
+  Bindings: Env;
+  Variables: { accessSession?: AccessSession };
+};
 
 const app = new Hono<AppEnv>();
 
@@ -51,10 +56,18 @@ app.use(
 // `access.dev` block in wrangler.jsonc.
 app.use("/api/*", async (c, next) => {
   const executionCtx = c.executionCtx as { access?: unknown } | undefined;
-  const throughAccess =
-    Boolean(executionCtx?.access) || Boolean(c.req.header("cf-access-jwt-assertion"));
+  const token = c.req.header("cf-access-jwt-assertion");
+  const throughAccess = Boolean(executionCtx?.access) || Boolean(token);
   if (!throughAccess) {
     return c.json({ error: "Access required", code: "access_required" }, 403);
+  }
+  // Optional hardening: verify the Access JWT when the ACCESS_* secrets are set.
+  if (isAccessVerificationEnabled(c.env) && !executionCtx?.access && token) {
+    try {
+      c.set("accessSession", await verifyAccessSession(c.env, token));
+    } catch {
+      return c.json({ error: "Invalid Access session", code: "access_invalid" }, 403);
+    }
   }
   await next();
 });
@@ -68,6 +81,7 @@ api.route("/messages", messageRoutes);
 api.route("/send", sendRoutes);
 api.route("/settings", settingsRoutes);
 api.route("/push", pushRoutes);
+api.route("/access", accessRoutes);
 
 app.route("/api", api);
 

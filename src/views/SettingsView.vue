@@ -13,6 +13,7 @@ import UiToolTip from "../components/UiToolTip.vue";
 import AccountSettings from "./parts/AccountSettings.vue";
 import PreferencesPanel from "./parts/PreferencesPanel.vue";
 import PrivacyPanel from "./parts/PrivacyPanel.vue";
+import AccessPanel from "./parts/AccessPanel.vue";
 import AboutPanel from "./parts/AboutPanel.vue";
 import { ChevronLeft } from "@lucide/vue";
 
@@ -51,6 +52,7 @@ onMounted(async () => {
         <AccountSettings :meta="meta" />
         <PreferencesPanel />
         <PrivacyPanel />
+        <AccessPanel />
         <AboutPanel />
       </section>
     </main>

@@ -65,6 +65,9 @@ export const api = {
   // meta
   health: () => request<HealthPayload>("/health"),
 
+  // Cloudflare Access (optional JWT verification) status
+  accessInfo: () => request<AccessInfoPayload>("/access", {}, { noToast: true }),
+
   // accounts
   accounts: () => request<{ accounts: AccountSummary[] }>("/accounts"),
   accountStates: () =>
@@ -217,4 +220,23 @@ export interface PushCapability {
   configured: boolean;
   publicKey: string | null;
   subscriptions: PushSubscriptionSummary[];
+}
+
+/** Identity claims Cloudflare Access asserted about the current session. */
+export interface AccessSessionInfo {
+  email?: string;
+  name?: string;
+  groups?: string[];
+  ip?: string;
+  geo?: string;
+  aud?: string;
+  iss?: string;
+  exp?: number;
+}
+
+/** /api/access payload: whether JWT verification is on, plus current session. */
+export interface AccessInfoPayload {
+  enabled: boolean;
+  aud: string | null;
+  session: AccessSessionInfo | null;
 }

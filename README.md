@@ -1,6 +1,6 @@
 # ACFB Email Client
 
-A Cloudflare based (ACFB) web email client that runs on **Cloudflare Workers (Free tier)**. Connect multiple email accounts and read, send, and organize mail through one unified interface.
+A Cloudflare based (ACFB) web email client that runs on Cloudflare Workers (Free tier). Connect multiple email accounts and read, send, and organize mail through one unified interface.
 
 ![screenshot-1](docs/screenshots/image-1.jpeg)
 
@@ -28,7 +28,7 @@ The full docs (VitePress) live under [`docs/`](./docs/): [architecture](./docs/a
 
 ## TODO
 
-- [ ] Upgrade Cloudflare Access detection (currently only a simple check)
+- [x] Upgrade Cloudflare Access detection (currently only a simple check)
 - [ ] Trace upstream issues
   - [ ] [🐛 Bug Report — Runtime APIs: `node:stream` on workerd drops a `'readable'` event under a reentrancy-guarded reader with manual backpressure](https://github.com/cloudflare/workerd/issues/7136)
   - [ ] [Type error when registering plugin with ESLint `defineConfig`](https://github.com/intlify/eslint-plugin-vue-i18n/issues/767)

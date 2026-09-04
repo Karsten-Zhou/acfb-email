@@ -2,7 +2,7 @@
   "app": {
     "appName": "Mail",
     "accessRequiredTitle": "需要访问授权",
-    "accessRequiredBody": "此应用受 Cloudflare Access 保护，但当前部署未启用 Access。请在 Cloudflare 仪表盘中启用它——参见 DEPLOYMENT.md。"
+    "accessRequiredBody": "此应用应受 Cloudflare Access 保护，但目前未启用 Access。请在 Cloudflare 仪表板中启用它 — 参见 deployment.md。"
   },
   "common": {
     "compose": "写邮件",
@@ -161,6 +161,21 @@
     "allowlistRemove": "移除",
     "allowlistInvalid": "请输入有效的邮箱地址或域名（例如 name{'@'}example.com 或 example.com）。",
     "allowlistEmpty": "还没有受信任的发件人。添加之前图片将保持阻止。"
+  },
+  "access": {
+    "title": "访问安全",
+    "badgeEnabled": "已验证",
+    "badgeBasic": "基础检查",
+    "hintEnabled": "每个请求都确认来自你的 Cloudflare Access 登录。",
+    "hintBasic": "Access 确认你已登录，但不会逐个检查请求。查看部署指南以启用更强的检查。",
+    "aud": "应用",
+    "sessionTitle": "会话详情",
+    "sessionNone": "此预览中无可用的登录详情。",
+    "email": "邮箱",
+    "groups": "用户组",
+    "country": "国家/地区",
+    "ip": "IP 地址",
+    "expires": "过期时间"
   },
   "notifications": {
     "title": "通知",

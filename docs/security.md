@@ -48,6 +48,7 @@ The system's security is layered: Cloudflare protects the edge (including who ca
 - The Worker is protected by worker-level Cloudflare Access (policy: account members only). Access authenticates at the edge before the Worker runs; requests that fail Access never reach the Worker.
 - The Worker performs no authentication of its own — no sessions, no app cookies, no per-user identity. (Behind Workers Static Assets, `ctx.access` is not forwarded to the user Worker, so there is no Access identity to read.) As a fail-safe it refuses API requests that carry no Access evidence (a 403, code `access_required`), accepting requests only when the runtime `access` object is present or the `Cf-Access-Jwt-Assertion` header is set.
 - The app has no per-user model: Cloudflare Access decides who can reach it.
+- **Optional (opt-in) JWT verification**: when the `ACCESS_JWKS` and `ACCESS_AUD` secrets are set, the Worker additionally verifies each request's `Cf-Access-Jwt-Assertion` JWT (signature, issuer, audience) against the account's Access signing keys (`server/access.ts`). Verified identity claims are exposed at `GET /api/access` and shown under Settings → Access security. Leave the secrets unset to keep only the header-presence fail-safe.
 
 ## 4. Email credentials
 

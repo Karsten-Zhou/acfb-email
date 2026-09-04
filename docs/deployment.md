@@ -50,6 +50,23 @@ Now that the Worker is deployed, protect it in the Cloudflare dashboard.
    - **Scope**: All traffic
    - **Authentication policy**: **Cloudflare account** — only members of this account can reach this worker.
 
+#### Verify Access JWTs (optional)
+
+![cf-access-guide](./assets/images/cf-access-guide.jpg)
+
+By default the Worker only checks that a request came through Access (header present). To also verify each request's Access **JWT** (signature, team domain, application audience), set two secrets:
+
+1. Go to **Workers & Pages** → select your Worker → **Access** tab.
+2. Find **AUG tag** and **JWKS** on the right.
+3. Copy and upload them:
+
+```bash
+npx wrangler secret put ACCESS_JWKS
+npx wrangler secret put ACCESS_AUD
+```
+
+Once both are set, the Settings → **Access security** panel shows the verified session info (email, groups, IP, expiry) that Cloudflare Access asserted. Leave them unset to keep the simple header check.
+
 ## 5. Configure OAuth providers (Optional)
 
 _Skip this step if you don't plan to use Gmail or Outlook._

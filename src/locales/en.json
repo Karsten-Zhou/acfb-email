@@ -2,7 +2,7 @@
   "app": {
     "appName": "Mail",
     "accessRequiredTitle": "Access required",
-    "accessRequiredBody": "This app is protected by Cloudflare Access, but Access isn't enabled for this deployment. Enable it in the Cloudflare dashboard — see DEPLOYMENT.md."
+    "accessRequiredBody": "This app should be protected by Cloudflare Access, but Access isn't enabled for now. Enable it in the Cloudflare dashboard — see deployment.md."
   },
   "common": {
     "compose": "Compose",
@@ -161,6 +161,21 @@
     "allowlistRemove": "Remove",
     "allowlistInvalid": "Enter a valid email address or domain (e.g. name{'@'}example.com or example.com).",
     "allowlistEmpty": "No trusted senders yet. Images stay blocked until you add one."
+  },
+  "access": {
+    "title": "Access security",
+    "badgeEnabled": "Verified",
+    "badgeBasic": "Basic check",
+    "hintEnabled": "Every request is confirmed to come from your Cloudflare Access sign-in.",
+    "hintBasic": "Access confirms you're signed in, but requests aren't individually checked. See the deployment guide to enable stronger checks.",
+    "aud": "Application",
+    "sessionTitle": "Session details",
+    "sessionNone": "No sign-in details available in this preview.",
+    "email": "Email",
+    "groups": "Groups",
+    "country": "Country",
+    "ip": "IP address",
+    "expires": "Expires"
   },
   "notifications": {
     "title": "Notifications",
