@@ -1,6 +1,7 @@
 // Worker entrypoint: Hono app mounted on /api, with SPA fallback handled by
 // Workers Assets (wrangler config: not_found_handling = single-page-application).
 
+import process from "node:process";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { syncAccount, syncMailbox } from "./sync/sync-service";
@@ -32,8 +33,9 @@ type AppEnv = {
 const app = new Hono<AppEnv>();
 
 // ----- global middleware -----
-// Request logger with wall-clock timestamps (for debugging sync/poll timings).
+// Request logger (dev only).
 app.use("*", async (c, next) => {
+  if (process.env.NODE_ENV === "production") return next();
   const started = Date.now();
   await next();
   const ms = Date.now() - started;
