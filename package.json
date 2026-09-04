@@ -12,6 +12,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "postinstall": "patch-package",
     "typecheck": "run-p -c typecheck:app typecheck:server typecheck:node typecheck:e2e",
     "typecheck:app": "vue-tsc --build --force tsconfig.app.json",
     "typecheck:server": "tsc --build --force tsconfig.server.json",
@@ -82,6 +83,7 @@
     "globals": "^17.11.0",
     "lefthook": "^2.1.12",
     "npm-run-all2": "^9.0.3",
+    "patch-package": "^8.0.1",
     "prettier": "^3.9.6",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.68.0",
@@ -90,9 +92,6 @@
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11",
     "wrangler": "^4.127.1"
-  },
-  "patchedDependencies": {
-    "imapflow@1.7.8": "patches/imapflow@1.7.8.patch"
   },
   "commit-and-tag-version": {
     "scripts": {
