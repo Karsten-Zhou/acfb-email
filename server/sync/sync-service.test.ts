@@ -285,15 +285,44 @@ describe("applyProviderMessages", () => {
 });
 
 describe("claimAccountSync", () => {
-  it("claims a non-running account, then discards a second claim", async () => {
-    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
-    // A sync is already in flight → a duplicate enqueue/claim is discarded.
-    expect(await claimAccountSync(env, ACCOUNT)).toBe(false);
+  const BUDGET = 480_000;
+
+  it("acquires a fresh lease; a second claim is discarded while it is live", async () => {
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("acquired");
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("running");
   });
 
-  it("releases the claim when the sync settles", async () => {
-    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
+  it("releases the lease when the sync settles", async () => {
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("acquired");
     await markAccountSyncSucceeded(env, ACCOUNT);
-    expect(await claimAccountSync(env, ACCOUNT)).toBe(true);
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("acquired");
+  });
+
+  it("stamps syncing_since so an expired lease can be detected", async () => {
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("acquired");
+    const row = await env.DB.prepare(`SELECT state, syncing_since FROM accounts WHERE id = ?`)
+      .bind(ACCOUNT)
+      .first<{ state: string; syncing_since: string | null }>();
+    expect(row?.state).toBe("running");
+    expect(row?.syncing_since).not.toBeNull();
+  });
+
+  it("starts when 'running' is only display and no lease exists yet", async () => {
+    // Enqueue shows 'running' before the job starts; the job must still acquire.
+    await env.DB.prepare(`UPDATE accounts SET state = 'running', syncing_since = NULL WHERE id = ?`)
+      .bind(ACCOUNT)
+      .run();
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("acquired");
+  });
+
+  it("reclaims an expired lease as 'stale' (crashed run never settled)", async () => {
+    await env.DB.prepare(`UPDATE accounts SET state = 'running', syncing_since = ? WHERE id = ?`)
+      .bind("2020-01-01T00:00:00.000Z", ACCOUNT)
+      .run();
+    expect(await claimAccountSync(env, ACCOUNT, BUDGET)).toBe("stale");
+    const row = await env.DB.prepare(`SELECT syncing_since FROM accounts WHERE id = ?`)
+      .bind(ACCOUNT)
+      .first<{ syncing_since: string | null }>();
+    expect(row?.syncing_since).not.toBe("2020-01-01T00:00:00.000Z");
   });
 });

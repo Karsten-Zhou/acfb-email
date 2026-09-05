@@ -107,7 +107,7 @@ app_settings(id PK, data JSON)   -- singleton
 
 **Sync is enqueued, not inline**: every trigger (account add / OAuth connect, manual "Sync now", the 5-minute cron, the browser auto-check) pushes a job to the `email-sync` Queue; the `queue()` consumer runs it with 15-min wall-time (vs `waitUntil`'s 30 s).
 
-**One sync per account**: enqueueing claims the account atomically (`claimAccountSync`), so a sync already queued/running discards new ones, and settling releases it. Enqueue helpers skip `auth_required` / `invalid_config` / `paused` accounts.
+**One sync per account**: a job takes a time-expiring lease (`claimAccountSync`) on start — duplicates are dropped and a crashed job can't strand the account (the lease expires; the next run reclaims it and logs). Enqueue is a plain send, skipping only accounts awaiting user action.
 
 **Check vs full**: a job carries a `mode`. "full" syncs every mailbox + reconciles (add/connect, manual Sync now, send/draft refreshes). "check" is fast new-mail (inbox-only), used by the cron and the browser auto-check. The SPA polls `/api/accounts/states` (1 s while syncing, 60 s idle) and refreshes the lists when a sync settles — whichever trigger started it.
 

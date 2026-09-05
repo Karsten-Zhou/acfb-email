@@ -28,7 +28,6 @@ import {
   markAccountSyncFailed,
   markAccountSyncSucceeded,
   markMailboxSyncFailed,
-  setAccountState,
   setSyncState,
   syncCursorUpsert,
   unseenForBox,
@@ -43,45 +42,41 @@ export interface SyncResult {
   messagesSeen: number;
   /** True when the sync was stopped by its time budget before finishing. */
   timedOut?: boolean;
+  /** True when the job was dropped: another sync holds a live lease. */
+  discarded?: boolean;
 }
 
-/** States that allow a new sync to be enqueued. */
-function isRunnable(state: string): boolean {
-  return (
-    state !== "running" &&
-    state !== "paused" &&
-    state !== "auth_required" &&
-    state !== "invalid_config"
-  );
+/** States that need user action and shouldn't be auto-enqueued. */
+function needsUserAction(state: string): boolean {
+  return state === "paused" || state === "auth_required" || state === "invalid_config";
 }
 
-/** Enqueue a sync for one account — the per-account claim point (a second
- *  enqueue while one is queued/syncing is discarded). `force` skips the state
- *  gate, e.g. an OAuth reconnect of an auth_required account. */
+/** Enqueue a sync. `state='running'` is set here as display (the job may not
+ *  start instantly) and reverted if the send fails; the lease acquired at job
+ *  start is the real concurrency guard. `force` skips the user-action gate. */
 export async function enqueueSync(
   env: Env,
   accountId: string,
   mode: SyncMode,
   opts: { force?: boolean } = {},
 ): Promise<{ enqueued: boolean }> {
-  const row = await env.DB.prepare(`SELECT state FROM accounts WHERE id = ?`)
+  const row = await env.DB.prepare(`SELECT state, state_message FROM accounts WHERE id = ?`)
     .bind(accountId)
-    .first<{ state: string }>();
+    .first<{ state: string | null; state_message: string | null }>();
   if (!row) return { enqueued: false };
-  if (row.state === "running") return { enqueued: false }; // already queued/syncing
-  if (!opts.force && !isRunnable(row.state)) return { enqueued: false };
+  if (!opts.force && needsUserAction(row.state ?? "")) return { enqueued: false };
 
-  // Claim the slot: only the caller that flips the account to 'running' sends.
-  const claimed = await claimAccountSync(env, accountId);
-  if (!claimed) return { enqueued: false };
+  await env.DB.prepare(`UPDATE accounts SET state = 'running', state_message = NULL WHERE id = ?`)
+    .bind(accountId)
+    .run();
   try {
     await env.SYNC_QUEUE.send({ accountId, mode });
     return { enqueued: true };
   } catch (err) {
-    // Release the slot so the account isn't stuck as syncing.
-    await env.DB.prepare(`UPDATE accounts SET state = ? WHERE id = ?`)
-      .bind(row.state, accountId)
+    await env.DB.prepare(`UPDATE accounts SET state = ?, state_message = ? WHERE id = ?`)
+      .bind(row.state, row.state_message, accountId)
       .run();
+    console.error("[sync-queue] send failed for account", accountId, err);
     throw err;
   }
 }
@@ -101,12 +96,8 @@ export interface MailboxSyncResult {
   seen: number;
 }
 
-/**
- * Discover an account's mailboxes and sync each one. Runs within a hard time
- * budget enforced by cooperative cancellation: the loop checks an AbortSignal
- * between provider round-trips, so a hung provider socket is cut off rather
- * than blocking the queue consumer indefinitely.
- */
+/** Sync an account under the lease; always settles state in `finally`, so an
+ *  account is never left stuck 'running'. */
 export async function syncAccount(
   env: Env,
   accountId: string,
@@ -115,18 +106,23 @@ export async function syncAccount(
   const account = await getAccount(env, accountId);
   if (!account) throw new Error("Account not found");
 
-  // Set at enqueue; keep it asserted while the job runs (covers direct callers).
-  await setAccountState(env, accountId, "running", null);
+  const timeBudgetMs = parseInt(env.SYNC_TIMEOUT_MS ?? "", 10) || 480_000;
+  const claim = await claimAccountSync(env, accountId, timeBudgetMs);
+  if (claim === "running") return { mailboxesSynced: 0, messagesSeen: 0, discarded: true };
+  if (claim === "stale") {
+    console.warn(
+      `[sync] reclaimed an expired sync lease for account ${accountId} — a previous run never settled`,
+    );
+  }
 
   const mode = opts.mode ?? "full";
-
   const controller = new AbortController();
-  const timeBudgetMs = parseInt(env.SYNC_TIMEOUT_MS ?? "", 10) || 480_000;
   const timer = setTimeout(() => controller.abort(), timeBudgetMs);
 
   let mailboxesSynced = 0;
   let messagesSeen = 0;
-  let firstError: string | null = null;
+  let timedOut = false;
+  let failure: { message: string; err?: unknown } | null = null;
 
   try {
     const credential = await getCredential(env, accountId);
@@ -137,6 +133,7 @@ export async function syncAccount(
     );
 
     const mailboxes = await provider.listMailboxes();
+    let firstError: string | null = null;
     for (const mb of mailboxes) {
       if (controller.signal.aborted) throw new AbortError();
       const mailbox = await upsertMailbox(env, accountId, mb);
@@ -153,26 +150,25 @@ export async function syncAccount(
         firstError ??= classifyError(err);
       }
     }
-
-    if (firstError) await markAccountSyncFailed(env, accountId, firstError);
-    else await markAccountSyncSucceeded(env, accountId);
+    if (firstError) throw new Error(firstError);
 
     await env.DB.prepare(`UPDATE accounts SET last_synced_at = ? WHERE id = ?`)
       .bind(new Date().toISOString(), accountId)
       .run();
-
     return { mailboxesSynced, messagesSeen };
   } catch (err) {
-    if (err instanceof AbortError) {
-      // Time budget exhausted: surface the partial result instead of leaving
-      // the account stuck in a transient state; the queue retries.
-      await markAccountSyncFailed(env, accountId, "errTimeout");
-      return { mailboxesSynced, messagesSeen, timedOut: true };
-    }
-    const message = classifyError(err);
-    await markAccountSyncFailed(env, accountId, message);
-    throw err;
+    if (err instanceof AbortError) timedOut = true;
+    else failure = { message: classifyError(err), err };
+    return { mailboxesSynced, messagesSeen, timedOut: timedOut || undefined };
   } finally {
+    if (timedOut) {
+      await markAccountSyncFailed(env, accountId, "errTimeout");
+    } else if (failure) {
+      console.error(`[sync] account failed account=${accountId} mode=${mode}`, failure.err);
+      await markAccountSyncFailed(env, accountId, failure.message);
+    } else {
+      await markAccountSyncSucceeded(env, accountId);
+    }
     clearTimeout(timer);
   }
 }

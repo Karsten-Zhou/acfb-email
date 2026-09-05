@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   -- state machine
   state          TEXT NOT NULL DEFAULT 'healthy',             -- see ACCOUNT_STATES
   state_message  TEXT,                                        -- human reason
+  syncing_since  TEXT,                                        -- lease start of the running sync (expiry)
   sync_enabled   INTEGER NOT NULL DEFAULT 1,
 
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),

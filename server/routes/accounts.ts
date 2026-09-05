@@ -174,7 +174,7 @@ accountRoutes.post("/", async (c) => {
     name: input.name,
     email: input.email,
     displayName: input.displayName || null,
-    state: "healthy",
+    state: "running",
     stateMessage: null,
     createdAt: now,
     lastSyncedAt: null,

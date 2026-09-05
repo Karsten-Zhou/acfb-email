@@ -78,17 +78,6 @@ export async function getSyncCursor(
 // account / mailbox state
 // ---------------------------------------------------------------------------
 
-export async function setAccountState(
-  env: Env,
-  accountId: string,
-  state: string,
-  message: string | null,
-): Promise<void> {
-  await env.DB.prepare(`UPDATE accounts SET state = ?, state_message = ? WHERE id = ?`)
-    .bind(state, message, accountId)
-    .run();
-}
-
 /** Enabled accounts (and their state) that an automatic sync may consider. */
 export async function listEnabledAccounts(env: Env): Promise<{ id: string; state: string }[]> {
   const { results } = await env.DB.prepare(
@@ -97,24 +86,44 @@ export async function listEnabledAccounts(env: Env): Promise<{ id: string; state
   return results;
 }
 
-/** Atomically mark an account as syncing; false when it already is. */
-export async function claimAccountSync(env: Env, accountId: string): Promise<boolean> {
+/** Acquire the per-account lease (expires after `budgetMs`, so a crashed job
+ *  can't lock forever): "acquired" | "running" (discard) | "stale" (took over
+ *  an expired lease — surface loudly). The lease is `syncing_since` only;
+ *  `state='running'` is display, never the lock. */
+export async function claimAccountSync(
+  env: Env,
+  accountId: string,
+  budgetMs: number,
+): Promise<"acquired" | "running" | "stale"> {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const cutoff = new Date(now - budgetMs).toISOString();
+  const since =
+    (
+      await env.DB.prepare(`SELECT syncing_since FROM accounts WHERE id = ?`)
+        .bind(accountId)
+        .first<{ syncing_since: string | null }>()
+    )?.syncing_since ?? null;
+
+  if (since !== null && since >= cutoff) return "running"; // live lease held elsewhere
+  const stale = since !== null; // started but never settled
+
   const r = await env.DB.prepare(
-    `UPDATE accounts SET state = 'running', state_message = NULL
-     WHERE id = ? AND COALESCE(state, '') != 'running'`,
+    `UPDATE accounts SET state = 'running', syncing_since = ?
+     WHERE id = ? AND (syncing_since IS NULL OR syncing_since < ?)`,
   )
-    .bind(accountId)
+    .bind(nowIso, accountId, cutoff)
     .run();
-  return (r.meta.changes ?? 0) > 0;
+  if ((r.meta.changes ?? 0) === 0) return "running"; // lost a race to a fresh lease
+  return stale ? "stale" : "acquired";
 }
 
-/** Settle an account as healthy only when no sibling mailbox is in error. */
+/** Settle a successful sync: healthy, lease released. */
 export async function markAccountSyncSucceeded(env: Env, accountId: string): Promise<void> {
   await env.DB.prepare(
-    `UPDATE accounts SET state = 'healthy', state_message = NULL WHERE id = ?
-     AND NOT EXISTS (SELECT 1 FROM sync_state WHERE account_id = ? AND state = 'error')`,
+    `UPDATE accounts SET state = 'healthy', state_message = NULL, syncing_since = NULL WHERE id = ?`,
   )
-    .bind(accountId, accountId)
+    .bind(accountId)
     .run();
 }
 
@@ -124,7 +133,9 @@ export async function markAccountSyncFailed(
   accountId: string,
   message: string,
 ): Promise<void> {
-  await env.DB.prepare(`UPDATE accounts SET state = 'unavailable', state_message = ? WHERE id = ?`)
+  await env.DB.prepare(
+    `UPDATE accounts SET state = 'unavailable', state_message = ?, syncing_since = NULL WHERE id = ?`,
+  )
     .bind(message, accountId)
     .run();
 }
