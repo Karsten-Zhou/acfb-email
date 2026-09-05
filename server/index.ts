@@ -30,12 +30,21 @@ type AppEnv = {
   Variables: { accessSession?: AccessSession };
 };
 
+/** Verbose logs in dev, or in prod when PRODUCTION_DEBUG is "true". */
+function isDebug(env: Env): boolean {
+  return process.env.NODE_ENV !== "production" || String(env.PRODUCTION_DEBUG) === "true";
+}
+
+function debugLog(env: Env, ...args: unknown[]): void {
+  if (isDebug(env)) console.log("[debug]", ...args);
+}
+
 const app = new Hono<AppEnv>();
 
 // ----- global middleware -----
-// Request logger (dev only).
+// Request logger (dev, or production when PRODUCTION_DEBUG is enabled).
 app.use("*", async (c, next) => {
-  if (process.env.NODE_ENV === "production") return next();
+  if (!isDebug(c.env)) return next();
   const started = Date.now();
   await next();
   const ms = Date.now() - started;
@@ -131,12 +140,21 @@ app.onError((err, c) => {
 async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     const { accountId, mailboxId, mode } = msg.body;
+    const t0 = Date.now();
     try {
       if (mailboxId) {
         await syncMailbox(env, accountId, mailboxId);
         await markAccountSyncSucceeded(env, accountId);
+        debugLog(
+          env,
+          `queue mailbox done acct=${accountId} mailbox=${mailboxId} ms=${Date.now() - t0}`,
+        );
       } else {
-        await syncAccount(env, accountId, { mode });
+        const r = await syncAccount(env, accountId, { mode });
+        debugLog(
+          env,
+          `queue done acct=${accountId} mode=${mode} ms=${Date.now() - t0} boxes=${r.mailboxesSynced} seen=${r.messagesSeen}${r.timedOut ? " timedOut" : ""}`,
+        );
       }
     } catch (err) {
       console.error("[queue] sync failed for account", accountId, mailboxId ?? "", err);
@@ -144,13 +162,13 @@ async function handleQueue(batch: MessageBatch<SyncMessage>, env: Env): Promise<
   }
 }
 
-// Cron: enqueue an inbox check for every enabled account that isn't already
-// syncing (or waiting on user action). Syncs run in the queue consumer.
+// Cron: enqueue an inbox check per enabled account (the lease drops dups).
 async function handleScheduled(_controller: ScheduledController, env: Env): Promise<void> {
   try {
-    await enqueueEligibleSyncs(env, "check");
+    const enqueued = await enqueueEligibleSyncs(env, "check");
+    debugLog(env, `cron enqueued checks=${enqueued.length}`);
   } catch (err) {
-    console.error("[cron] enqueue checks failed", err);
+    console.error("[cron] check run failed", err);
   }
 }
 

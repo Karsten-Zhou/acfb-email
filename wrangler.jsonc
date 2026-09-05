@@ -40,6 +40,7 @@
   "vars": {
     "SYNC_FETCH_LIMIT": "100",
     "SYNC_TIMEOUT_MS": "480000",
+    "PRODUCTION_DEBUG": "false",
   },
   "access": {
     // Local dev: simulates a signed-in user via ctx.access so the API gate
