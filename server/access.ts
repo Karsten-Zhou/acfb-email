@@ -2,18 +2,9 @@
 // ACCESS_AUD secrets are set, verify each Cf-Access-Jwt-Assertion header
 // (signature, issuer, audience) against the account's Access signing keys.
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import type { AccessSession } from "@shared/access";
 
-/** Identity claims Cloudflare Access asserted about the current user/session. */
-export interface AccessSession {
-  email?: string;
-  name?: string;
-  groups?: string[];
-  ip?: string;
-  geo?: string;
-  aud?: string;
-  iss?: string;
-  exp?: number;
-}
+export type { AccessSession };
 
 /** Whether upgraded Access verification is enabled (both secrets present). */
 export function isAccessVerificationEnabled(env: Env): boolean {
@@ -54,10 +45,9 @@ export function mapAccessClaims(payload: JWTPayload): AccessSession {
   const aud = payload.aud;
   return {
     email: str(payload.email),
-    name: str(payload.name),
     groups: strs(payload.groups),
-    ip: str(payload.ip),
-    geo: str(payload.geo),
+    country: str(payload.country),
+    sub: str(payload.sub),
     aud: typeof aud === "string" ? aud : strs(aud)?.[0],
     iss: str(payload.iss),
     exp: typeof payload.exp === "number" ? payload.exp : undefined,

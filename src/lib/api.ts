@@ -5,12 +5,15 @@ import type {
   AccountDetail,
   AccountSummary,
   AddAccountInput,
+  DraftInput,
   Mailbox,
   Message,
   MessageDetail,
   PushSubscriptionInput,
   SendMessageInput,
 } from "@shared/types";
+import type { AccessInfoPayload } from "@shared/access";
+import type { HealthPayload, PushCapability } from "@shared/api";
 
 export class ApiError extends Error {
   constructor(
@@ -195,53 +198,3 @@ export const api = {
   saveSettings: (settings: Record<string, unknown>) =>
     request<{ ok: boolean }>("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };
-
-export interface DraftInput {
-  accountId: string;
-  to?: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject?: string;
-  html?: string;
-  text?: string;
-}
-
-export interface HealthPayload {
-  ok: boolean;
-  config: {
-    gmailOauth: boolean;
-    outlookOauth: boolean;
-  };
-}
-
-export interface PushSubscriptionSummary {
-  id: string;
-  endpoint: string;
-  enabled: number;
-  created_at: string;
-}
-
-export interface PushCapability {
-  configured: boolean;
-  publicKey: string | null;
-  subscriptions: PushSubscriptionSummary[];
-}
-
-/** Identity claims Cloudflare Access asserted about the current session. */
-export interface AccessSessionInfo {
-  email?: string;
-  name?: string;
-  groups?: string[];
-  ip?: string;
-  geo?: string;
-  aud?: string;
-  iss?: string;
-  exp?: number;
-}
-
-/** /api/access payload: whether JWT verification is on, plus current session. */
-export interface AccessInfoPayload {
-  enabled: boolean;
-  aud: string | null;
-  session: AccessSessionInfo | null;
-}

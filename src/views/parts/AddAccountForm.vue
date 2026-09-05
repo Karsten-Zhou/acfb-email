@@ -4,7 +4,7 @@
 // UI. Visibility is driven by the `open` prop (the parent's "add account"
 // button).
 import { useAddAccountForm } from "../../composables/useAddAccountForm";
-import type { HealthPayload } from "../../lib/api";
+import type { HealthPayload } from "@shared/api";
 import { t } from "../../lib/i18n";
 import UiButton from "../../components/UiButton.vue";
 import UiInput from "../../components/UiInput.vue";

@@ -2,7 +2,8 @@
 // Access security status and, when enabled, the identity Cloudflare Access
 // asserted for this request.
 import { onMounted, ref } from "vue";
-import { api, type AccessInfoPayload } from "../../lib/api";
+import { api } from "../../lib/api";
+import type { AccessInfoPayload } from "@shared/access";
 import { t, formatDateTime } from "../../lib/i18n";
 import { ShieldCheck, ShieldAlert } from "@lucide/vue";
 
@@ -76,13 +77,9 @@ const expiresLabel = () => {
               {{ (session()?.groups ?? []).join(", ") }}
             </dd>
           </div>
-          <div v-if="session()?.geo" class="flex justify-between">
+          <div v-if="session()?.country" class="flex justify-between">
             <dt class="text-muted-foreground">{{ t("access.country") }}</dt>
-            <dd class="font-medium">{{ session()?.geo }}</dd>
-          </div>
-          <div v-if="session()?.ip" class="flex justify-between">
-            <dt class="text-muted-foreground">{{ t("access.ip") }}</dt>
-            <dd class="font-medium">{{ session()?.ip }}</dd>
+            <dd class="font-medium">{{ session()?.country }}</dd>
           </div>
           <div v-if="expiresLabel()" class="flex justify-between">
             <dt class="text-muted-foreground">{{ t("access.expires") }}</dt>

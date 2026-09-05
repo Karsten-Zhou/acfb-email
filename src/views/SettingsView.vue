@@ -6,7 +6,8 @@
 //   AboutPanel.
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { api, type HealthPayload } from "../lib/api";
+import { api } from "../lib/api";
+import type { HealthPayload } from "@shared/api";
 import { t } from "../lib/i18n";
 import UiButton from "../components/UiButton.vue";
 import UiToolTip from "../components/UiToolTip.vue";

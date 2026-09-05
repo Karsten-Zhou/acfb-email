@@ -26,18 +26,17 @@ describe("mapAccessClaims", () => {
     const p: JWTPayload = {
       email: "me@example.com",
       groups: ["everyone", "admins"],
-      geo: "US",
-      ip: "1.2.3.4",
+      country: "US",
+      sub: "7335d417-61da-459d-899c-0a01c76a2f94",
       exp: 1_700_000_000,
       aud: "aud-tag",
       iss: "https://t.cloudflareaccess.com",
     };
     expect(mapAccessClaims(p)).toEqual({
       email: "me@example.com",
-      name: undefined,
       groups: ["everyone", "admins"],
-      geo: "US",
-      ip: "1.2.3.4",
+      country: "US",
+      sub: "7335d417-61da-459d-899c-0a01c76a2f94",
       aud: "aud-tag",
       iss: "https://t.cloudflareaccess.com",
       exp: 1_700_000_000,

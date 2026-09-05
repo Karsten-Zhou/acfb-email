@@ -15,3 +15,4 @@ export type AddAccountInput = z.infer<typeof S.AddAccountInputSchema>;
 export type SendMessageInput = z.infer<typeof S.SendMessageInputSchema>;
 export type SendAttachment = z.infer<typeof S.SendAttachmentSchema>;
 export type PushSubscriptionInput = z.infer<typeof S.PushSubscriptionSchema>;
+export type DraftInput = z.infer<typeof S.DraftInputSchema>;

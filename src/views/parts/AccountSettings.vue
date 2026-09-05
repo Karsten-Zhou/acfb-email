@@ -7,7 +7,7 @@
 // save share one state.
 import { ref } from "vue";
 import { useEditAccount } from "../../composables/useEditAccount";
-import type { HealthPayload } from "../../lib/api";
+import type { HealthPayload } from "@shared/api";
 import { t } from "../../lib/i18n";
 import UiButton from "../../components/UiButton.vue";
 import AddAccountForm from "./AddAccountForm.vue";
